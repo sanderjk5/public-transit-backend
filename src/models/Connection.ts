@@ -1,8 +1,8 @@
 export interface Connection{
-    id: Number,
-    departureStop: Number,
-    arrivalStop: Number,
-    departureTime: Number,
-    arrivalTime: Number,
-    trip: Number
+    id: number,
+    departureStop: number,
+    arrivalStop: number,
+    departureTime: number,
+    arrivalTime: number,
+    trip: number
 }

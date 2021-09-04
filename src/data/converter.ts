@@ -5,7 +5,7 @@ export class Converter {
         timeInSeconds += Number(splittedString[0]) * 3600;
         timeInSeconds += Number(splittedString[1]) * 60;
         timeInSeconds += Number(splittedString[2]);
-        if(timeInSeconds >= 24*3600){
+        while(timeInSeconds >= 24*3600){
             timeInSeconds = timeInSeconds - 24*3600;
         }
         return timeInSeconds;
@@ -14,7 +14,7 @@ export class Converter {
     public static secondsToTime(timeInSeconds: number): string {
         let time = '';
         let calculation = 0;
-        if(timeInSeconds >= 24*3600){
+        while(timeInSeconds >= 24*3600){
             timeInSeconds = timeInSeconds - 24*3600;
         }
         let divider = 3600;

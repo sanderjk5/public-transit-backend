@@ -13,7 +13,8 @@ import { Agency } from '../models/Agency';
 export class Importer {
 
     public static readonly GOOGLE_TRANSIT_FOLDER: string = path.join(__dirname, '../../google_transit');
-
+    private static stopIdMap = new Map<number, number>();
+    private static tripIdMap = new Map<number, number>();
 
     public static importGoogleTransitData(): void {
         console.time('import')
@@ -22,8 +23,8 @@ export class Importer {
         Importer.importCalendarDates();
         Importer.importRoutes();
         Importer.importStops();
-        Importer.importStopTimes();
         Importer.importTrips();
+        Importer.importStopTimes();
         console.timeEnd('import')
         
     }
@@ -141,11 +142,12 @@ export class Importer {
             const lat = currentStopAsArray[2];
             const lon = currentStopAsArray[3];
             const stop: Stop = {
-                id: id,
+                id: importedStops.length,
                 name: name,
                 lat: lat,
                 lon: lon
             }
+            this.stopIdMap.set(id, stop.id);
             importedStops.push(stop);
         }
         GoogleTransitData.STOPS = importedStops;
@@ -166,10 +168,10 @@ export class Importer {
             const pickupType = currentStopTimeAsArray[5];
             const dropOffType = currentStopTimeAsArray[6];
             const stopTime: StopTime = {
-                tripId: tripId,
+                tripId: this.tripIdMap.get(tripId),
                 arrivalTime: Converter.timeToSeconds(arrivalTime),
                 departureTime: Converter.timeToSeconds(departureTime),
-                stopId: stopId,
+                stopId: this.stopIdMap.get(stopId),
                 stopSequence: stopSequence,
                 pickupType: pickupType,
                 dropOffType: dropOffType,
@@ -193,9 +195,10 @@ export class Importer {
             const trip: Trip = {
                 routeId: routeId,
                 serviceId: serviceId,
-                id: id,
+                id: importedTrips.length,
                 directionId: directionId,
             }
+            this.tripIdMap.set(id, trip.id);
             importedTrips.push(trip);
         }
         GoogleTransitData.TRIPS = importedTrips;

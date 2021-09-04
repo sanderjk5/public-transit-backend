@@ -38,8 +38,14 @@ export class Generator {
     }
 
     public static generateTransfers(){
-        let counter = 0;
         for(let i = 0; i < GoogleTransitData.STOPS.length; i++){
+            let transfer: Transfer = {
+                id: GoogleTransitData.TRANSFERS.length,
+                departureStop: GoogleTransitData.STOPS[i].id,
+                arrivalStop: GoogleTransitData.STOPS[i].id,
+                duration: 0
+            }
+            GoogleTransitData.TRANSFERS.push(transfer);
             for(let j = i+1; j < GoogleTransitData.STOPS.length; j++) {
                 if(GoogleTransitData.STOPS[i].name === GoogleTransitData.STOPS[j].name){
                     let transfer: Transfer = {
@@ -56,12 +62,8 @@ export class Generator {
                         duration: 120
                     }
                     GoogleTransitData.TRANSFERS.push(transfer);
-                    if((GoogleTransitData.STOPS[i].lat !== GoogleTransitData.STOPS[j].lat) || (GoogleTransitData.STOPS[i].lon !== GoogleTransitData.STOPS[j].lon)){
-                        counter++;
-                    }
                 }
             }
         }
-        console.log(counter)
     }
 }
