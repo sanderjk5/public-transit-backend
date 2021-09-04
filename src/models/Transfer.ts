@@ -1,6 +1,6 @@
 export interface Transfer {
-    fromStopId: number,
-    toStopId: number,
-    transferType: string,
-    minTransferTime: number
+    id: number,
+    departureStop: number,
+    arrivalStop: number,
+    duration: number
 }

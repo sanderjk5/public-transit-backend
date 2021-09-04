@@ -17,6 +17,7 @@ export class Importer {
 
     public static importGoogleTransitData(): void {
         console.time('import')
+        Importer.importAgency();
         Importer.importCalendar();
         Importer.importCalendarDates();
         Importer.importRoutes();
@@ -111,11 +112,11 @@ export class Importer {
         const routeData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_FOLDER, 'routes.txt'), 'utf-8').toString().split('\n');
         for(let i = 1; i < routeData.length - 1; i++){
             const currentRouteAsArray: string[] = routeData[i].split(',');
-            const id = Number(currentRouteAsArray[5]);
-            const agencyId = Number(currentRouteAsArray[3]);
+            const id = Number(currentRouteAsArray[4]);
+            const agencyId = Number(currentRouteAsArray[2]);
             const shortName = currentRouteAsArray[1];
             const longName = currentRouteAsArray[0];
-            const routeType = Number(currentRouteAsArray[4]);
+            const routeType = Number(currentRouteAsArray[3]);
             const route: Route = {
                 id: id,
                 agencyId: agencyId,

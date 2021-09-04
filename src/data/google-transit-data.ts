@@ -7,6 +7,7 @@ import { Transfer } from "../models/Transfer";
 import { Trip } from "../models/Trip";
 import { Sorter } from "./sorter";
 import { Agency } from "../models/Agency";
+import { Connection } from "../models/Connection";
 
 export class GoogleTransitData {
     public static AGENCIES: Agency[] = [];
@@ -17,6 +18,7 @@ export class GoogleTransitData {
     public static STOPTIMES: StopTime[] = [];
     public static TRANSFERS: Transfer[] = [];
     public static TRIPS: Trip[] = [];
+    public static CONNECTIONS: Connection[] = [];
     
 
     public static getRouteByID(routeID: number): Route{
@@ -85,7 +87,7 @@ export class GoogleTransitData {
     public static getAllTransfersOfAStop(stopID: number){
         let transfers: Transfer[] = [];
         for(let i = 0; i < this.TRANSFERS.length; i++){
-            if(this.TRANSFERS[i].fromStopId === stopID){
+            if(this.TRANSFERS[i].departureStop === stopID){
                 transfers.push(this.TRANSFERS[i]);
             }
         }
