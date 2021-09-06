@@ -23,21 +23,28 @@ export class ConnectionScanController {
         while(true){
             for(let i = firstConnectionId; i < GoogleTransitData.CONNECTIONS.length; i++){
                 let currentConnection = GoogleTransitData.CONNECTIONS[i];
-                if(this.s[targetStop] <= currentConnection.departureTime + dayDifference){
+                let currentConnectionDepartureTime = currentConnection.departureTime + dayDifference;
+                let currentConnectionArrivalTime = currentConnection.arrivalTime + dayDifference;
+                if(currentConnectionArrivalTime < currentConnectionDepartureTime) {
+                    currentConnectionArrivalTime += (24 * 3600);
+                }
+                if(this.s[targetStop] <= currentConnectionDepartureTime){
                     break;
                 }
-                if(this.t[currentConnection.trip] !== null || this.s[currentConnection.departureStop] <= currentConnection.departureTime + dayDifference){
+                if(this.t[currentConnection.trip] !== null || this.s[currentConnection.departureStop] <= currentConnectionDepartureTime){
                     if(this.t[currentConnection.trip] === null){
                         this.t[currentConnection.trip] = currentConnection.id;
                     }
-                    let transfers: Transfer[] = GoogleTransitData.getAllTransfersOfAStop(currentConnection.arrivalStop);
-                    for(let i = 0; i < transfers.length; i++){
-                        if(currentConnection.arrivalTime + transfers[i].duration + dayDifference < this.s[transfers[i].arrivalStop]){
-                            this.s[transfers[i].arrivalStop] = currentConnection.arrivalTime + transfers[i].duration + dayDifference;
-                            this.j[transfers[i].arrivalStop] = {
-                                enterConnection: this.t[currentConnection.trip],
-                                exitConnection: currentConnection.id,
-                                transfer: transfers[i].id
+                    if(currentConnectionArrivalTime < this.s[currentConnection.arrivalStop]){
+                        let transfers: Transfer[] = GoogleTransitData.getAllTransfersOfAStop(currentConnection.arrivalStop);
+                        for(let i = 0; i < transfers.length; i++){
+                            if(currentConnectionArrivalTime + transfers[i].duration < this.s[transfers[i].arrivalStop]){
+                                this.s[transfers[i].arrivalStop] = currentConnectionArrivalTime + transfers[i].duration;
+                                this.j[transfers[i].arrivalStop] = {
+                                    enterConnection: this.t[currentConnection.trip],
+                                    exitConnection: currentConnection.id,
+                                    transfer: transfers[i].id
+                                }
                             }
                         }
                     }
@@ -50,7 +57,7 @@ export class ConnectionScanController {
             firstConnectionId = 0;
         }
         
-        this.getJourney(sourceStop, targetStop);
+        this.getJourney(targetStop);
         console.timeEnd('connection scan algorithm')
         console.log(this.s[targetStop]);
         console.log(Converter.secondsToTime(this.s[targetStop]));
@@ -82,7 +89,7 @@ export class ConnectionScanController {
         }
     }
 
-    private static getJourney(sourceStop: number, targetStop: number){
+    private static getJourney(targetStop: number){
         let transfers: Transfer[] = [];
         let stops: Stop[] = [];
 
