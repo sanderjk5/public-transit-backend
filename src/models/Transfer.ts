@@ -1,6 +1,7 @@
+import { Stop } from "./Stop";
+
 export interface Transfer {
-    id: number,
-    departureStop: number,
-    arrivalStop: number,
+    departureStop: Stop,
+    arrivalStop: Stop,
     duration: number
 }

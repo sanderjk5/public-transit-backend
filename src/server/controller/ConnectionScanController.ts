@@ -2,12 +2,15 @@ import { Converter } from "../../data/converter";
 import { GoogleTransitData } from "../../data/google-transit-data";
 import { Searcher } from "../../data/searcher";
 import { Stop } from "../../models/Stop";
+import { Footpath } from "../../models/Footpath";
+import { Journey } from "../../models/Journey";
+import { Leg } from "../../models/Leg";
 import { Transfer } from "../../models/Transfer";
 
 interface JourneyPointer {
     enterConnection?: number,
     exitConnection?: number,
-    transfer?: number
+    footpath?: number
 }
 
 export class ConnectionScanController {
@@ -15,9 +18,18 @@ export class ConnectionScanController {
     private static t: number[];
     private static j: JourneyPointer[];
 
-    public static connectionScanAlgorithm(sourceStop: number, targetStop: number, sourceTime: number){
+    public static connectionScanAlgorithm(sourceStopName: string, targetStopName: string, sourceTime: number):Journey{
+        const sourceStops = GoogleTransitData.getStopIdsByName(sourceStopName);
+        const targetStops = GoogleTransitData.getStopIdsByName(targetStopName);
+        const journey = this.performAlgorithm(sourceStops, targetStops, sourceTime);
+        return journey;
+    }
+
+    public static performAlgorithm(sourceStops: number[], targetStops: number[], sourceTime: number): Journey{
         console.time('connection scan algorithm')
-        this.init(sourceStop, sourceTime);
+        let targetStop: number = null;
+        let reachedTargetStop = false;
+        this.init(sourceStops, sourceTime);
         let firstConnectionId = Searcher.binarySearchOfConnections(sourceTime);
         let dayDifference = 0;
         while(true){
@@ -28,42 +40,55 @@ export class ConnectionScanController {
                 if(currentConnectionArrivalTime < currentConnectionDepartureTime) {
                     currentConnectionArrivalTime += (24 * 3600);
                 }
-                if(this.s[targetStop] <= currentConnectionDepartureTime){
+                for(let j = 0; j < targetStops.length; j++){
+                    if(this.s[targetStops[j]] <= currentConnectionDepartureTime){
+                        reachedTargetStop = true;
+                        break;
+                    }
+                }
+                if(reachedTargetStop){
                     break;
                 }
+                
                 if(this.t[currentConnection.trip] !== null || this.s[currentConnection.departureStop] <= currentConnectionDepartureTime){
                     if(this.t[currentConnection.trip] === null){
                         this.t[currentConnection.trip] = currentConnection.id;
                     }
                     if(currentConnectionArrivalTime < this.s[currentConnection.arrivalStop]){
-                        let transfers: Transfer[] = GoogleTransitData.getAllTransfersOfAStop(currentConnection.arrivalStop);
-                        for(let i = 0; i < transfers.length; i++){
-                            if(currentConnectionArrivalTime + transfers[i].duration < this.s[transfers[i].arrivalStop]){
-                                this.s[transfers[i].arrivalStop] = currentConnectionArrivalTime + transfers[i].duration;
-                                this.j[transfers[i].arrivalStop] = {
+                        let footpaths: Footpath[] = GoogleTransitData.getAllFootpathsOfAStop(currentConnection.arrivalStop);
+                        for(let i = 0; i < footpaths.length; i++){
+                            if(currentConnectionArrivalTime + footpaths[i].duration < this.s[footpaths[i].arrivalStop]){
+                                this.s[footpaths[i].arrivalStop] = currentConnectionArrivalTime + footpaths[i].duration;
+                                this.j[footpaths[i].arrivalStop] = {
                                     enterConnection: this.t[currentConnection.trip],
                                     exitConnection: currentConnection.id,
-                                    transfer: transfers[i].id
+                                    footpath: footpaths[i].id
                                 }
                             }
                         }
                     }
                 }
             }
-            if(this.s[targetStop] !== Number.MAX_VALUE){
+            if(reachedTargetStop){
                 break;
             }
             dayDifference += 24 * 3600;
             firstConnectionId = 0;
         }
         
-        this.getJourney(targetStop);
+        targetStop = targetStops[0];
+        for(let j = 1; j < targetStops.length; j++){
+            if(this.s[targetStops[j]] < this.s[targetStop]){
+                targetStop = targetStops[j];
+            }
+        }
+
+        const journey: Journey = this.getJourney(targetStop);
         console.timeEnd('connection scan algorithm')
-        console.log(this.s[targetStop]);
-        console.log(Converter.secondsToTime(this.s[targetStop]));
+        return journey;
     }
 
-    private static init(sourceStop: number, sourceTime: number) {
+    private static init(sourceStops: number[], sourceTime: number) {
         this.s = new Array(GoogleTransitData.STOPS.length);
         for(let i = 0; i < GoogleTransitData.STOPS.length; i++){
             this.s[i] = Number.MAX_VALUE;
@@ -79,28 +104,64 @@ export class ConnectionScanController {
             this.j[i] = {
                 enterConnection: null,
                 exitConnection: null,
-                transfer: null
+                footpath: null
             }
         }
 
-        const transfersOfSourceStop = GoogleTransitData.getAllTransfersOfAStop(sourceStop);
-        for(let i = 0; i < transfersOfSourceStop.length; i++){
-            this.s[transfersOfSourceStop[i].arrivalStop] = sourceTime + transfersOfSourceStop[i].duration;
+        for(let j = 0; j < sourceStops.length; j++){
+            const footpathsOfSourceStop = GoogleTransitData.getAllFootpathsOfAStop(sourceStops[j]);
+            for(let i = 0; i < footpathsOfSourceStop.length; i++){
+                if(this.s[footpathsOfSourceStop[i].arrivalStop] > sourceTime + footpathsOfSourceStop[i].duration){
+                    this.s[footpathsOfSourceStop[i].arrivalStop] = sourceTime + footpathsOfSourceStop[i].duration;
+                }
+            }
         }
+        
     }
 
-    private static getJourney(targetStop: number){
-        let transfers: Transfer[] = [];
-        let stops: Stop[] = [];
+    private static getJourney(targetStop: number): Journey{
+        const journeyPointersOfRoute: JourneyPointer[] = [];
 
         let currentStop = targetStop;
 
-        while(this.j[currentStop].enterConnection && this.j[currentStop].exitConnection && this.j[currentStop].transfer){
-            transfers.push(GoogleTransitData.TRANSFERS[this.j[currentStop].transfer]);
-            stops.push(GoogleTransitData.STOPS[GoogleTransitData.CONNECTIONS[this.j[currentStop].exitConnection].arrivalStop]);
+        while(this.j[currentStop].enterConnection && this.j[currentStop].exitConnection && this.j[currentStop].footpath){
+            journeyPointersOfRoute.push(this.j[currentStop]);
             currentStop = GoogleTransitData.CONNECTIONS[this.j[currentStop].enterConnection].departureStop;
         }
-        console.log(transfers);
-        console.log(stops);
+
+        const journey: Journey = {
+            legs: [],
+            transfers: []
+        }
+        
+        for(let i = journeyPointersOfRoute.length - 1; i >= 0; i--) {
+            const enterConnection = GoogleTransitData.CONNECTIONS[journeyPointersOfRoute[i].enterConnection];
+            const exitConnection = GoogleTransitData.CONNECTIONS[journeyPointersOfRoute[i].exitConnection];
+
+            const departureStop = GoogleTransitData.STOPS[enterConnection.departureStop];
+            const arrivalStop = GoogleTransitData.STOPS[exitConnection.arrivalStop];
+            const departureTime = Converter.secondsToTime(enterConnection.departureTime);
+            const arrivalTime = Converter.secondsToTime(exitConnection.arrivalTime);
+
+            const leg: Leg = {
+                departureStop: departureStop,
+                arrivalStop: arrivalStop,
+                departureTime: departureTime,
+                arrivalTime: arrivalTime
+            }
+
+            journey.legs.push(leg);
+            
+            const footpath = GoogleTransitData.FOOTPATHS[journeyPointersOfRoute[i].footpath];
+
+            const transfer: Transfer = {
+                departureStop: GoogleTransitData.STOPS[footpath.departureStop],
+                arrivalStop: GoogleTransitData.STOPS[footpath.arrivalStop],
+                duration: footpath.duration
+            }
+
+            journey.transfers.push(transfer);
+        }
+        return journey;
     }
 }

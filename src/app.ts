@@ -11,13 +11,17 @@ const app = express();
 
 Importer.importGoogleTransitData();
 Generator.generateSortedConnections();
-Generator.generateTransfers();
-let departureStop = 13749;
-let arrivalStop = 24;
+Generator.generateFootpaths();
+let departureStop = [12172];
+let arrivalStop = [1234];
 let departureTime = Converter.timeToSeconds('12:00:00');
-console.log(GoogleTransitData.STOPS[departureStop])
-console.log(GoogleTransitData.STOPS[arrivalStop])
-ConnectionScanController.connectionScanAlgorithm(departureStop, arrivalStop, departureTime);
+
+let result = ConnectionScanController.connectionScanAlgorithm('Stuttgart-Rohr', 'Düsseldorf-Zoo', departureTime);
+
+for(let i = 0; i < result.legs.length; i++){
+  console.log(result.legs[i]);
+  console.log(result.transfers[i]);
+}
 
 const port = 1337;
 const corsOptions = {

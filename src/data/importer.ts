@@ -15,6 +15,7 @@ export class Importer {
     public static readonly GOOGLE_TRANSIT_FOLDER: string = path.join(__dirname, '../../google_transit');
     private static stopIdMap = new Map<number, number>();
     private static tripIdMap = new Map<number, number>();
+    private static routeIdMap = new Map<number, number>();
 
     public static importGoogleTransitData(): void {
         console.time('import')
@@ -119,12 +120,13 @@ export class Importer {
             const longName = currentRouteAsArray[0];
             const routeType = Number(currentRouteAsArray[3]);
             const route: Route = {
-                id: id,
+                id: importedRoutes.length,
                 agencyId: agencyId,
                 shortName: shortName,
                 longName: longName,
                 routeType: routeType,
             }
+            this.routeIdMap.set(id, route.id);
             importedRoutes.push(route);
         }
         GoogleTransitData.ROUTES = importedRoutes;
@@ -193,7 +195,7 @@ export class Importer {
             const id = Number(currentTripAsArray[3]);
             const directionId = Number(currentTripAsArray[2]);
             const trip: Trip = {
-                routeId: routeId,
+                routeId: this.routeIdMap.get(routeId),
                 serviceId: serviceId,
                 id: importedTrips.length,
                 directionId: directionId,

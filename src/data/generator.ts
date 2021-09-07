@@ -1,6 +1,6 @@
 import { Connection } from "../models/Connection";
 import { StopTime } from "../models/StopTime";
-import { Transfer } from "../models/Transfer";
+import { Footpath } from "../models/Footpath";
 import { GoogleTransitData } from "./google-transit-data";
 import { Sorter } from "./sorter";
 
@@ -37,31 +37,31 @@ export class Generator {
         GoogleTransitData.CONNECTIONS = connections;
     }
 
-    public static generateTransfers(){
+    public static generateFootpaths(){
         for(let i = 0; i < GoogleTransitData.STOPS.length; i++){
-            let transfer: Transfer = {
-                id: GoogleTransitData.TRANSFERS.length,
+            let footpath: Footpath = {
+                id: GoogleTransitData.FOOTPATHS.length,
                 departureStop: GoogleTransitData.STOPS[i].id,
                 arrivalStop: GoogleTransitData.STOPS[i].id,
                 duration: 0
             }
-            GoogleTransitData.TRANSFERS.push(transfer);
+            GoogleTransitData.FOOTPATHS.push(footpath);
             for(let j = i+1; j < GoogleTransitData.STOPS.length; j++) {
                 if(GoogleTransitData.STOPS[i].name === GoogleTransitData.STOPS[j].name){
-                    let transfer: Transfer = {
-                        id: GoogleTransitData.TRANSFERS.length,
+                    let footpath: Footpath = {
+                        id: GoogleTransitData.FOOTPATHS.length,
                         departureStop: GoogleTransitData.STOPS[i].id,
                         arrivalStop: GoogleTransitData.STOPS[j].id,
                         duration: 120
                     };
-                    GoogleTransitData.TRANSFERS.push(transfer);
-                    transfer = {
-                        id: GoogleTransitData.TRANSFERS.length,
+                    GoogleTransitData.FOOTPATHS.push(footpath);
+                    footpath = {
+                        id: GoogleTransitData.FOOTPATHS.length,
                         departureStop: GoogleTransitData.STOPS[j].id,
                         arrivalStop: GoogleTransitData.STOPS[i].id,
                         duration: 120
                     }
-                    GoogleTransitData.TRANSFERS.push(transfer);
+                    GoogleTransitData.FOOTPATHS.push(footpath);
                 }
             }
         }
