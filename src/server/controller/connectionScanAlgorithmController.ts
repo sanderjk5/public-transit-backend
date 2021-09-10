@@ -1,3 +1,4 @@
+import express, { response } from 'express';
 import { Converter } from "../../data/converter";
 import { GoogleTransitData } from "../../data/google-transit-data";
 import { Searcher } from "../../data/searcher";
@@ -13,19 +14,30 @@ interface JourneyPointer {
     footpath?: number
 }
 
-export class ConnectionScanController {
+export class ConnectionScanAlgorithmController {
     private static s: number[];
     private static t: number[];
     private static j: JourneyPointer[];
 
-    public static connectionScanAlgorithm(sourceStopName: string, targetStopName: string, sourceTime: number):Journey{
-        const sourceStops = GoogleTransitData.getStopIdsByName(sourceStopName);
-        const targetStops = GoogleTransitData.getStopIdsByName(targetStopName);
-        const journey = this.performAlgorithm(sourceStops, targetStops, sourceTime);
-        return journey;
+    public static connectionScanAlgorithm(req: express.Request, res: express.Response){
+        try {
+            if(!req.query || !req.query.sourceStop || !req.query.targetStop || !req.query.sourceTime || 
+                typeof req.query.sourceStop !== 'string' || typeof req.query.targetStop !== 'string' || typeof req.query.sourceTime !== 'string'){
+                res.status(400).send();
+                return;
+            }
+            const sourceStops = GoogleTransitData.getStopIdsByName(req.query.sourceStop);
+            const targetStops = GoogleTransitData.getStopIdsByName(req.query.targetStop);
+            const sourceTimeInSeconds = Converter.timeToSeconds(req.query.sourceTime)
+            const journey = this.performAlgorithm(sourceStops, targetStops, sourceTimeInSeconds);
+            res.send(journey);
+        } catch(error) {
+            res.status(500).send(error);
+        }
+        
     }
 
-    public static performAlgorithm(sourceStops: number[], targetStops: number[], sourceTime: number): Journey{
+    private static performAlgorithm(sourceStops: number[], targetStops: number[], sourceTime: number): Journey{
         console.time('connection scan algorithm')
         let targetStop: number = null;
         let reachedTargetStop = false;
