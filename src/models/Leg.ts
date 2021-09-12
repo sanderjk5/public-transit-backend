@@ -3,5 +3,6 @@ export interface Leg {
     departureStop: Stop,
     arrivalStop: Stop,
     departureTime: string,
-    arrivalTime: string
+    arrivalTime: string,
+    duration: string
 }

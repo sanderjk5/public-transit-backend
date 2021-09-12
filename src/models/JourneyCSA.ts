@@ -1,6 +1,6 @@
 import { Leg } from './Leg';
 import { Transfer } from './Transfer';
-export interface Journey {
+export interface JourneyCSA {
     legs: Leg[],
     transfers: Transfer[]
 }

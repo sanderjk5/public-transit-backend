@@ -4,9 +4,11 @@ import { GoogleTransitData } from "../../data/google-transit-data";
 import { Searcher } from "../../data/searcher";
 import { Stop } from "../../models/Stop";
 import { Footpath } from "../../models/Footpath";
-import { Journey } from "../../models/Journey";
+import { JourneyCSA } from "../../models/JourneyCSA";
 import { Leg } from "../../models/Leg";
 import { Transfer } from "../../models/Transfer";
+import { JourneyResponse } from '../../models/JourneyResponse';
+import { Section } from '../../models/Section';
 
 interface JourneyPointer {
     enterConnection?: number,
@@ -26,18 +28,19 @@ export class ConnectionScanAlgorithmController {
                 res.status(400).send();
                 return;
             }
+            
             const sourceStops = GoogleTransitData.getStopIdsByName(req.query.sourceStop);
             const targetStops = GoogleTransitData.getStopIdsByName(req.query.targetStop);
             const sourceTimeInSeconds = Converter.timeToSeconds(req.query.sourceTime)
             const journey = this.performAlgorithm(sourceStops, targetStops, sourceTimeInSeconds);
-            res.send(journey);
+            const journeyResponse = this.getJourneyResponse(journey);
+            res.send(journeyResponse);
         } catch(error) {
             res.status(500).send(error);
         }
-        
     }
 
-    private static performAlgorithm(sourceStops: number[], targetStops: number[], sourceTime: number): Journey{
+    private static performAlgorithm(sourceStops: number[], targetStops: number[], sourceTime: number): JourneyCSA{
         console.time('connection scan algorithm')
         let targetStop: number = null;
         let reachedTargetStop = false;
@@ -95,7 +98,7 @@ export class ConnectionScanAlgorithmController {
             }
         }
 
-        const journey: Journey = this.getJourney(targetStop);
+        const journey: JourneyCSA = this.getJourney(targetStop);
         console.timeEnd('connection scan algorithm')
         return journey;
     }
@@ -131,7 +134,7 @@ export class ConnectionScanAlgorithmController {
         
     }
 
-    private static getJourney(targetStop: number): Journey{
+    private static getJourney(targetStop: number): JourneyCSA{
         const journeyPointersOfRoute: JourneyPointer[] = [];
 
         let currentStop = targetStop;
@@ -141,7 +144,7 @@ export class ConnectionScanAlgorithmController {
             currentStop = GoogleTransitData.CONNECTIONS[this.j[currentStop].enterConnection].departureStop;
         }
 
-        const journey: Journey = {
+        const journey: JourneyCSA = {
             legs: [],
             transfers: []
         }
@@ -154,12 +157,20 @@ export class ConnectionScanAlgorithmController {
             const arrivalStop = GoogleTransitData.STOPS[exitConnection.arrivalStop];
             const departureTime = Converter.secondsToTime(enterConnection.departureTime);
             const arrivalTime = Converter.secondsToTime(exitConnection.arrivalTime);
+            let duration;
+            if(exitConnection.arrivalTime < enterConnection.departureTime){
+                duration = Converter.secondsToTime((exitConnection.arrivalTime + (24*3600)) - enterConnection.departureTime);
+            } else {
+                duration = Converter.secondsToTime(exitConnection.arrivalTime - enterConnection.departureTime);
+            }
+            
 
             const leg: Leg = {
                 departureStop: departureStop,
                 arrivalStop: arrivalStop,
                 departureTime: departureTime,
-                arrivalTime: arrivalTime
+                arrivalTime: arrivalTime,
+                duration: duration
             }
 
             journey.legs.push(leg);
@@ -175,5 +186,42 @@ export class ConnectionScanAlgorithmController {
             journey.transfers.push(transfer);
         }
         return journey;
+    }
+
+    private static getJourneyResponse(journeyCSA: JourneyCSA): JourneyResponse {
+        const sections: Section[] = [];
+        for(let i = 0; i < journeyCSA.legs.length - 1; i++) {
+            let section: Section = {
+                departureTime: journeyCSA.legs[i].departureTime,
+                arrivalTime: journeyCSA.legs[i].arrivalTime,
+                duration: journeyCSA.legs[i].duration,
+                departureStop: journeyCSA.legs[i].departureStop.name,
+                arrivalStop: journeyCSA.legs[i].arrivalStop.name,
+                type: 'Train'
+            }
+            sections.push(section);
+            section = {
+                departureTime: journeyCSA.legs[i].arrivalTime,
+                arrivalTime:  Converter.secondsToTime(Converter.timeToSeconds(journeyCSA.legs[i].arrivalTime) + journeyCSA.transfers[i].duration),
+                duration: Converter.secondsToTime(journeyCSA.transfers[i].duration),
+                departureStop: journeyCSA.transfers[i].departureStop.name,
+                arrivalStop: journeyCSA.transfers[i].arrivalStop.name,
+                type: 'Footpath'
+            }
+            sections.push(section);
+        }
+        let section: Section = {
+            departureTime: journeyCSA.legs[journeyCSA.legs.length-1].departureTime,
+            arrivalTime: journeyCSA.legs[journeyCSA.legs.length-1].arrivalTime,
+            duration: journeyCSA.legs[journeyCSA.legs.length-1].duration,
+            departureStop: journeyCSA.legs[journeyCSA.legs.length-1].departureStop.name,
+            arrivalStop: journeyCSA.legs[journeyCSA.legs.length-1].arrivalStop.name,
+            type: 'Train'
+        }
+        sections.push(section)
+        const journeyResponse: JourneyResponse = {
+            sections: sections
+        }
+        return journeyResponse;
     }
 }
