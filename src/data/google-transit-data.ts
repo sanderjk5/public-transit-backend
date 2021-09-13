@@ -8,6 +8,8 @@ import { Trip } from "../models/Trip";
 import { Sorter } from "./sorter";
 import { Agency } from "../models/Agency";
 import { Connection } from "../models/Connection";
+import { RouteStopMapping } from "../models/RouteStopMapping";
+
 
 export class GoogleTransitData {
     public static AGENCIES: Agency[] = [];
@@ -19,6 +21,8 @@ export class GoogleTransitData {
     public static FOOTPATHS: Footpath[] = [];
     public static TRIPS: Trip[] = [];
     public static CONNECTIONS: Connection[] = [];
+    public static ROUTESSERVINGSTOPS: RouteStopMapping[][];
+    public static STOPSOFAROUTE: number[][];
     
 
     public static getRouteByID(routeID: number): Route{
@@ -51,6 +55,15 @@ export class GoogleTransitData {
             }
         }
         return stops;
+    }
+
+    public static getFirstTripOfARoute(routeId: number){
+        for(let i = 0; i < this.TRIPS.length; i++){
+            if(this.TRIPS[i].routeId === routeId){
+                return this.TRIPS[i].id
+            }
+        }
+        return null;
     }
 
     public static getTripByID(tripID: number): Trip{
@@ -102,5 +115,27 @@ export class GoogleTransitData {
             }
         }
         return footpaths;
+    }
+
+    public static getStopTimeByTripAndStop(tripId: number, stopId: number): StopTime {
+        for(let i = 0; i < GoogleTransitData.STOPTIMES.length; i++) {
+            let stopTime = GoogleTransitData.STOPTIMES[i];
+            if(stopTime.tripId === tripId && stopTime.stopId === stopId){
+                return stopTime;
+            }
+        }
+        return null;
+    }
+
+    public static getStopTimesByStopAndRoute(stopId: number, r: number): StopTime[] {
+        let stopTimes = []
+        for(let i = 0; i < GoogleTransitData.STOPTIMES.length; i++) {
+            let stopTime = GoogleTransitData.STOPTIMES[i];
+            let routeId = GoogleTransitData.TRIPS[stopTime.tripId].routeId;
+            if(stopTime.stopId === stopId && routeId === r){
+                stopTimes.push(stopTime);
+            }
+        }
+        return stopTimes;
     }
 }

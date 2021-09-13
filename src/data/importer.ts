@@ -9,6 +9,7 @@ import { StopTime } from '../models/StopTime';
 import { Trip } from '../models/Trip';
 import { Converter } from './converter';
 import { Agency } from '../models/Agency';
+import { RouteStopMapping } from '../models/RouteStopMapping';
 
 export class Importer {
 
@@ -26,6 +27,8 @@ export class Importer {
         Importer.importStops();
         Importer.importTrips();
         Importer.importStopTimes();
+        Importer.initializeRoutesServingStops();
+        Importer.initializeAllStopsOfARoute();
         console.timeEnd('import')
         
     }
@@ -178,9 +181,12 @@ export class Importer {
                 pickupType: pickupType,
                 dropOffType: dropOffType,
             }
-            importedStopTimes.push(stopTime);
+            if(stopTime.tripId && stopTime.stopId){
+                importedStopTimes.push(stopTime);
+            }
         }
         GoogleTransitData.STOPTIMES = importedStopTimes;
+        console.log(GoogleTransitData.STOPTIMES.length)
         console.timeEnd('stop times');
     }
 
@@ -200,10 +206,53 @@ export class Importer {
                 id: importedTrips.length,
                 directionId: directionId,
             }
-            this.tripIdMap.set(id, trip.id);
-            importedTrips.push(trip);
+            if(trip.routeId){
+                this.tripIdMap.set(id, trip.id);
+                importedTrips.push(trip);
+            }
         }
         GoogleTransitData.TRIPS = importedTrips;
         console.timeEnd('trips');
+    }
+
+    private static initializeRoutesServingStops() {
+        const routesServingStops: RouteStopMapping[][] = new Array(GoogleTransitData.STOPS.length);
+        for(let i = 0; i < GoogleTransitData.STOPS.length; i++){
+            routesServingStops[i] = [];
+        }
+        for(let i = 0; i < GoogleTransitData.STOPTIMES.length; i++) {
+            let stopId = GoogleTransitData.STOPTIMES[i].stopId;
+            let tripId = GoogleTransitData.STOPTIMES[i].tripId;
+            let stopSequence = GoogleTransitData.STOPTIMES[i].stopSequence;
+            let routeId = GoogleTransitData.TRIPS[tripId].routeId;
+            let containsRouteId = false;
+            for(let j = 0; j < routesServingStops[stopId].length; j++){
+                if(routesServingStops[stopId][j].routeId === routeId){
+                    containsRouteId = true;
+                }
+            }
+            if(!containsRouteId){
+                let routeStopMapping: RouteStopMapping = {
+                    routeId: routeId,
+                    stopSequence: stopSequence
+                }
+                routesServingStops[stopId].push(routeStopMapping);
+            }
+        }
+        GoogleTransitData.ROUTESSERVINGSTOPS = routesServingStops;
+    }
+
+    private static initializeAllStopsOfARoute() {
+        const stopsOfARoute: number[][] = new Array(GoogleTransitData.ROUTES.length);
+        for(let i = 0; i < GoogleTransitData.ROUTES.length; i++){
+            let trip: number = GoogleTransitData.getFirstTripOfARoute(i);
+            let stopTimes = GoogleTransitData.getAllStopTimesOfATripSortedBySequence(trip);
+            let stops: number[] = [];
+            for(let j = 0; j < stopTimes.length; j++){
+                stops.push(stopTimes[j].stopId)
+            }
+            stopsOfARoute[i] = stops;
+        }
+        GoogleTransitData.STOPSOFAROUTE = stopsOfARoute;
     }
 }

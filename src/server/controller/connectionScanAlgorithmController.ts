@@ -9,6 +9,7 @@ import { Leg } from "../../models/Leg";
 import { Transfer } from "../../models/Transfer";
 import { JourneyResponse } from '../../models/JourneyResponse';
 import { Section } from '../../models/Section';
+import { RaptorAlgorithmController } from './raptorAlgorithmController';
 
 interface JourneyPointer {
     enterConnection?: number,
@@ -34,6 +35,7 @@ export class ConnectionScanAlgorithmController {
             const sourceTimeInSeconds = Converter.timeToSeconds(req.query.sourceTime)
             const journey = this.performAlgorithm(sourceStops, targetStops, sourceTimeInSeconds);
             const journeyResponse = this.getJourneyResponse(journey);
+            RaptorAlgorithmController.raptorAlgorithm(sourceStops[0], targetStops[0], req.query.sourceTime);
             res.send(journeyResponse);
         } catch(error) {
             res.status(500).send(error);
