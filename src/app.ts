@@ -4,18 +4,15 @@ import cors from 'cors';
 import { Importer } from './data/importer';
 import { GoogleTransitData } from './data/google-transit-data';
 import { Generator } from './data/generator';
+import { ConnectionScanAlgorithmController } from './server/controller/connectionScanAlgorithmController';
+import { Converter } from './data/converter';
 
 const app = express();
 
 Importer.importGoogleTransitData();
 Generator.generateSortedConnections();
-Generator.generateTransfers();
+Generator.generateFootpaths();
 
-for(let i = 0; i < 20; i++){
-  console.log(GoogleTransitData.TRANSFERS[i])
-}
-console.log(GoogleTransitData.TRANSFERS[GoogleTransitData.TRANSFERS.length - 1])
-console.log(GoogleTransitData.TRANSFERS.length)
 
 const port = 1337;
 const corsOptions = {

@@ -3,7 +3,7 @@ import { CalendarDate } from "../models/CalendarDates";
 import { Route } from "../models/Routes";
 import { Calendar } from "../models/Calendar";
 import { StopTime } from "../models/StopTime";
-import { Transfer } from "../models/Transfer";
+import { Footpath } from "../models/Footpath";
 import { Trip } from "../models/Trip";
 import { Sorter } from "./sorter";
 import { Agency } from "../models/Agency";
@@ -16,7 +16,7 @@ export class GoogleTransitData {
     public static ROUTES: Route[] = [];
     public static STOPS: Stop[] = [];
     public static STOPTIMES: StopTime[] = [];
-    public static TRANSFERS: Transfer[] = [];
+    public static FOOTPATHS: Footpath[] = [];
     public static TRIPS: Trip[] = [];
     public static CONNECTIONS: Connection[] = [];
     
@@ -41,6 +41,16 @@ export class GoogleTransitData {
             }
         }
         return stop;
+    }
+
+    public static getStopIdsByName(name: string): number[]{
+        let stops: number[] = [];
+        for(let i = 0; i < this.STOPS.length; i++){
+            if(this.STOPS[i].name === name){
+                stops.push(this.STOPS[i].id)
+            }
+        }
+        return stops;
     }
 
     public static getTripByID(tripID: number): Trip{
@@ -84,13 +94,13 @@ export class GoogleTransitData {
         return stopTimes;
     }
 
-    public static getAllTransfersOfAStop(stopID: number){
-        let transfers: Transfer[] = [];
-        for(let i = 0; i < this.TRANSFERS.length; i++){
-            if(this.TRANSFERS[i].departureStop === stopID){
-                transfers.push(this.TRANSFERS[i]);
+    public static getAllFootpathsOfAStop(stopID: number){
+        let footpaths: Footpath[] = [];
+        for(let i = 0; i < this.FOOTPATHS.length; i++){
+            if(this.FOOTPATHS[i].departureStop === stopID){
+                footpaths.push(this.FOOTPATHS[i]);
             }
         }
-        return transfers;
+        return footpaths;
     }
 }
