@@ -38,4 +38,13 @@ export class Converter {
         }
         return time;
     }
+
+    public static getDayOffset(timeInSeconds: number): number {
+        let counter = 0;
+        while(timeInSeconds >= 24*3600){
+            timeInSeconds = timeInSeconds - 24*3600;
+            counter++;
+        }
+        return counter * (24*3600);
+    }
 }

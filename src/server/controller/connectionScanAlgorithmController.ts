@@ -33,9 +33,10 @@ export class ConnectionScanAlgorithmController {
             const sourceStops = GoogleTransitData.getStopIdsByName(req.query.sourceStop);
             const targetStops = GoogleTransitData.getStopIdsByName(req.query.targetStop);
             const sourceTimeInSeconds = Converter.timeToSeconds(req.query.sourceTime)
+            //RaptorAlgorithmController.raptorAlgorithm(req.query.sourceStop, req.query.targetStop, req.query.sourceTime);
             const journey = this.performAlgorithm(sourceStops, targetStops, sourceTimeInSeconds);
             const journeyResponse = this.getJourneyResponse(journey);
-            RaptorAlgorithmController.raptorAlgorithm(req.query.sourceStop, req.query.targetStop, req.query.sourceTime);
+            
             res.send(journeyResponse);
         } catch(error) {
             res.status(500).send(error);

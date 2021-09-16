@@ -2,10 +2,7 @@ import express from 'express';
 import routes from './server/routes';
 import cors from 'cors';
 import { Importer } from './data/importer';
-import { GoogleTransitData } from './data/google-transit-data';
 import { Generator } from './data/generator';
-import { ConnectionScanAlgorithmController } from './server/controller/connectionScanAlgorithmController';
-import { Converter } from './data/converter';
 import { RaptorAlgorithmController } from './server/controller/raptorAlgorithmController';
 
 const app = express();
@@ -15,7 +12,7 @@ Generator.generateSortedConnections();
 Generator.generateFootpaths();
 //RaptorAlgorithmController.raptorAlgorithm(646, 12983, '08:12:00');
 //ConnectionScanAlgorithmController.performAlgorithm([646], [12983], Converter.timeToSeconds('08:12:00'));
-RaptorAlgorithmController.raptorAlgorithm('Stuttgart-Rohr', 'Stuttgart Hbf', '13:12:00');
+RaptorAlgorithmController.raptorAlgorithm('Stuttgart-Rohr', 'Stuttgart Hbf', '23:59:00');
 
 
 const port = 1337;
