@@ -33,10 +33,9 @@ export class ConnectionScanAlgorithmController {
             const sourceStops = GoogleTransitData.getStopIdsByName(req.query.sourceStop);
             const targetStops = GoogleTransitData.getStopIdsByName(req.query.targetStop);
             const sourceTimeInSeconds = Converter.timeToSeconds(req.query.sourceTime)
-            //RaptorAlgorithmController.raptorAlgorithm(req.query.sourceStop, req.query.targetStop, req.query.sourceTime);
+            RaptorAlgorithmController.raptorAlgorithm(req.query.sourceStop, req.query.targetStop, req.query.sourceTime);
             const journey = this.performAlgorithm(sourceStops, targetStops, sourceTimeInSeconds);
             const journeyResponse = this.getJourneyResponse(journey);
-            
             res.send(journeyResponse);
         } catch(error) {
             res.status(500).send(error);
@@ -88,7 +87,6 @@ export class ConnectionScanAlgorithmController {
                 }
             }
             if(reachedTargetStop){
-                console.log(Converter.secondsToTime(this.s[targetStops[0]]))
                 break;
             }
             dayDifference += 24 * 3600;
@@ -113,22 +111,19 @@ export class ConnectionScanAlgorithmController {
 
     private static init(sourceStops: number[], sourceTime: number) {
         this.s = new Array(GoogleTransitData.STOPS.length);
-        for(let i = 0; i < GoogleTransitData.STOPS.length; i++){
-            this.s[i] = Number.MAX_VALUE;
-        }
-
-        this.t = new Array(GoogleTransitData.TRIPS.length);
-        for(let i = 0; i < GoogleTransitData.TRIPS.length; i++){
-            this.t[i] = null;
-        }
-
         this.j = new Array(GoogleTransitData.STOPS.length);
         for(let i = 0; i < GoogleTransitData.STOPS.length; i++){
+            this.s[i] = Number.MAX_VALUE;
             this.j[i] = {
                 enterConnection: null,
                 exitConnection: null,
                 footpath: null
             }
+        }
+
+        this.t = new Array(GoogleTransitData.TRIPS.length);
+        for(let i = 0; i < GoogleTransitData.TRIPS.length; i++){
+            this.t[i] = null;
         }
 
         for(let j = 0; j < sourceStops.length; j++){
