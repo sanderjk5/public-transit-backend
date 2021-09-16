@@ -23,6 +23,8 @@ export class GoogleTransitData {
     public static CONNECTIONS: Connection[] = [];
     public static ROUTESSERVINGSTOPS: RouteStopMapping[][];
     public static STOPSOFAROUTE: number[][];
+    public static STOPTIMESOFATRIP: number[];
+    public static TRIPSOFAROUTE: number[][];
     
 
     public static getRouteByID(routeID: number): Route{
@@ -64,6 +66,16 @@ export class GoogleTransitData {
             }
         }
         return null;
+    }
+
+    public static getTripsOfARoute(routeId: number){
+        let trips: number[] = [];
+        for(let i = 0; i < this.TRIPS.length; i++){
+            if(this.TRIPS[i].routeId === routeId){
+                trips.push(this.TRIPS[i].id)
+            }
+        }
+        return trips;
     }
 
     public static getTripByID(tripID: number): Trip{
@@ -118,8 +130,15 @@ export class GoogleTransitData {
     }
 
     public static getStopTimeByTripAndStop(tripId: number, stopId: number): StopTime {
-        for(let i = 0; i < GoogleTransitData.STOPTIMES.length; i++) {
+        if(!tripId || !stopId){
+            return null;
+        }
+        let firstStopTimeOfTrip = GoogleTransitData.STOPTIMESOFATRIP[tripId];
+        for(let i = firstStopTimeOfTrip; i < GoogleTransitData.STOPTIMES.length; i++) {
             let stopTime = GoogleTransitData.STOPTIMES[i];
+            if(stopTime.tripId !== tripId){
+                break;
+            }
             if(stopTime.tripId === tripId && stopTime.stopId === stopId){
                 return stopTime;
             }
@@ -128,12 +147,23 @@ export class GoogleTransitData {
     }
 
     public static getStopTimesByStopAndRoute(stopId: number, r: number): StopTime[] {
+        if(!r || !stopId){
+            return [];
+        }
         let stopTimes = []
-        for(let i = 0; i < GoogleTransitData.STOPTIMES.length; i++) {
-            let stopTime = GoogleTransitData.STOPTIMES[i];
-            let routeId = GoogleTransitData.TRIPS[stopTime.tripId].routeId;
-            if(stopTime.stopId === stopId && routeId === r){
-                stopTimes.push(stopTime);
+        let tripsOfRoute = GoogleTransitData.TRIPSOFAROUTE[r];
+        for(let i = 0; i < tripsOfRoute.length; i++){
+            let tripId = tripsOfRoute[i];
+            let firstStopTimeOfTrip = GoogleTransitData.STOPTIMESOFATRIP[tripId];
+            for(let j = firstStopTimeOfTrip; j < GoogleTransitData.STOPTIMES.length; j++) {
+                let stopTime = GoogleTransitData.STOPTIMES[j];
+                if(tripId !== stopTime.tripId){
+                    break;
+                }
+                let routeId = GoogleTransitData.TRIPS[stopTime.tripId].routeId;
+                if(stopTime.stopId === stopId && routeId === r){
+                    stopTimes.push(stopTime);
+                }
             }
         }
         return stopTimes;

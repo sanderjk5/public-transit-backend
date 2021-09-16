@@ -13,9 +13,9 @@ const app = express();
 Importer.importGoogleTransitData();
 Generator.generateSortedConnections();
 Generator.generateFootpaths();
-console.log(GoogleTransitData.TRIPS[38726])
-console.log(GoogleTransitData.TRIPS[38724])
-RaptorAlgorithmController.raptorAlgorithm(12172, 12179, '12:00:00');
+//RaptorAlgorithmController.raptorAlgorithm(646, 12983, '08:12:00');
+//ConnectionScanAlgorithmController.performAlgorithm([646], [12983], Converter.timeToSeconds('08:12:00'));
+RaptorAlgorithmController.raptorAlgorithm('Stuttgart-Rohr', 'Stuttgart Hbf', '13:12:00');
 
 
 const port = 1337;

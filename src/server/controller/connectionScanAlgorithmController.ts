@@ -35,14 +35,14 @@ export class ConnectionScanAlgorithmController {
             const sourceTimeInSeconds = Converter.timeToSeconds(req.query.sourceTime)
             const journey = this.performAlgorithm(sourceStops, targetStops, sourceTimeInSeconds);
             const journeyResponse = this.getJourneyResponse(journey);
-            RaptorAlgorithmController.raptorAlgorithm(sourceStops[0], targetStops[0], req.query.sourceTime);
+            RaptorAlgorithmController.raptorAlgorithm(req.query.sourceStop, req.query.targetStop, req.query.sourceTime);
             res.send(journeyResponse);
         } catch(error) {
             res.status(500).send(error);
         }
     }
 
-    private static performAlgorithm(sourceStops: number[], targetStops: number[], sourceTime: number): JourneyCSA{
+    public static performAlgorithm(sourceStops: number[], targetStops: number[], sourceTime: number): JourneyCSA{
         console.time('connection scan algorithm')
         let targetStop: number = null;
         let reachedTargetStop = false;
@@ -87,6 +87,7 @@ export class ConnectionScanAlgorithmController {
                 }
             }
             if(reachedTargetStop){
+                console.log(Converter.secondsToTime(this.s[targetStops[0]]))
                 break;
             }
             dayDifference += 24 * 3600;
