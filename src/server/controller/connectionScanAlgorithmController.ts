@@ -91,6 +91,10 @@ export class ConnectionScanAlgorithmController {
                 break;
             }
             dayDifference += 24 * 3600;
+            if(dayDifference > 4 * (24*3600)){
+                console.timeEnd('connection scan algorithm')
+                throw new Error('Too many iterations.');
+            }
             firstConnectionId = 0;
         }
         
