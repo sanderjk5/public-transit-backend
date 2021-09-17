@@ -5,6 +5,7 @@ import { StopTime } from "../../models/StopTime";
 import { Sorter } from "../../data/sorter";
 import { JourneyResponse } from "../../models/JourneyResponse";
 import { Section } from "../../models/Section";
+import express from "express";
 
 interface QEntry {
     r: number,
@@ -34,15 +35,27 @@ export class RaptorAlgorithmController {
     private static Q: QEntry[];
     private static j: JourneyPointer[];
 
-    public static raptorAlgorithm(sourceStop: string, targetStop: string, sourceTime: string){
-        console.time('raptor algorithm')
-        const sourceTimeInSeconds = Converter.timeToSeconds(sourceTime);
-        const sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
-        const targetStops = GoogleTransitData.getStopIdsByName(targetStop);
-        this.init(sourceStops, sourceTimeInSeconds);
-        this.performAlgorithm(targetStops);
-        const journeyResponse = this.getJourneyResponse(sourceStops, targetStops);
-        console.timeEnd('raptor algorithm')
+    public static raptorAlgorithm(req: express.Request, res: express.Response){
+        try {
+            if(!req.query || !req.query.sourceStop || !req.query.targetStop || !req.query.sourceTime || 
+                typeof req.query.sourceStop !== 'string' || typeof req.query.targetStop !== 'string' || typeof req.query.sourceTime !== 'string' || typeof req.query.date !== 'string'){
+                res.status(400).send();
+                return;
+            }
+            const sourceStops = GoogleTransitData.getStopIdsByName(req.query.sourceStop);
+            const targetStops = GoogleTransitData.getStopIdsByName(req.query.targetStop);
+            const sourceTimeInSeconds = Converter.timeToSeconds(req.query.sourceTime)
+            this.init(sourceStops, sourceTimeInSeconds);
+            console.time('raptor algorithm')
+            this.performAlgorithm(targetStops);
+            console.timeEnd('raptor algorithm')
+            const journeyResponse = this.getJourneyResponse(sourceStops, targetStops, req.query.date);
+            res.status(200).send(journeyResponse);
+        } catch (err) {
+            console.timeEnd('raptor algorithm')
+            res.status(500).send(err);
+        }
+        
     }
 
     private static performAlgorithm(targetStops: number[]){
@@ -266,7 +279,7 @@ export class RaptorAlgorithmController {
         return earliestTripInfo;
     }
 
-    public static getJourneyResponse(sourceStops: number[], targetStops: number[]): JourneyResponse {
+    private static getJourneyResponse(sourceStops: number[], targetStops: number[], date: string): JourneyResponse {
         let earliestTargetStopArrival = this.earliestArrivalTime[targetStops[0]];
         let earliestTargetStopId = targetStops[0];
         for(let i = 1; i < targetStops.length; i++){
@@ -283,7 +296,7 @@ export class RaptorAlgorithmController {
             stopId = this.j[stopId].enterTripAtStop;
         }
 
-        let journeyResponse: JourneyResponse = {sections: []};
+        const sections: Section[] = []
         for(let i = (journeyPointers.length - 1); i >= 0; i--){
             let departureTime = journeyPointers[i].departureTime;
             let arrivalTime = journeyPointers[i].arrivalTime;
@@ -300,7 +313,7 @@ export class RaptorAlgorithmController {
                 duration: Converter.secondsToTime((arrivalTime - departureTime)),
                 type: type
             }
-            journeyResponse.sections.push(section);
+            sections.push(section);
             if(i > 0){
                 let nextDepartureStop = journeyPointers[i-1].enterTripAtStop;
                 if(arrivalStop === nextDepartureStop && type === 'Train' && journeyPointers[i-1].footpath === null){
@@ -313,9 +326,27 @@ export class RaptorAlgorithmController {
                         duration: Converter.secondsToTime(0),
                         type: 'Footpath'
                     }
-                    journeyResponse.sections.push(section);
+                    sections.push(section);
                 }
             }
+        }
+
+        let initialDate = new Date(date);
+        let departureDate = new Date(initialDate);
+        let arrivalDate = new Date(initialDate);
+        departureDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyPointers[journeyPointers.length-1].departureTime))
+        arrivalDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyPointers[0].arrivalTime))
+        let departureDateAsString = departureDate.toLocaleDateString();
+        let arrivalDateAsString = arrivalDate.toLocaleDateString();
+        const journeyResponse: JourneyResponse = {
+            sourceStop: sections[0].departureStop,
+            targetStop: sections[sections.length-1].arrivalStop,
+            departureTime: sections[0].departureTime,
+            arrivalTime: sections[sections.length-1].arrivalTime,
+            departureDate: departureDateAsString,
+            arrivalDate: arrivalDateAsString,
+            changes: Math.floor((sections.length/2)),
+            sections: sections
         }
         return journeyResponse;
     }

@@ -47,4 +47,13 @@ export class Converter {
         }
         return counter * (24*3600);
     }
+
+    public static getDayDifference(timeInSeconds: number): number {
+        let counter = 0;
+        while(timeInSeconds >= 24*3600){
+            timeInSeconds = timeInSeconds - 24*3600;
+            counter++;
+        }
+        return counter;
+    }
 }
