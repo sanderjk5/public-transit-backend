@@ -1,6 +1,11 @@
 import express from 'express';
 import { GoogleTransitData } from '../../data/google-transit-data';
 export class StopController {
+    /**
+     * Returns a number of stop names which match a given string.
+     * @param req 
+     * @param res 
+     */
     public static getMatchingStops(req: express.Request, res: express.Response){
         try {
             if(req.query && req.query.name && req.query.limit){
