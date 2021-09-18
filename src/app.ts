@@ -2,10 +2,8 @@ import express from 'express';
 import routes from './server/routes';
 import cors from 'cors';
 import { Importer } from './data/importer';
-import { GoogleTransitData } from './data/google-transit-data';
 import { Generator } from './data/generator';
-import { ConnectionScanAlgorithmController } from './server/controller/connectionScanAlgorithmController';
-import { Converter } from './data/converter';
+import { RaptorAlgorithmController } from './server/controller/raptorAlgorithmController';
 
 const app = express();
 

@@ -12,6 +12,9 @@ export class Converter {
     }
 
     public static secondsToTime(timeInSeconds: number): string {
+        if(timeInSeconds === Number.MAX_VALUE){
+            return timeInSeconds.toString();
+        }
         let time = '';
         let calculation = 0;
         while(timeInSeconds >= 24*3600){
@@ -34,5 +37,23 @@ export class Converter {
             time += timeInSeconds;
         }
         return time;
+    }
+
+    public static getDayOffset(timeInSeconds: number): number {
+        let counter = 0;
+        while(timeInSeconds >= 24*3600){
+            timeInSeconds = timeInSeconds - 24*3600;
+            counter++;
+        }
+        return counter * (24*3600);
+    }
+
+    public static getDayDifference(timeInSeconds: number): number {
+        let counter = 0;
+        while(timeInSeconds >= 24*3600){
+            timeInSeconds = timeInSeconds - 24*3600;
+            counter++;
+        }
+        return counter;
     }
 }
