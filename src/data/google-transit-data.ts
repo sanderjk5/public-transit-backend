@@ -27,6 +27,8 @@ export class GoogleTransitData {
     public static STOPSOFAROUTE: number[][];
     public static STOPTIMESOFATRIP: number[];
     public static TRIPSOFAROUTE: number[][];
+    // pointer to get faster all footpaths of a stop
+    public static FOOTPATHSOFASTOP: number[];
 
     /**
      * Gets all stop ids with a given stop name.
@@ -50,9 +52,14 @@ export class GoogleTransitData {
      */
     public static getAllFootpathsOfAStop(stopID: number){
         let footpaths: Footpath[] = [];
-        for(let i = 0; i < this.FOOTPATHS.length; i++){
-            if(this.FOOTPATHS[i].departureStop === stopID){
-                footpaths.push(this.FOOTPATHS[i]);
+        let firstFootpathOfStop = GoogleTransitData.FOOTPATHSOFASTOP[stopID];
+        if(firstFootpathOfStop){
+            for(let i = firstFootpathOfStop; i < this.FOOTPATHS.length; i++){
+                if(this.FOOTPATHS[i].departureStop === stopID){
+                    footpaths.push(this.FOOTPATHS[i]);
+                } else {
+                    break;
+                }
             }
         }
         return footpaths;

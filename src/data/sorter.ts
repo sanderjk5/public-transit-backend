@@ -1,4 +1,5 @@
 import { Connection } from "../models/Connection";
+import { Footpath } from "../models/Footpath";
 import { StopTime } from "../models/StopTime";
 
 export class Sorter {
@@ -60,6 +61,18 @@ export class Sorter {
             return 0;
         }
         if(a.departureTime > b.departureTime){
+            return 1;
+        }
+    }
+
+    public static sortFootpathsByDepartureStop(a: Footpath, b: Footpath){
+        if(a.departureStop < b.departureStop) {
+            return -1;
+        }
+        if(a.departureStop === b.departureStop) {
+            return 0;
+        }
+        if(a.departureStop > b.departureStop) {
             return 1;
         }
     }

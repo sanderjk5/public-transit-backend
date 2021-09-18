@@ -75,6 +75,22 @@ export class Generator {
                 }
             }
         }
+
+        GoogleTransitData.FOOTPATHS.sort((a: Footpath, b: Footpath) => {
+            return Sorter.sortFootpathsByDepartureStop(a, b);
+        })
+
+        GoogleTransitData.FOOTPATHSOFASTOP = new Array(GoogleTransitData.STOPS.length);
+        let lastDepartureStopId = 0;
+        GoogleTransitData.FOOTPATHSOFASTOP[lastDepartureStopId] = 0;
+
+        for(let i = 0; i < GoogleTransitData.FOOTPATHS.length; i++) {
+            let departureStop = GoogleTransitData.FOOTPATHS[i].departureStop
+            if(lastDepartureStopId !== departureStop){
+                GoogleTransitData.FOOTPATHSOFASTOP[departureStop] = i;
+            }
+            lastDepartureStopId = departureStop;
+        }
     }
 
     /**
