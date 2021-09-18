@@ -45,11 +45,16 @@ export class ConnectionScanAlgorithmController {
             // initializes the csa algorithm
             this.init(sourceStops, sourceTimeInSeconds);
             // calls the csa
-            const journey = this.performAlgorithm(targetStops, sourceTimeInSeconds);
+            console.time('connection scan algorithm')
+            this.performAlgorithm(targetStops, sourceTimeInSeconds);
+            console.timeEnd('connection scan algorithm')
+            // gets the journey in csa format
+            const journey: JourneyCSA = this.getJourney(targetStops, sourceTimeInSeconds);
             // generates the http response which includes all information of the journey
             const journeyResponse = this.getJourneyResponse(journey, req.query.date);
             res.send(journeyResponse);
         } catch(error) {
+            console.timeEnd('connection scan algorithm')
             res.status(500).send(error);
         }
     }
@@ -61,9 +66,7 @@ export class ConnectionScanAlgorithmController {
      * @param sourceTime 
      * @returns 
      */
-    private static performAlgorithm(targetStops: number[], sourceTime: number): JourneyCSA{
-        console.time('connection scan algorithm')
-        let targetStop: number = null;
+    private static performAlgorithm(targetStops: number[], sourceTime: number){
         let reachedTargetStop = false;
         // gets the first connection id
         let firstConnectionId = Searcher.binarySearchOfConnections(sourceTime);
@@ -124,24 +127,11 @@ export class ConnectionScanAlgorithmController {
             dayDifference += 24 * 3600;
             // termination condition
             if(dayDifference > 2 * (24*3600)){
-                console.timeEnd('connection scan algorithm')
                 throw new Error('Too many iterations.');
             }
             firstConnectionId = 0;
         }
         
-        // finds the target stop with the earliest arrival time
-        targetStop = targetStops[0];
-        for(let j = 1; j < targetStops.length; j++){
-            if(this.s[targetStops[j]] < this.s[targetStop]){
-                targetStop = targetStops[j];
-            }
-        }
-
-        // reconstructs the journey in csa format
-        const journey: JourneyCSA = this.getJourney(targetStop, sourceTime);
-        console.timeEnd('connection scan algorithm')
-        return journey;
     }
 
     /**
@@ -183,7 +173,15 @@ export class ConnectionScanAlgorithmController {
      * @param sourceTime 
      * @returns 
      */
-    private static getJourney(targetStop: number, sourceTime: number): JourneyCSA{
+    private static getJourney(targetStops: number[], sourceTime: number): JourneyCSA{
+        // finds the target stop with the earliest arrival time
+        let targetStop = targetStops[0];
+        for(let j = 1; j < targetStops.length; j++){
+            if(this.s[targetStops[j]] < this.s[targetStop]){
+                targetStop = targetStops[j];
+            }
+        }
+
         const journeyPointersOfRoute: JourneyPointer[] = [];
 
         let currentStop = targetStop;
