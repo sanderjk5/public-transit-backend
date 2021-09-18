@@ -219,7 +219,7 @@ export class ConnectionScanAlgorithmController {
                 arrivalTime += (24*3600);
             }
             
-            let duration: string = Converter.secondsToTime(exitConnection.arrivalTime - enterConnection.departureTime);
+            let duration: string = Converter.secondsToTime(arrivalTime - departureTime);
             
             const leg: Leg = {
                 departureStop: departureStop,
