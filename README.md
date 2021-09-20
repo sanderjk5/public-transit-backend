@@ -31,6 +31,8 @@ If the installation was successful, you should be able to run the following comm
     $ npm --version
     6.14.13
 
+To clone this repository, git lfs is required. Please install it [here](https://git-lfs.github.com/)
+
 ## Install dependencies
 
 To install all required packages run the following command:
