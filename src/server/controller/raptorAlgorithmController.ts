@@ -43,6 +43,8 @@ export class RaptorAlgorithmController {
     // stores the journey pointer for each stop
     private static j: JourneyPointer[];
 
+    private static sourceWeekday: number;
+
     /**
      * Initializes and calls the algorithm.
      * @param req 
@@ -52,7 +54,7 @@ export class RaptorAlgorithmController {
     public static raptorAlgorithm(req: express.Request, res: express.Response){
         try {
             // checks the parameters of the http request
-            if(!req.query || !req.query.sourceStop || !req.query.targetStop || !req.query.sourceTime || 
+            if(!req.query || !req.query.sourceStop || !req.query.targetStop || !req.query.sourceTime ||  !req.query.date ||
                 typeof req.query.sourceStop !== 'string' || typeof req.query.targetStop !== 'string' || typeof req.query.sourceTime !== 'string' || typeof req.query.date !== 'string'){
                 res.status(400).send();
                 return;
@@ -62,6 +64,8 @@ export class RaptorAlgorithmController {
             const targetStops = GoogleTransitData.getStopIdsByName(req.query.targetStop);
             // converts the source time
             const sourceTimeInSeconds = Converter.timeToSeconds(req.query.sourceTime)
+            const sourceDate = new Date(req.query.date);
+            this.sourceWeekday = (sourceDate.getDay() - 1) % 7;
             // initializes the csa algorithm
             this.init(sourceStops, sourceTimeInSeconds);
             console.time('raptor algorithm')
@@ -306,17 +310,38 @@ export class RaptorAlgorithmController {
             return Sorter.sortStopTimesByDeparture(a, b);
         })
 
+        if(stopTimes.length === 0) {
+            earliestTripInfo = {
+                tripId: null,
+                tripDeparture: null,
+                dayOffset: null
+            }
+            return earliestTripInfo;
+        }
+
         let earliestArrival = this.earliestArrivalTimePerRound[k-1][pi];
         let earliestArrivalDayOffset = Converter.getDayOffset(earliestArrival);
+        let weekday = (this.sourceWeekday + Converter.getDayDifference(earliestArrival)) % 7;
         
         // loops over all stop times until it finds the first departure after the earliestArrival
-        for(let i = 0; i < stopTimes.length; i++) {
-            let stopTime = stopTimes[i];
-            if(stopTime.departureTime + earliestArrivalDayOffset > earliestArrival) {
-                tripId = stopTime.tripId;
-                tripDeparture = stopTime.departureTime + earliestArrivalDayOffset;
+        for(let i = 0; i < 4; i ++) {
+            for(let j = 0; j < stopTimes.length; j++) {
+                let stopTime = stopTimes[j];
+                let serviceId = GoogleTransitData.TRIPS[stopTime.tripId].serviceId;
+                if(!GoogleTransitData.CALENDAR[serviceId].isAvailable[weekday]){
+                    continue;
+                }
+                if(stopTime.departureTime + earliestArrivalDayOffset > earliestArrival) {
+                    tripId = stopTime.tripId;
+                    tripDeparture = stopTime.departureTime + earliestArrivalDayOffset;
+                    break;
+                }
+            }
+            if(tripId){
                 break;
             }
+            weekday = (weekday + 1) % 7;
+            earliestArrivalDayOffset += (24*3600);
         }
         
         // checks if it found a trip at the same day
@@ -326,13 +351,6 @@ export class RaptorAlgorithmController {
                 tripId: tripId,
                 tripDeparture: tripDeparture,
                 dayOffset: earliestArrivalDayOffset
-            }
-        } else if(stopTimes.length > 0){
-            // otherwise, use the first trip of the next day
-            earliestTripInfo = {
-                tripId: stopTimes[0].tripId,
-                tripDeparture: stopTimes[0].departureTime + earliestArrivalDayOffset + (24*3600),
-                dayOffset: earliestArrivalDayOffset + (24*3600)
             }
         } else {
             // return null if there are no stop times at this stop

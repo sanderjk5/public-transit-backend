@@ -42,14 +42,15 @@ export class ConnectionScanAlgorithmController {
             const targetStops = GoogleTransitData.getStopIdsByName(req.query.targetStop);
             // converts the source time
             const sourceTimeInSeconds = Converter.timeToSeconds(req.query.sourceTime)
+            const sourceDate = new Date(req.query.date);
             // initializes the csa algorithm
             this.init(sourceStops, sourceTimeInSeconds);
             // calls the csa
             console.time('connection scan algorithm')
-            this.performAlgorithm(targetStops, sourceTimeInSeconds);
+            this.performAlgorithm(targetStops, sourceTimeInSeconds, sourceDate);
             console.timeEnd('connection scan algorithm')
             // gets the journey in csa format
-            const journey: JourneyCSA = this.getJourney(targetStops, sourceTimeInSeconds);
+            const journey: JourneyCSA = this.getJourney(sourceStops, targetStops, sourceTimeInSeconds);
             // generates the http response which includes all information of the journey
             const journeyResponse = this.getJourneyResponse(journey, req.query.date);
             res.send(journeyResponse);
@@ -66,7 +67,8 @@ export class ConnectionScanAlgorithmController {
      * @param sourceTime 
      * @returns 
      */
-    private static performAlgorithm(targetStops: number[], sourceTime: number){
+    private static performAlgorithm(targetStops: number[], sourceTime: number, sourceDate: Date){
+        let weekday = (sourceDate.getDay() - 1) % 7;
         let reachedTargetStop = false;
         // gets the first connection id
         let firstConnectionId = Searcher.binarySearchOfConnections(sourceTime);
@@ -76,6 +78,11 @@ export class ConnectionScanAlgorithmController {
             // loop over all connections
             for(let i = firstConnectionId; i < GoogleTransitData.CONNECTIONS.length; i++){
                 let currentConnection = GoogleTransitData.CONNECTIONS[i];
+                let serviceId = GoogleTransitData.TRIPS[currentConnection.trip].serviceId;
+                let isAvailable = GoogleTransitData.CALENDAR[serviceId].isAvailable[weekday];
+                if(!GoogleTransitData.CALENDAR[serviceId].isAvailable[weekday]){
+                    continue;
+                }
                 // sets departure and arrival time
                 let currentConnectionDepartureTime = currentConnection.departureTime + dayDifference;
                 let currentConnectionArrivalTime = currentConnection.arrivalTime + dayDifference;
@@ -125,8 +132,9 @@ export class ConnectionScanAlgorithmController {
             }
             // tries connections of the next day if it didn't find a journey to one of the target stops.
             dayDifference += 24 * 3600;
+            weekday = (weekday + 1) % 7;
             // termination condition
-            if(dayDifference > 2 * (24*3600)){
+            if(dayDifference > 4 * (24*3600)){
                 throw new Error('Too many iterations.');
             }
             firstConnectionId = 0;
@@ -173,7 +181,7 @@ export class ConnectionScanAlgorithmController {
      * @param sourceTime 
      * @returns 
      */
-    private static getJourney(targetStops: number[], sourceTime: number): JourneyCSA{
+    private static getJourney(sourceStops: number[], targetStops: number[], sourceTime: number): JourneyCSA{
         // finds the target stop with the earliest arrival time
         let targetStop = targetStops[0];
         for(let j = 1; j < targetStops.length; j++){
@@ -187,7 +195,7 @@ export class ConnectionScanAlgorithmController {
         let currentStop = targetStop;
 
         // goes backward until it reaches a source stop which has a undefined journey pointer
-        while(this.j[currentStop].enterConnection && this.j[currentStop].exitConnection && this.j[currentStop].footpath){
+        while(!sourceStops.includes(currentStop)){
             journeyPointersOfRoute.push(this.j[currentStop]);
             currentStop = GoogleTransitData.CONNECTIONS[this.j[currentStop].enterConnection].departureStop;
         }
