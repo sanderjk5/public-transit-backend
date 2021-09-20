@@ -36,9 +36,11 @@ export class GoogleTransitData {
      * @returns 
      */
     public static getStopIdsByName(name: string): number[]{
-        let stops: number[] = [];
+        const searchName = name.toLowerCase();
+        const stops: number[] = [];
         for(let i = 0; i < this.STOPS.length; i++){
-            if(this.STOPS[i].name === name){
+            const stopName = this.STOPS[i].name.toLowerCase();
+            if(stopName === searchName){
                 stops.push(this.STOPS[i].id)
             }
         }

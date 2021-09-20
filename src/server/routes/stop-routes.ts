@@ -7,4 +7,8 @@ router.get('/matchingNames', (req, res) => {
     StopController.getMatchingStops(req, res);
 });
 
+router.get('/isValidStop', (req, res) => {
+    StopController.isValidStop(req, res);
+})
+
 export default router

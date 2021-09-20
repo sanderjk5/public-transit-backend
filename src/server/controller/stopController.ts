@@ -31,4 +31,32 @@ export class StopController {
             res.status(500).send(err);
         }
     }
+
+    /**
+     * Returns if a stop matches the given name.
+     * @param req 
+     * @param res 
+     */
+    public static isValidStop(req: express.Request, res: express.Response){
+        try {
+            if(req.query && req.query.name){
+                let isValidStop = false;
+                const searchName = req.query.name.toString().toLowerCase();
+                for(let stop of GoogleTransitData.STOPS) {
+                    const stopName = stop.name.toLowerCase();
+                    if(stopName === searchName){
+                        isValidStop = true;
+                        break;
+                    }
+                }
+                res.status(200).send(isValidStop);
+            }
+            else{
+                res.status(400).send();
+            }
+        }
+        catch (err) {
+            res.status(500).send(err);
+        }
+    }
 }
