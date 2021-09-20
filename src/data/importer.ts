@@ -17,6 +17,7 @@ export class Importer {
     private static stopIdMap = new Map<number, number>();
     private static tripIdMap = new Map<number, number>();
     private static routeIdMap = new Map<number, number>();
+    private static serviceIdMap = new Map<number, number>();
 
     // Imports all relevant files and stores the data.
     public static importGoogleTransitData(): void {
@@ -29,7 +30,6 @@ export class Importer {
         Importer.importTrips();
         Importer.importStopTimes();
         console.timeEnd('import')
-        
     }
 
     /**
@@ -68,28 +68,24 @@ export class Importer {
         const calendarData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_FOLDER, 'calendar.txt'), 'utf-8').toString().split('\n');
         for(let i = 1; i < calendarData.length - 1; i++){
             const currentCalendarAsArray: string[] = calendarData[i].split(',');
-            const monday = currentCalendarAsArray[0];
-            const tuesday = currentCalendarAsArray[1];
-            const wednesday = currentCalendarAsArray[2]
-            const thursday = currentCalendarAsArray[3]
-            const friday = currentCalendarAsArray[4]
-            const saturday = currentCalendarAsArray[5]
-            const sunday = currentCalendarAsArray[6]
             const startDate = currentCalendarAsArray[7]
             const endDate = currentCalendarAsArray[8];
             const serviceId = Number(currentCalendarAsArray[9]);
+            const isAvailable = new Array(7);
+            for(let i = 0; i < 7; i++){
+                if(currentCalendarAsArray[i] === '1'){
+                    isAvailable[i] = true;
+                } else {
+                    isAvailable[i] = false;
+                }
+            }
             const calendar: Calendar = {
-                serviceId: serviceId,
-                monday: monday,
-                tuesday: tuesday,
-                wednesday: wednesday,
-                thursday: thursday,
-                friday: friday,
-                saturday: saturday,
-                sunday: sunday,
+                serviceId: importedCalendar.length,
+                isAvailable: isAvailable,
                 startDate: startDate,
                 endDate: endDate
             }
+            this.serviceIdMap.set(serviceId, calendar.serviceId);
             importedCalendar.push(calendar);
         }
         GoogleTransitData.CALENDAR = importedCalendar;
@@ -109,9 +105,12 @@ export class Importer {
             const exceptionType = currentCalendarDatesAsArray[1];
             const date = currentCalendarDatesAsArray[2];
             const calendarDate: CalendarDate = {
-                serviceId: serviceId,
+                serviceId: this.serviceIdMap.get(serviceId),
                 date: date,
                 exception_type: exceptionType
+            }
+            if(calendarDate.serviceId){
+                importedCalendarDates.push(calendarDate);
             }
             importedCalendarDates.push(calendarDate);
         }
@@ -225,12 +224,12 @@ export class Importer {
             const trip: Trip = {
                 // mapping to the new id
                 routeId: this.routeIdMap.get(routeId),
-                serviceId: serviceId,
+                serviceId: this.serviceIdMap.get(serviceId),
                 id: importedTrips.length,
                 directionId: directionId,
             }
             // adds the trip only when a related route exists
-            if(trip.routeId){
+            if(trip.routeId && trip.serviceId){
                 // mapping to the new id
                 this.tripIdMap.set(id, trip.id);
                 importedTrips.push(trip);
