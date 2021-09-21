@@ -76,7 +76,6 @@ export class RaptorAlgorithmController {
             const journeyResponse = this.getJourneyResponse(sourceStops, targetStops, req.query.date);
             res.status(200).send(journeyResponse);
         } catch (err) {
-            console.timeEnd('raptor algorithm')
             res.status(500).send(err);
         }
         
@@ -380,6 +379,10 @@ export class RaptorAlgorithmController {
                 earliestTargetStopArrival = this.earliestArrivalTime[targetStops[i]];
                 earliestTargetStopId = targetStops[i];
             }
+        }
+
+        if(earliestTargetStopArrival === Number.MAX_VALUE){
+            throw new Error("Couldn't find a connection.");
         }
 
         // reconstructs the journey pointers from target to source stop
