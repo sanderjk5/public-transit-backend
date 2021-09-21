@@ -90,8 +90,6 @@ export class Generator {
             }
         }
 
-        console.log(GoogleTransitData.FOOTPATHS.length);
-
         GoogleTransitData.FOOTPATHS.sort((a: Footpath, b: Footpath) => {
             return Sorter.sortFootpathsByDepartureStop(a, b);
         })
@@ -125,7 +123,7 @@ export class Generator {
                         const nextArrivalStop = GoogleTransitData.STOPS[footPathsOfArrivalStop[k].arrivalStop];
                         if(!arrivalStops.includes(nextArrivalStop.id)) {
                             const distance = this.calculateDistance(stop.lat, nextArrivalStop.lat, stop.lon, nextArrivalStop.lon);
-                            const duration = Math.floor(15 * distance);
+                            const duration = Math.floor(15 * distance) * 60;
                             const footpath = {
                                 id: GoogleTransitData.FOOTPATHS.length + newFootpaths.length,
                                 departureStop: stop.id,
@@ -140,13 +138,7 @@ export class Generator {
             for(let i = 0; i < newFootpaths.length; i++){
                 GoogleTransitData.FOOTPATHS.push(newFootpaths[i])
             }
-
-            console.log(newFootpaths.length);
             
-            if(newFootpaths.length === 0){
-                break;
-            }
-
             GoogleTransitData.FOOTPATHS.sort((a: Footpath, b: Footpath) => {
                 return Sorter.sortFootpathsByDepartureStop(a, b);
             })
@@ -162,6 +154,14 @@ export class Generator {
                 }
                 lastDepartureStopId = departureStop;
             }
+
+            if(newFootpaths.length === 0){
+                break;
+            }
+        }
+
+        for(let i = 0; i < GoogleTransitData.FOOTPATHS.length; i++){
+            GoogleTransitData.FOOTPATHS[i].id = i;
         }
     }
 
