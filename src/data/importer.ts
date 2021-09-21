@@ -158,8 +158,8 @@ export class Importer {
             const currentStopAsArray: string[] = stopData[i].split(',');
             const id = Number(currentStopAsArray[1]);
             const name = currentStopAsArray[0];
-            const lat = currentStopAsArray[2];
-            const lon = currentStopAsArray[3];
+            const lat = Number(currentStopAsArray[2]);
+            const lon = Number(currentStopAsArray[3]);
             const stop: Stop = {
                 id: importedStops.length,
                 name: name,

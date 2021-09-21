@@ -43,38 +43,54 @@ export class Generator {
 
     /**
      * Generates all footpaths within stops. Sets footpaths between stop entries of the same stop to 2 minutes and footpath within the same stop entry to 0 minutes.
-     * Footpaths are reflexiv: if a foothpath between stop a and b exits, there is also a footpath between b and a with the same duration.
+     * Footpaths are reflexive: if a foothpath between stop a and b exits, there is also a footpath between b and a with the same duration.
      */
     public static generateFootpaths(){
         for(let i = 0; i < GoogleTransitData.STOPS.length; i++){
+            const stop1 = GoogleTransitData.STOPS[i];
             // change time at every stop
             let footpath: Footpath = {
                 id: GoogleTransitData.FOOTPATHS.length,
-                departureStop: GoogleTransitData.STOPS[i].id,
-                arrivalStop: GoogleTransitData.STOPS[i].id,
+                departureStop: stop1.id,
+                arrivalStop: stop1.id,
                 duration: 0
             }
             GoogleTransitData.FOOTPATHS.push(footpath);
             // reflexive footpaths between stop entries of the same stop
             for(let j = i+1; j < GoogleTransitData.STOPS.length; j++) {
-                if(GoogleTransitData.STOPS[i].name === GoogleTransitData.STOPS[j].name){
+                const stop2 = GoogleTransitData.STOPS[j];
+                let createStops = false;
+                let duration: number;
+                if(stop1.name === GoogleTransitData.STOPS[j].name){
+                    createStops = true;
+                    duration = 120;
+                } else {
+                    const distance = this.calculateDistance(stop1.lat, stop2.lat, stop1.lon, stop2.lon);
+                    if(distance < 0.2){
+                        createStops = true;
+                        duration = Math.floor(15 * distance) * 60;
+                    }
+                }
+                if(createStops) {
                     let footpath: Footpath = {
                         id: GoogleTransitData.FOOTPATHS.length,
-                        departureStop: GoogleTransitData.STOPS[i].id,
-                        arrivalStop: GoogleTransitData.STOPS[j].id,
-                        duration: 120
+                        departureStop: stop1.id,
+                        arrivalStop: stop2.id,
+                        duration: duration
                     };
                     GoogleTransitData.FOOTPATHS.push(footpath);
                     footpath = {
                         id: GoogleTransitData.FOOTPATHS.length,
-                        departureStop: GoogleTransitData.STOPS[j].id,
-                        arrivalStop: GoogleTransitData.STOPS[i].id,
-                        duration: 120
+                        departureStop: stop2.id,
+                        arrivalStop: stop1.id,
+                        duration: duration
                     }
                     GoogleTransitData.FOOTPATHS.push(footpath);
                 }
             }
         }
+
+        console.log(GoogleTransitData.FOOTPATHS.length);
 
         GoogleTransitData.FOOTPATHS.sort((a: Footpath, b: Footpath) => {
             return Sorter.sortFootpathsByDepartureStop(a, b);
@@ -91,6 +107,70 @@ export class Generator {
             }
             lastDepartureStopId = departureStop;
         }
+
+        while(true) {
+            const newFootpaths: Footpath[] = [];
+
+            for(let i = 0; i < GoogleTransitData.STOPS.length; i++){
+                const stop = GoogleTransitData.STOPS[i];
+                const footPathsOfStop = GoogleTransitData.getAllFootpathsOfAStop(stop.id);
+                const arrivalStops = [];
+                for(let j = 0; j < footPathsOfStop.length; j++){
+                    arrivalStops.push(footPathsOfStop[j].arrivalStop);
+                }
+                for(let j = 0; j < arrivalStops.length; j++){
+                    const arrivalStopId = arrivalStops[j]
+                    const footPathsOfArrivalStop = GoogleTransitData.getAllFootpathsOfAStop(arrivalStopId);
+                    for(let k = 0; k < footPathsOfArrivalStop.length; k++) {
+                        const nextArrivalStop = GoogleTransitData.STOPS[footPathsOfArrivalStop[k].arrivalStop];
+                        if(!arrivalStops.includes(nextArrivalStop.id)) {
+                            const distance = this.calculateDistance(stop.lat, nextArrivalStop.lat, stop.lon, nextArrivalStop.lon);
+                            const duration = Math.floor(15 * distance);
+                            const footpath = {
+                                id: GoogleTransitData.FOOTPATHS.length + newFootpaths.length,
+                                departureStop: stop.id,
+                                arrivalStop: nextArrivalStop.id,
+                                duration: duration
+                            }
+                            newFootpaths.push(footpath);
+                        }
+                    }
+                }
+            }
+            for(let i = 0; i < newFootpaths.length; i++){
+                GoogleTransitData.FOOTPATHS.push(newFootpaths[i])
+            }
+
+            console.log(newFootpaths.length);
+            
+            if(newFootpaths.length === 0){
+                break;
+            }
+
+            GoogleTransitData.FOOTPATHS.sort((a: Footpath, b: Footpath) => {
+                return Sorter.sortFootpathsByDepartureStop(a, b);
+            })
+    
+            GoogleTransitData.FOOTPATHSOFASTOP = new Array(GoogleTransitData.STOPS.length);
+            let lastDepartureStopId = 0;
+            GoogleTransitData.FOOTPATHSOFASTOP[lastDepartureStopId] = 0;
+    
+            for(let i = 0; i < GoogleTransitData.FOOTPATHS.length; i++) {
+                let departureStop = GoogleTransitData.FOOTPATHS[i].departureStop
+                if(lastDepartureStopId !== departureStop){
+                    GoogleTransitData.FOOTPATHSOFASTOP[departureStop] = i;
+                }
+                lastDepartureStopId = departureStop;
+            }
+        }
+    }
+
+    private static calculateDistance(lat1: number, lat2: number, lon1: number, lon2: number): number {
+        const R = 111.319;
+        const x = (lon2 - lon1) * Math.cos(0.00872664626*(lat2+lat1));
+        const y = lat2 - lat1;
+        const d = R * Math.sqrt(x*x + y*y);
+        return d;
     }
 
     /**
