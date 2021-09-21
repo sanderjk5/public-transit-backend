@@ -434,8 +434,8 @@ export class RaptorAlgorithmController {
         let arrivalDate = new Date(initialDate);
         departureDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyPointers[journeyPointers.length-1].departureTime))
         arrivalDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyPointers[0].arrivalTime))
-        let departureDateAsString = departureDate.toLocaleDateString();
-        let arrivalDateAsString = arrivalDate.toLocaleDateString();
+        let departureDateAsString = departureDate.toLocaleDateString('de-DE');
+        let arrivalDateAsString = arrivalDate.toLocaleDateString('de-DE');
 
         // creates the journey response
         const journeyResponse: JourneyResponse = {

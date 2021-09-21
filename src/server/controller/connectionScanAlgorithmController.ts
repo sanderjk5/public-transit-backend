@@ -300,8 +300,8 @@ export class ConnectionScanAlgorithmController {
         let arrivalDate = new Date(initialDate);
         departureDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyCSA.legs[0].departureTime))
         arrivalDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyCSA.legs[journeyCSA.legs.length-1].arrivalTime))
-        let departureDateAsString = departureDate.toLocaleDateString();
-        let arrivalDateAsString = arrivalDate.toLocaleDateString();
+        let departureDateAsString = departureDate.toLocaleDateString('de-DE');
+        let arrivalDateAsString = arrivalDate.toLocaleDateString('de-DE');
 
         // creates the journey response
         const journeyResponse: JourneyResponse = {
