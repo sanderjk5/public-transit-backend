@@ -274,6 +274,13 @@ export class RaptorAlgorithmController {
                     this.markedStops.push(pN);
                     if(this.earliestArrivalTimePerRound[0][pN] < this.earliestArrivalTime[pN]){
                         this.earliestArrivalTime[pN] = this.earliestArrivalTimePerRound[0][pN];
+                        this.j[pN] = {
+                            enterTripAtStop: p,
+                            departureTime: this.earliestArrivalTimePerRound[0][p],
+                            arrivalTime: this.earliestArrivalTime[pN],
+                            tripId: null,
+                            footpath: sourceFootpaths[j].id
+                        }
                     }
                 }
             }
@@ -393,15 +400,17 @@ export class RaptorAlgorithmController {
             journeyPointers.push(this.j[stopId]);
             stopId = this.j[stopId].enterTripAtStop;
         }
-
+        
         // generates the sections
         const sections: Section[] = []
+        let numberOfFootpaths = 0;
         for(let i = (journeyPointers.length - 1); i >= 0; i--){
             let departureTime = journeyPointers[i].departureTime;
             let arrivalTime = journeyPointers[i].arrivalTime;
             let arrivalStop = journeyPointers[i].exitTripAtStop;
             let type = 'Train'
             if(journeyPointers[i].footpath !== null) {
+                numberOfFootpaths++;
                 type = 'Footpath'
             }
             let section: Section = {
@@ -417,6 +426,7 @@ export class RaptorAlgorithmController {
                 let nextDepartureStop = journeyPointers[i-1].enterTripAtStop;
                 // raptor doesn't saves changes at stops. create them as footpath with a duration of 0 seconds.
                 if(arrivalStop === nextDepartureStop && type === 'Train' && journeyPointers[i-1].footpath === null){
+                    numberOfFootpaths++;
                     let stopName = GoogleTransitData.STOPS[nextDepartureStop].name;
                     let section: Section = {
                         departureTime: Converter.secondsToTime(arrivalTime),
@@ -448,7 +458,7 @@ export class RaptorAlgorithmController {
             arrivalTime: sections[sections.length-1].arrivalTime,
             departureDate: departureDateAsString,
             arrivalDate: arrivalDateAsString,
-            changes: Math.floor((sections.length/2)),
+            changes: sections.length - numberOfFootpaths - 1,
             sections: sections
         }
         return journeyResponse;
