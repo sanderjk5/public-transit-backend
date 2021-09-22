@@ -46,6 +46,7 @@ export class Generator {
      * Footpaths are reflexive: if a foothpath between stop a and b exits, there is also a footpath between b and a with the same duration.
      */
     public static generateFootpaths(){
+        console.time('generate footpaths')
         for(let i = 0; i < GoogleTransitData.STOPS.length; i++){
             const stop1 = GoogleTransitData.STOPS[i];
             // change time at every stop
@@ -163,6 +164,8 @@ export class Generator {
         for(let i = 0; i < GoogleTransitData.FOOTPATHS.length; i++){
             GoogleTransitData.FOOTPATHS[i].id = i;
         }
+
+        console.timeEnd('generate footpaths')
     }
 
     private static calculateDistance(lat1: number, lat2: number, lon1: number, lon2: number): number {
