@@ -50,9 +50,9 @@ export class ConnectionScanAlgorithmController {
             this.performAlgorithm(targetStops, sourceTimeInSeconds, sourceDate);
             console.timeEnd('connection scan algorithm')
             // gets the journey in csa format
-            const journey: JourneyCSA = this.getJourney(sourceStops, targetStops, sourceTimeInSeconds);
+            const journey: JourneyCSA = this.getJourney(targetStops, sourceTimeInSeconds);
             // generates the http response which includes all information of the journey
-            const journeyResponse = this.getJourneyResponse(journey, req.query.date, sourceTimeInSeconds);
+            const journeyResponse = this.getJourneyResponse(journey, sourceDate, sourceTimeInSeconds);
             res.send(journeyResponse);
         } catch(error) {
             console.timeEnd('connection scan algorithm')
@@ -68,6 +68,7 @@ export class ConnectionScanAlgorithmController {
      * @returns 
      */
     private static performAlgorithm(targetStops: number[], sourceTime: number, sourceDate: Date){
+        // typescript date format starts the week with sunday, gtfs with monday
         let weekday = (sourceDate.getDay() - 1) % 7;
         let reachedTargetStop = false;
         // gets the first connection id
@@ -181,7 +182,7 @@ export class ConnectionScanAlgorithmController {
      * @param sourceTime 
      * @returns 
      */
-    private static getJourney(sourceStops: number[], targetStops: number[], sourceTime: number): JourneyCSA{
+    private static getJourney(targetStops: number[], sourceTime: number): JourneyCSA{
         // finds the target stop with the earliest arrival time
         let targetStop = targetStops[0];
         for(let j = 1; j < targetStops.length; j++){
@@ -194,11 +195,12 @@ export class ConnectionScanAlgorithmController {
 
         let currentStop = targetStop;
 
-        // goes backward until it reaches a source stop which has a undefined journey pointer
+        // goes backward until it reaches a source stop which has a undefined connection in journey pointer
         while(this.j[currentStop].enterConnection){
             journeyPointersOfRoute.push(this.j[currentStop]);
             currentStop = GoogleTransitData.CONNECTIONS[this.j[currentStop].enterConnection].departureStop;
         }
+        // stores the first journey pointer (contains the initial footpath)
         journeyPointersOfRoute.push(this.j[currentStop]);
 
         const journey: JourneyCSA = {
@@ -209,7 +211,7 @@ export class ConnectionScanAlgorithmController {
         let lastArrivalTime = sourceTime;
         let dayOffset = 0;
         
-        // generates the legs and transfers
+        // generates the legs and transfers for the csa journey representation
         for(let i = journeyPointersOfRoute.length - 1; i >= 0; i--) {
             if(journeyPointersOfRoute[i].enterConnection && journeyPointersOfRoute[i].exitConnection){
                 const enterConnection = GoogleTransitData.CONNECTIONS[journeyPointersOfRoute[i].enterConnection];
@@ -260,12 +262,13 @@ export class ConnectionScanAlgorithmController {
     /**
      * Transforms the journeyCSA to a valid journey http response.
      * @param journeyCSA 
-     * @param date 
+     * @param initialDate 
      * @returns 
      */
-    private static getJourneyResponse(journeyCSA: JourneyCSA, date: string, sourceTime: number): JourneyResponse {
+    private static getJourneyResponse(journeyCSA: JourneyCSA, initialDate: Date, sourceTime: number): JourneyResponse {
         const sections: Section[] = [];
 
+        // adds the first transfer if it is a footpath between different stops
         if(journeyCSA.transfers[0].departureStop.name !== journeyCSA.transfers[0].arrivalStop.name){
             let section = {
                 departureTime: Converter.secondsToTime(sourceTime),
@@ -290,6 +293,7 @@ export class ConnectionScanAlgorithmController {
             }
             sections.push(section);
             // following footpath
+            // doesn't add the last footpath if it is a footpath inside a stop
             if(i < journeyCSA.legs.length-1 || journeyCSA.transfers[i+1].departureStop.name !== journeyCSA.transfers[i+1].arrivalStop.name){
                 section = {
                     departureTime: Converter.secondsToTime(journeyCSA.legs[i].arrivalTime),
@@ -304,7 +308,6 @@ export class ConnectionScanAlgorithmController {
         }
 
         // calculates departure and arrival date
-        let initialDate = new Date(date);
         let departureDate = new Date(initialDate);
         let arrivalDate = new Date(initialDate);
         departureDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyCSA.legs[0].departureTime))

@@ -73,7 +73,7 @@ export class RaptorAlgorithmController {
             this.performAlgorithm(targetStops);
             console.timeEnd('raptor algorithm')
             // generates the http response which includes all information of the journey
-            const journeyResponse = this.getJourneyResponse(sourceStops, targetStops, req.query.date);
+            const journeyResponse = this.getJourneyResponse(sourceStops, targetStops, sourceDate);
             res.status(200).send(journeyResponse);
         } catch (err) {
             res.status(500).send(err);
@@ -374,10 +374,10 @@ export class RaptorAlgorithmController {
      * Uses the journey pointers to generate the journey response of the http request.
      * @param sourceStops 
      * @param targetStops 
-     * @param date 
+     * @param initialDate 
      * @returns 
      */
-    private static getJourneyResponse(sourceStops: number[], targetStops: number[], date: string): JourneyResponse {
+    private static getJourneyResponse(sourceStops: number[], targetStops: number[], initialDate: Date): JourneyResponse {
         // finds the earliest arrival at the target stops
         let earliestTargetStopArrival = this.earliestArrivalTime[targetStops[0]];
         let earliestTargetStopId = targetStops[0];
@@ -442,7 +442,6 @@ export class RaptorAlgorithmController {
         }
 
         // calculates departure and arrival date
-        let initialDate = new Date(date);
         let departureDate = new Date(initialDate);
         let arrivalDate = new Date(initialDate);
         departureDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyPointers[journeyPointers.length-1].departureTime))
