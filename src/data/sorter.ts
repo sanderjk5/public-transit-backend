@@ -65,6 +65,12 @@ export class Sorter {
         }
     }
 
+    /**
+     * Sorts footpaths by their departure stop.
+     * @param a 
+     * @param b 
+     * @returns 
+     */
     public static sortFootpathsByDepartureStop(a: Footpath, b: Footpath){
         if(a.departureStop < b.departureStop) {
             return -1;

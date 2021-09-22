@@ -73,10 +73,9 @@ export class RaptorAlgorithmController {
             this.performAlgorithm(targetStops);
             console.timeEnd('raptor algorithm')
             // generates the http response which includes all information of the journey
-            const journeyResponse = this.getJourneyResponse(sourceStops, targetStops, req.query.date);
+            const journeyResponse = this.getJourneyResponse(sourceStops, targetStops, sourceDate);
             res.status(200).send(journeyResponse);
         } catch (err) {
-            console.timeEnd('raptor algorithm')
             res.status(500).send(err);
         }
         
@@ -275,6 +274,13 @@ export class RaptorAlgorithmController {
                     this.markedStops.push(pN);
                     if(this.earliestArrivalTimePerRound[0][pN] < this.earliestArrivalTime[pN]){
                         this.earliestArrivalTime[pN] = this.earliestArrivalTimePerRound[0][pN];
+                        this.j[pN] = {
+                            enterTripAtStop: p,
+                            departureTime: this.earliestArrivalTimePerRound[0][p],
+                            arrivalTime: this.earliestArrivalTime[pN],
+                            tripId: null,
+                            footpath: sourceFootpaths[j].id
+                        }
                     }
                 }
             }
@@ -368,10 +374,10 @@ export class RaptorAlgorithmController {
      * Uses the journey pointers to generate the journey response of the http request.
      * @param sourceStops 
      * @param targetStops 
-     * @param date 
+     * @param initialDate 
      * @returns 
      */
-    private static getJourneyResponse(sourceStops: number[], targetStops: number[], date: string): JourneyResponse {
+    private static getJourneyResponse(sourceStops: number[], targetStops: number[], initialDate: Date): JourneyResponse {
         // finds the earliest arrival at the target stops
         let earliestTargetStopArrival = this.earliestArrivalTime[targetStops[0]];
         let earliestTargetStopId = targetStops[0];
@@ -382,6 +388,10 @@ export class RaptorAlgorithmController {
             }
         }
 
+        if(earliestTargetStopArrival === Number.MAX_VALUE){
+            throw new Error("Couldn't find a connection.");
+        }
+
         // reconstructs the journey pointers from target to source stop
         let journeyPointers: JourneyPointer[] = []
         let stopId = earliestTargetStopId;
@@ -390,15 +400,17 @@ export class RaptorAlgorithmController {
             journeyPointers.push(this.j[stopId]);
             stopId = this.j[stopId].enterTripAtStop;
         }
-
+        
         // generates the sections
         const sections: Section[] = []
+        let numberOfFootpaths = 0;
         for(let i = (journeyPointers.length - 1); i >= 0; i--){
             let departureTime = journeyPointers[i].departureTime;
             let arrivalTime = journeyPointers[i].arrivalTime;
             let arrivalStop = journeyPointers[i].exitTripAtStop;
             let type = 'Train'
             if(journeyPointers[i].footpath !== null) {
+                numberOfFootpaths++;
                 type = 'Footpath'
             }
             let section: Section = {
@@ -414,6 +426,7 @@ export class RaptorAlgorithmController {
                 let nextDepartureStop = journeyPointers[i-1].enterTripAtStop;
                 // raptor doesn't saves changes at stops. create them as footpath with a duration of 0 seconds.
                 if(arrivalStop === nextDepartureStop && type === 'Train' && journeyPointers[i-1].footpath === null){
+                    numberOfFootpaths++;
                     let stopName = GoogleTransitData.STOPS[nextDepartureStop].name;
                     let section: Section = {
                         departureTime: Converter.secondsToTime(arrivalTime),
@@ -429,7 +442,6 @@ export class RaptorAlgorithmController {
         }
 
         // calculates departure and arrival date
-        let initialDate = new Date(date);
         let departureDate = new Date(initialDate);
         let arrivalDate = new Date(initialDate);
         departureDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyPointers[journeyPointers.length-1].departureTime))
@@ -445,7 +457,7 @@ export class RaptorAlgorithmController {
             arrivalTime: sections[sections.length-1].arrivalTime,
             departureDate: departureDateAsString,
             arrivalDate: arrivalDateAsString,
-            changes: Math.floor((sections.length/2)),
+            changes: sections.length - numberOfFootpaths - 1,
             sections: sections
         }
         return journeyResponse;

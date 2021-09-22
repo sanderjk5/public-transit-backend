@@ -50,9 +50,9 @@ export class ConnectionScanAlgorithmController {
             this.performAlgorithm(targetStops, sourceTimeInSeconds, sourceDate);
             console.timeEnd('connection scan algorithm')
             // gets the journey in csa format
-            const journey: JourneyCSA = this.getJourney(sourceStops, targetStops, sourceTimeInSeconds);
+            const journey: JourneyCSA = this.getJourney(targetStops, sourceTimeInSeconds);
             // generates the http response which includes all information of the journey
-            const journeyResponse = this.getJourneyResponse(journey, req.query.date);
+            const journeyResponse = this.getJourneyResponse(journey, sourceDate, sourceTimeInSeconds);
             res.send(journeyResponse);
         } catch(error) {
             console.timeEnd('connection scan algorithm')
@@ -68,6 +68,7 @@ export class ConnectionScanAlgorithmController {
      * @returns 
      */
     private static performAlgorithm(targetStops: number[], sourceTime: number, sourceDate: Date){
+        // typescript date format starts the week with sunday, gtfs with monday
         let weekday = (sourceDate.getDay() - 1) % 7;
         let reachedTargetStop = false;
         // gets the first connection id
@@ -79,7 +80,6 @@ export class ConnectionScanAlgorithmController {
             for(let i = firstConnectionId; i < GoogleTransitData.CONNECTIONS.length; i++){
                 let currentConnection = GoogleTransitData.CONNECTIONS[i];
                 let serviceId = GoogleTransitData.TRIPS[currentConnection.trip].serviceId;
-                let isAvailable = GoogleTransitData.CALENDAR[serviceId].isAvailable[weekday];
                 if(!GoogleTransitData.CALENDAR[serviceId].isAvailable[weekday]){
                     continue;
                 }
@@ -169,6 +169,7 @@ export class ConnectionScanAlgorithmController {
             for(let i = 0; i < footpathsOfSourceStop.length; i++){
                 if(this.s[footpathsOfSourceStop[i].arrivalStop] > sourceTime + footpathsOfSourceStop[i].duration){
                     this.s[footpathsOfSourceStop[i].arrivalStop] = sourceTime + footpathsOfSourceStop[i].duration;
+                    this.j[footpathsOfSourceStop[i].arrivalStop].footpath = footpathsOfSourceStop[i].id;
                 }
             }
         }
@@ -181,7 +182,7 @@ export class ConnectionScanAlgorithmController {
      * @param sourceTime 
      * @returns 
      */
-    private static getJourney(sourceStops: number[], targetStops: number[], sourceTime: number): JourneyCSA{
+    private static getJourney(targetStops: number[], sourceTime: number): JourneyCSA{
         // finds the target stop with the earliest arrival time
         let targetStop = targetStops[0];
         for(let j = 1; j < targetStops.length; j++){
@@ -194,11 +195,13 @@ export class ConnectionScanAlgorithmController {
 
         let currentStop = targetStop;
 
-        // goes backward until it reaches a source stop which has a undefined journey pointer
-        while(!sourceStops.includes(currentStop)){
+        // goes backward until it reaches a source stop which has a undefined connection in journey pointer
+        while(this.j[currentStop].enterConnection){
             journeyPointersOfRoute.push(this.j[currentStop]);
             currentStop = GoogleTransitData.CONNECTIONS[this.j[currentStop].enterConnection].departureStop;
         }
+        // stores the first journey pointer (contains the initial footpath)
+        journeyPointersOfRoute.push(this.j[currentStop]);
 
         const journey: JourneyCSA = {
             legs: [],
@@ -208,46 +211,50 @@ export class ConnectionScanAlgorithmController {
         let lastArrivalTime = sourceTime;
         let dayOffset = 0;
         
-        // generates the legs and transfers
+        // generates the legs and transfers for the csa journey representation
         for(let i = journeyPointersOfRoute.length - 1; i >= 0; i--) {
-            const enterConnection = GoogleTransitData.CONNECTIONS[journeyPointersOfRoute[i].enterConnection];
-            const exitConnection = GoogleTransitData.CONNECTIONS[journeyPointersOfRoute[i].exitConnection];
-
-            const departureStop = GoogleTransitData.STOPS[enterConnection.departureStop];
-            const arrivalStop = GoogleTransitData.STOPS[exitConnection.arrivalStop];
-            // calculates the day difference of departure and arrival time
-            let departureTime = enterConnection.departureTime + dayOffset
-            if(departureTime < lastArrivalTime){
-                dayOffset += (24*3600);
-                departureTime += (24*3600);
-            }
-            let arrivalTime = exitConnection.arrivalTime + dayOffset;
-            if(arrivalTime < departureTime){
-                dayOffset += (24*3600);
-                arrivalTime += (24*3600);
-            }
-            
-            let duration: string = Converter.secondsToTime(arrivalTime - departureTime);
-            
-            const leg: Leg = {
-                departureStop: departureStop,
-                arrivalStop: arrivalStop,
-                departureTime: departureTime,
-                arrivalTime: arrivalTime,
-                duration: duration
-            }
-
-            journey.legs.push(leg);
-            
-            const footpath = GoogleTransitData.FOOTPATHS[journeyPointersOfRoute[i].footpath];
-
-            const transfer: Transfer = {
-                departureStop: GoogleTransitData.STOPS[footpath.departureStop],
-                arrivalStop: GoogleTransitData.STOPS[footpath.arrivalStop],
-                duration: footpath.duration
+            if(journeyPointersOfRoute[i].enterConnection && journeyPointersOfRoute[i].exitConnection){
+                const enterConnection = GoogleTransitData.CONNECTIONS[journeyPointersOfRoute[i].enterConnection];
+                const exitConnection = GoogleTransitData.CONNECTIONS[journeyPointersOfRoute[i].exitConnection];
+    
+                const departureStop = GoogleTransitData.STOPS[enterConnection.departureStop];
+                const arrivalStop = GoogleTransitData.STOPS[exitConnection.arrivalStop];
+                // calculates the day difference of departure and arrival time
+                let departureTime = enterConnection.departureTime + dayOffset
+                if(departureTime < lastArrivalTime){
+                    dayOffset += (24*3600);
+                    departureTime += (24*3600);
+                }
+                let arrivalTime = exitConnection.arrivalTime + dayOffset;
+                if(arrivalTime < departureTime){
+                    dayOffset += (24*3600);
+                    arrivalTime += (24*3600);
+                }
+                
+                let duration: string = Converter.secondsToTime(arrivalTime - departureTime);
+                
+                const leg: Leg = {
+                    departureStop: departureStop,
+                    arrivalStop: arrivalStop,
+                    departureTime: departureTime,
+                    arrivalTime: arrivalTime,
+                    duration: duration
+                }
+    
+                journey.legs.push(leg); 
             }
 
-            journey.transfers.push(transfer);
+            if(journeyPointersOfRoute[i].footpath){
+                const footpath = GoogleTransitData.FOOTPATHS[journeyPointersOfRoute[i].footpath];
+
+                const transfer: Transfer = {
+                    departureStop: GoogleTransitData.STOPS[footpath.departureStop],
+                    arrivalStop: GoogleTransitData.STOPS[footpath.arrivalStop],
+                    duration: footpath.duration
+                }
+    
+                journey.transfers.push(transfer);
+            }
         }
         return journey;
     }
@@ -255,13 +262,26 @@ export class ConnectionScanAlgorithmController {
     /**
      * Transforms the journeyCSA to a valid journey http response.
      * @param journeyCSA 
-     * @param date 
+     * @param initialDate 
      * @returns 
      */
-    private static getJourneyResponse(journeyCSA: JourneyCSA, date: string): JourneyResponse {
+    private static getJourneyResponse(journeyCSA: JourneyCSA, initialDate: Date, sourceTime: number): JourneyResponse {
         const sections: Section[] = [];
+
+        // adds the first transfer if it is a footpath between different stops
+        if(journeyCSA.transfers[0].departureStop.name !== journeyCSA.transfers[0].arrivalStop.name){
+            let section = {
+                departureTime: Converter.secondsToTime(sourceTime),
+                arrivalTime:  Converter.secondsToTime(sourceTime + journeyCSA.transfers[0].duration),
+                duration: Converter.secondsToTime(journeyCSA.transfers[0].duration),
+                departureStop: journeyCSA.transfers[0].departureStop.name,
+                arrivalStop: journeyCSA.transfers[0].arrivalStop.name,
+                type: 'Footpath'
+            }
+            sections.push(section);
+        }
         //loops over all legs and transfers and uses them to generate sections.
-        for(let i = 0; i < journeyCSA.legs.length - 1; i++) {
+        for(let i = 0; i < journeyCSA.legs.length; i++) {
             // train connection
             let section: Section = {
                 departureTime: Converter.secondsToTime(journeyCSA.legs[i].departureTime),
@@ -273,29 +293,21 @@ export class ConnectionScanAlgorithmController {
             }
             sections.push(section);
             // following footpath
-            section = {
-                departureTime: Converter.secondsToTime(journeyCSA.legs[i].arrivalTime),
-                arrivalTime:  Converter.secondsToTime(journeyCSA.legs[i].arrivalTime + journeyCSA.transfers[i].duration),
-                duration: Converter.secondsToTime(journeyCSA.transfers[i].duration),
-                departureStop: journeyCSA.transfers[i].departureStop.name,
-                arrivalStop: journeyCSA.transfers[i].arrivalStop.name,
-                type: 'Footpath'
+            // doesn't add the last footpath if it is a footpath inside a stop
+            if(i < journeyCSA.legs.length-1 || journeyCSA.transfers[i+1].departureStop.name !== journeyCSA.transfers[i+1].arrivalStop.name){
+                section = {
+                    departureTime: Converter.secondsToTime(journeyCSA.legs[i].arrivalTime),
+                    arrivalTime:  Converter.secondsToTime(journeyCSA.legs[i].arrivalTime + journeyCSA.transfers[i+1].duration),
+                    duration: Converter.secondsToTime(journeyCSA.transfers[i+1].duration),
+                    departureStop: journeyCSA.transfers[i+1].departureStop.name,
+                    arrivalStop: journeyCSA.transfers[i+1].arrivalStop.name,
+                    type: 'Footpath'
+                }
+                sections.push(section);
             }
-            sections.push(section);
         }
-        // last train connection to the target stop
-        let section: Section = {
-            departureTime: Converter.secondsToTime(journeyCSA.legs[journeyCSA.legs.length-1].departureTime),
-            arrivalTime: Converter.secondsToTime(journeyCSA.legs[journeyCSA.legs.length-1].arrivalTime),
-            duration: journeyCSA.legs[journeyCSA.legs.length-1].duration,
-            departureStop: journeyCSA.legs[journeyCSA.legs.length-1].departureStop.name,
-            arrivalStop: journeyCSA.legs[journeyCSA.legs.length-1].arrivalStop.name,
-            type: 'Train'
-        }
-        sections.push(section)
 
         // calculates departure and arrival date
-        let initialDate = new Date(date);
         let departureDate = new Date(initialDate);
         let arrivalDate = new Date(initialDate);
         departureDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyCSA.legs[0].departureTime))
@@ -311,7 +323,7 @@ export class ConnectionScanAlgorithmController {
             arrivalTime: sections[sections.length-1].arrivalTime,
             departureDate: departureDateAsString,
             arrivalDate: arrivalDateAsString,
-            changes: Math.floor((sections.length/2)),
+            changes: journeyCSA.legs.length-1,
             sections: sections
         }
         return journeyResponse;
