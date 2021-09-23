@@ -76,9 +76,9 @@ export class RaptorAlgorithmController {
             const journeyResponse = this.getJourneyResponse(sourceStops, targetStops, sourceDate);
             res.status(200).send(journeyResponse);
         } catch (err) {
+            console.log(err);
             res.status(500).send(err);
         }
-        
     }
 
     /**
@@ -105,7 +105,7 @@ export class RaptorAlgorithmController {
                     let routeId = routesServingStop[i].routeId;
                     let stopSequence = routesServingStop[i].stopSequence;
                     // sets the minimal sequence number for each route
-                    if(!routeSequenceMinima[routeId] || stopSequence < routeSequenceMinima[routeId]){
+                    if(routeSequenceMinima[routeId] === undefined || stopSequence < routeSequenceMinima[routeId]){
                         routeSequenceMinima[routeId] = stopSequence;
                     }
                     qTemp.push({r: routeId, p: markedStop, stopSequence: stopSequence});
@@ -137,7 +137,6 @@ export class RaptorAlgorithmController {
                     let pi = GoogleTransitData.STOPSOFAROUTE[r][j];
                     if(pi === p){
                         reachedP = true;
-                        continue;
                     }
                     if(!reachedP){
                         continue;
@@ -145,7 +144,7 @@ export class RaptorAlgorithmController {
                     
                     // gets stop time of stop pi in trip t
                     let stopTime = GoogleTransitData.getStopTimeByTripAndStop(t, pi);
-                    
+
                     if(!stopTime){
                         continue;
                     }
@@ -163,8 +162,8 @@ export class RaptorAlgorithmController {
                     // gets the earliest arrival time at the target stops
                     let earliestTargetStopArrival = this.earliestArrivalTime[targetStops[0]];
                     for(let l = 1; l < targetStops.length; l++){
-                        if(this.earliestArrivalTime[targetStops[i]] < earliestTargetStopArrival){
-                            earliestTargetStopArrival = this.earliestArrivalTime[targetStops[i]];
+                        if(this.earliestArrivalTime[targetStops[l]] < earliestTargetStopArrival){
+                            earliestTargetStopArrival = this.earliestArrivalTime[targetStops[l]];
                         }
                     }
                     // sets the arrival time + journey pointer
@@ -187,11 +186,9 @@ export class RaptorAlgorithmController {
                     // checks if it is possible to catch an earlier trip at pi in round k
                     if(stopTime && this.earliestArrivalTimePerRound[k-1][pi] < departureTime){
                         let newT = this.getEarliestTrip(r, pi, k);
-                        if(newT && newT.tripId !== t){
-                            tripInfo = newT;
-                            t = tripInfo.tripId;
-                            enterTripAtStop = stopTime.stopId;
-                        }
+                        tripInfo = newT;
+                        t = tripInfo.tripId;
+                        enterTripAtStop = stopTime.stopId;
                     }
                 }
             }
@@ -337,7 +334,7 @@ export class RaptorAlgorithmController {
                 if(!GoogleTransitData.CALENDAR[serviceId].isAvailable[weekday]){
                     continue;
                 }
-                if(stopTime.departureTime + earliestArrivalDayOffset > earliestArrival) {
+                if(stopTime.departureTime + earliestArrivalDayOffset >= earliestArrival) {
                     tripId = stopTime.tripId;
                     tripDeparture = stopTime.departureTime + earliestArrivalDayOffset;
                     break;
