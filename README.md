@@ -5,7 +5,7 @@ The backend part of the public transit project.
 ---
 ## Requirements
 
-To run the backend, you will only need Node.js installed in your environement.
+To clone this repository, git lfs is required. Please install it [here](https://git-lfs.github.com/). To run the backend, you will only need Node.js installed in your environement.
 
 ### Node
 - #### Node installation on Windows
@@ -30,8 +30,6 @@ If the installation was successful, you should be able to run the following comm
 
     $ npm --version
     6.14.13
-
-To clone this repository, git lfs is required. Please install it [here](https://git-lfs.github.com/).
 
 ## Install dependencies
 
