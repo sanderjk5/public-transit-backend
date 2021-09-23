@@ -15,7 +15,7 @@ Also, be sure to have `git` available in your PATH, `npm` might need it (You can
 
 - #### Node installation on Ubuntu
 
-  You can install nodejs and npm easily with apt install, just run the following commands.
+  You can install nodejs and npm easily with apt install, just run the following commands:
 
       $ sudo apt install nodejs
       $ sudo apt install npm
