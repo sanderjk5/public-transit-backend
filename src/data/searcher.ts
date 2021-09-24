@@ -15,6 +15,6 @@ export class Searcher {
                 end = middle - 1;
             }
         }
-        return 0;
+        return Number.MAX_VALUE;
     }
 }
