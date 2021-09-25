@@ -6,6 +6,8 @@ import { Generator } from './data/generator';
 import { RaptorAlgorithmController } from './server/controller/raptorAlgorithmController';
 import { TestController } from './server/controller/testController';
 import { GoogleTransitData } from './data/google-transit-data';
+import { Converter } from './data/converter';
+import { Calculator } from './data/calculator';
 
 const app = express();
 
@@ -39,16 +41,16 @@ TestController.testAlgorithms();
 //   console.log(GoogleTransitData.STOPS[stopTime.stopId])
 // }
 
-// let routeId = GoogleTransitData.TRIPS[19900].routeId
-// console.log(19308)
+// let routeId = GoogleTransitData.TRIPS[10282].routeId
+// console.log(10282)
 // console.log(routeId)
 // for(let i = 0; i < GoogleTransitData.STOPSOFAROUTE[routeId].length; i++){
 //   let stopId = GoogleTransitData.STOPSOFAROUTE[routeId][i];
 //   console.log(GoogleTransitData.STOPS[stopId].name)
 // }
 
-// routeId = GoogleTransitData.TRIPS[19894].routeId
-// console.log(21912)
+// routeId = GoogleTransitData.TRIPS[8825].routeId
+// console.log(8825)
 // console.log(routeId)
 // for(let i = 0; i < GoogleTransitData.STOPSOFAROUTE[routeId].length; i++){
 //   let stopId = GoogleTransitData.STOPSOFAROUTE[routeId][i];
@@ -97,8 +99,8 @@ TestController.testAlgorithms();
 //   console.log(GoogleTransitData.STOPS[stopId].name)
 // }
 
-// for(let i = -8; i < 18; i++){
-//   console.log((i+7) % 7)
+// for(let i = -18; i < 18; i++){
+//   console.log(Calculator.moduloSeven(i))
 // }
 
 

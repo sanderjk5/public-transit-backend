@@ -7,6 +7,7 @@ import { JourneyResponse } from "../../models/JourneyResponse";
 import { Section } from "../../models/Section";
 import express from "express";
 import { performance } from 'perf_hooks';
+import { Calculator } from "../../data/calculator";
 
 // entries of the q array
 interface QEntry {
@@ -66,7 +67,7 @@ export class RaptorAlgorithmController {
             // converts the source time
             const sourceTimeInSeconds = Converter.timeToSeconds(req.query.sourceTime)
             const sourceDate = new Date(req.query.date);
-            this.sourceWeekday = (sourceDate.getDay() - 1) % 7;
+            this.sourceWeekday = Calculator.moduloSeven((sourceDate.getDay() - 1));
             // initializes the csa algorithm
             this.init(sourceStops, sourceTimeInSeconds);
             console.time('raptor algorithm')
@@ -87,7 +88,7 @@ export class RaptorAlgorithmController {
         const sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
         const targetStops = GoogleTransitData.getStopIdsByName(targetStop);
         // sets the source Weekday
-        this.sourceWeekday = (sourceDate.getDay() - 1) % 7;
+        this.sourceWeekday = Calculator.moduloSeven((sourceDate.getDay() - 1));
         try {
             // initializes the csa algorithm
             this.init(sourceStops, sourceTimeInSeconds);
@@ -190,8 +191,6 @@ export class RaptorAlgorithmController {
                         continue;
                     }
 
-                    
-                    
                     // gets stop time of stop pi in trip t
                     let stopTime = GoogleTransitData.getStopTimeByTripAndStop(t, pi);
 
@@ -214,8 +213,6 @@ export class RaptorAlgorithmController {
                     if(departureTime < tripInfo.tripDeparture){
                         departureTime += (24*3600);
                     }
-
-                    
 
                     // if(GoogleTransitData.TRIPS[21912].routeId === r) {
                     //     console.log(GoogleTransitData.STOPS[pi].name)
@@ -401,24 +398,24 @@ export class RaptorAlgorithmController {
         let earliestArrival = this.earliestArrivalTimePerRound[k-1][pi];
         let earliestArrivalDayOffset = Converter.getDayOffset(earliestArrival);
         let previousDay = false;
-        let weekday = (this.sourceWeekday + Converter.getDayDifference(earliestArrival)) % 7;
+        let currentWeekday = Calculator.moduloSeven(this.sourceWeekday + Converter.getDayDifference(earliestArrival));
+        let previousWeekday = Calculator.moduloSeven(currentWeekday - 1);
 
         // loops over all stop times until it finds the first departure after the earliestArrival
-        for(let i = 0; i < 4; i ++) {
+        for(let i = 0; i < 7; i ++) {
             for(let j = 0; j < stopTimes.length; j++) {
                 let stopTime = stopTimes[j];
                 let departureTime = stopTime.departureTime;
                 let serviceId = GoogleTransitData.TRIPS[stopTime.tripId].serviceId;
-                if(!GoogleTransitData.CALENDAR[serviceId].isAvailable[weekday]){
-                    //continue;
-                }
-                if((departureTime + earliestArrivalDayOffset) >= earliestArrival && (departureTime + earliestArrivalDayOffset) < tripDeparture) {
+                if(GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday] && (departureTime + earliestArrivalDayOffset) >= earliestArrival 
+                    && (departureTime + earliestArrivalDayOffset) < tripDeparture) {
                     tripId = stopTime.tripId;
                     tripDeparture = departureTime + earliestArrivalDayOffset;
                     previousDay = false;
                 }
                 let departureTimeOfPreviousDay = departureTime - (24*3600);
-                if(departureTimeOfPreviousDay >= 0 && (departureTimeOfPreviousDay + earliestArrivalDayOffset) >= earliestArrival && (departureTimeOfPreviousDay + earliestArrivalDayOffset) < tripDeparture){
+                if(GoogleTransitData.CALENDAR[serviceId].isAvailable[previousWeekday] && departureTimeOfPreviousDay >= 0 
+                    && (departureTimeOfPreviousDay + earliestArrivalDayOffset) >= earliestArrival && (departureTimeOfPreviousDay + earliestArrivalDayOffset) < tripDeparture){
                     tripId = stopTime.tripId;
                     tripDeparture = departureTimeOfPreviousDay + earliestArrivalDayOffset;
                     previousDay = true;
@@ -427,13 +424,14 @@ export class RaptorAlgorithmController {
             if(tripId){
                 break;
             }
-            weekday = (weekday + 1) % 7;
+            previousWeekday = currentWeekday;
+            currentWeekday = Calculator.moduloSeven(currentWeekday + 1);
             earliestArrivalDayOffset += (24*3600);
         }
         
         // checks if it found a trip at the same day
         if(tripId){
-            let dayOffset;
+            let dayOffset: number;
             if(previousDay) {
                 dayOffset = earliestArrivalDayOffset-(24*3600);
             } else {
