@@ -1,3 +1,4 @@
+import { SECONDS_OF_A_DAY } from "../constants";
 export class Converter {
     /**
      * Converts a given time to its number of seconds since 00:00:00.
@@ -13,9 +14,6 @@ export class Converter {
         timeInSeconds += Number(splittedString[1]) * 60;
         //seconds
         timeInSeconds += Number(splittedString[2]);
-        // while(timeInSeconds >= 24*3600){
-        //     timeInSeconds = timeInSeconds - 24*3600;
-        // }
         return timeInSeconds;
     }
 
@@ -32,8 +30,8 @@ export class Converter {
         let time = '';
         let calculation = 0;
         // subtracts additional days
-        while(timeInSeconds >= 24*3600){
-            timeInSeconds = timeInSeconds - 24*3600;
+        while(timeInSeconds >= SECONDS_OF_A_DAY){
+            timeInSeconds = timeInSeconds - SECONDS_OF_A_DAY;
         }
         // calculates hours and minutes
         let divider = 3600;
@@ -66,11 +64,11 @@ export class Converter {
             return 0;
         }
         let counter = 0;
-        while(timeInSeconds >= 24*3600){
-            timeInSeconds = timeInSeconds - 24*3600;
+        while(timeInSeconds >= SECONDS_OF_A_DAY){
+            timeInSeconds = timeInSeconds - SECONDS_OF_A_DAY;
             counter++;
         }
-        return counter * (24*3600);
+        return counter * SECONDS_OF_A_DAY;
     }
 
     /**
@@ -83,8 +81,8 @@ export class Converter {
             return 0;
         }
         let counter = 0;
-        while(timeInSeconds >= 24*3600){
-            timeInSeconds = timeInSeconds - 24*3600;
+        while(timeInSeconds >= SECONDS_OF_A_DAY){
+            timeInSeconds = timeInSeconds - SECONDS_OF_A_DAY;
             counter++;
         }
         return counter;

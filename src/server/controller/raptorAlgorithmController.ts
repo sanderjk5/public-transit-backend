@@ -7,6 +7,7 @@ import { Section } from "../../models/Section";
 import express from "express";
 import { performance } from 'perf_hooks';
 import { Calculator } from "../../data/calculator";
+import { SECONDS_OF_A_DAY } from "../../constants";
 
 // entries of the q array
 interface QEntry {
@@ -185,10 +186,10 @@ export class RaptorAlgorithmController {
                     let arrivalTime = stopTime.arrivalTime + tripInfo.dayOffset;
                     let departureTime = stopTime.departureTime + tripInfo.dayOffset;
                     if(arrivalTime < tripInfo.tripDeparture){
-                        arrivalTime += (24*3600);
+                        arrivalTime += SECONDS_OF_A_DAY;
                     }
                     if(departureTime < tripInfo.tripDeparture){
-                        departureTime += (24*3600);
+                        departureTime += SECONDS_OF_A_DAY;
                     }
 
                     // gets the earliest arrival time at the target stops
@@ -380,7 +381,7 @@ export class RaptorAlgorithmController {
                     tripDeparture = departureTime + earliestArrivalDayOffset;
                     previousDay = false;
                 }
-                let departureTimeOfPreviousDay = departureTime - (24*3600);
+                let departureTimeOfPreviousDay = departureTime - SECONDS_OF_A_DAY;
                 if(GoogleTransitData.CALENDAR[serviceId].isAvailable[previousWeekday] && departureTimeOfPreviousDay >= 0 
                     && (departureTimeOfPreviousDay + earliestArrivalDayOffset) >= earliestArrival && (departureTimeOfPreviousDay + earliestArrivalDayOffset) < tripDeparture){
                     tripId = stopTime.tripId;
@@ -393,14 +394,14 @@ export class RaptorAlgorithmController {
             }
             previousWeekday = currentWeekday;
             currentWeekday = Calculator.moduloSeven(currentWeekday + 1);
-            earliestArrivalDayOffset += (24*3600);
+            earliestArrivalDayOffset += SECONDS_OF_A_DAY;
         }
         
         // checks if it found a trip at the same day
         if(tripId){
             let dayOffset: number;
             if(previousDay) {
-                dayOffset = earliestArrivalDayOffset-(24*3600);
+                dayOffset = earliestArrivalDayOffset-SECONDS_OF_A_DAY;
             } else {
                 dayOffset = earliestArrivalDayOffset;
             }
