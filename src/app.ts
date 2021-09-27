@@ -3,6 +3,7 @@ import routes from './server/routes';
 import cors from 'cors';
 import { Importer } from './data/importer';
 import { Generator } from './data/generator';
+import { TestController } from './server/controller/testController';
 
 const app = express();
 

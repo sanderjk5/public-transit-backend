@@ -266,7 +266,7 @@ export class ConnectionScanAlgorithmController {
             dayDifference += 24 * 3600;
             
             // termination condition
-            if(dayDifference > 4 * (24*3600)){
+            if(dayDifference > 7 * (24*3600)){
                 throw new Error('Too many iterations.');
             }
 
