@@ -368,6 +368,8 @@ export class ConnectionScanAlgorithmController {
                 let arrivalTime = exitConnection.arrivalTime;
                 const departureDate = journeyPointersOfRoute[i].departureDate;
                 const arrivalDate = journeyPointersOfRoute[i].arrivalDate;
+
+                console.log(enterConnection.trip)
                 
                 let duration: string = Converter.secondsToTime(arrivalTime - departureTime);
                 
@@ -380,7 +382,6 @@ export class ConnectionScanAlgorithmController {
                     departureDate: departureDate,
                     arrivalDate: arrivalDate,
                 }
-    
                 journey.legs.push(leg); 
             }
 

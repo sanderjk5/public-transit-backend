@@ -375,6 +375,7 @@ export class RaptorAlgorithmController {
         let previousDay = false;
         let currentWeekday = Calculator.moduloSeven(this.sourceWeekday + Converter.getDayDifference(earliestArrival));
         let previousWeekday = Calculator.moduloSeven(currentWeekday - 1);
+        let observedTrip = false;
         // loops over all stop times until it finds the first departure after the earliestArrival
         for(let i = 0; i < 8; i ++) {
             for(let j = 0; j < stopTimes.length; j++) {
