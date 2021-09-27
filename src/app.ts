@@ -18,26 +18,6 @@ Generator.generateSortedConnections();
 Generator.generateFootpaths();
 //TestController.testAlgorithms();
 
-let trip = 41238;
-console.log('trip: ' + trip)
-let route = GoogleTransitData.TRIPS[trip].routeId;
-console.log('route: ' + route)
-for(let stop of GoogleTransitData.STOPSOFAROUTE[route]){
-  console.log(GoogleTransitData.STOPS[stop].name)
-}
-console.log(GoogleTransitData.CALENDAR[GoogleTransitData.TRIPS[trip].serviceId].isAvailable)
-
-trip = 41745;
-console.log('trip: ' + trip)
-route = GoogleTransitData.TRIPS[trip].routeId;
-console.log('route: ' + route)
-for(let stop of GoogleTransitData.STOPSOFAROUTE[route]){
-  console.log(GoogleTransitData.STOPS[stop].name)
-}
-console.log(GoogleTransitData.CALENDAR[GoogleTransitData.TRIPS[trip].serviceId].isAvailable)
-
-
-
 const port = 1337;
 const corsOptions = {
   origin: 'http://localhost:4200',

@@ -120,13 +120,6 @@ export class RaptorAlgorithmController {
         while(true){
             k++;
             this.addNextArrivalTimeRound();
-
-            let earliestTargetStopArrival = this.earliestArrivalTime[targetStops[0]];
-            for(let l = 1; l < targetStops.length; l++){
-                if(this.earliestArrivalTime[targetStops[l]] < earliestTargetStopArrival){
-                    earliestTargetStopArrival = this.earliestArrivalTime[targetStops[l]];
-                }
-            }
             
             this.Q = [];
             let qTemp: QEntry[] = [];
@@ -375,7 +368,6 @@ export class RaptorAlgorithmController {
         let previousDay = false;
         let currentWeekday = Calculator.moduloSeven(this.sourceWeekday + Converter.getDayDifference(earliestArrival));
         let previousWeekday = Calculator.moduloSeven(currentWeekday - 1);
-        let observedTrip = false;
         // loops over all stop times until it finds the first departure after the earliestArrival
         for(let i = 0; i < 8; i ++) {
             for(let j = 0; j < stopTimes.length; j++) {
