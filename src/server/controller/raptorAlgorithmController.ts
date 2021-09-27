@@ -120,13 +120,6 @@ export class RaptorAlgorithmController {
         while(true){
             k++;
             this.addNextArrivalTimeRound();
-
-            let earliestTargetStopArrival = this.earliestArrivalTime[targetStops[0]];
-            for(let l = 1; l < targetStops.length; l++){
-                if(this.earliestArrivalTime[targetStops[l]] < earliestTargetStopArrival){
-                    earliestTargetStopArrival = this.earliestArrivalTime[targetStops[l]];
-                }
-            }
             
             this.Q = [];
             let qTemp: QEntry[] = [];

@@ -12,7 +12,7 @@ import { Agency } from '../models/Agency';
 
 export class Importer {
     // directory of the gtfs files.
-    public static readonly GOOGLE_TRANSIT_FOLDER: string = path.join(__dirname, '../../data/latest_schienenregionalverkehr');
+    public static readonly GOOGLE_TRANSIT_DIRECTORY: string = path.join(__dirname, '../../data/');
     // maps to set the new ids. New ids should be equal to the position of the entry in the array.
     private static stopIdMap = new Map<number, number>();
     private static tripIdMap = new Map<number, number>();
@@ -22,23 +22,39 @@ export class Importer {
     // Imports all relevant files and stores the data.
     public static importGoogleTransitData(): void {
         console.time('complete import')
-        Importer.importAgency();
-        Importer.importCalendar();
-        Importer.importCalendarDates();
-        Importer.importRoutes();
-        Importer.importStops();
-        Importer.importTrips();
-        Importer.importStopTimes();
+        this.resetArrays();
+        this.importDirectory('latest_schienenregionalverkehr')
+        this.importDirectory('latest_schienenfernverkehr')
         console.timeEnd('complete import')
+    }
+
+    private static importDirectory(directoryName: string): void {
+        Importer.importAgency(directoryName + '/agency.txt');
+        Importer.importCalendar(directoryName + '/calendar.txt');
+        Importer.importCalendarDates(directoryName + '/calendar_dates.txt');
+        Importer.importRoutes(directoryName + '/routes.txt');
+        Importer.importStops(directoryName + '/stops.txt');
+        Importer.importTrips(directoryName + '/trips.txt');
+        Importer.importStopTimes(directoryName + '/stop_times.txt');
+    }
+
+    private static resetArrays() {
+        GoogleTransitData.AGENCIES = [];
+        GoogleTransitData.CALENDAR = [];
+        GoogleTransitData.CALENDAR_DATES = [];
+        GoogleTransitData.ROUTES = [];
+        GoogleTransitData.STOPS = [];
+        GoogleTransitData.TRIPS = [];
+        GoogleTransitData.STOPTIMES = [];
     }
 
     /**
      * Imports the agency table.
      */
-    private static importAgency(): void {
+    private static importAgency(filename: string): void {
         console.time('import agency table');
-        const importedAgency = [];
-        const agencyData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_FOLDER, 'agency.txt'), 'utf-8').toString().split('\n');
+        const importedAgency = GoogleTransitData.AGENCIES;
+        const agencyData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_DIRECTORY, filename), 'utf-8').toString().split('\n');
         for(let i = 1; i < agencyData.length - 1; i++){
             const currentAgencyAsArray: string[] = agencyData[i].split(',');
             const id = Number(currentAgencyAsArray[0]);
@@ -62,10 +78,11 @@ export class Importer {
     /**
      * Imports the calendar table.
      */
-    private static importCalendar(): void {
+    private static importCalendar(filename: string): void {
         console.time('import calendar table');
-        const importedCalendar = [];
-        const calendarData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_FOLDER, 'calendar.txt'), 'utf-8').toString().split('\n');
+        const importedCalendar = GoogleTransitData.CALENDAR;
+        this.serviceIdMap = new Map<number, number>();
+        const calendarData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_DIRECTORY, filename), 'utf-8').toString().split('\n');
         for(let i = 1; i < calendarData.length - 1; i++){
             const currentCalendarAsArray: string[] = calendarData[i].split(',');
             const startDate = currentCalendarAsArray[7]
@@ -96,10 +113,10 @@ export class Importer {
     /**
      * Imports the calendar dates table.
      */
-    private static importCalendarDates(): void {
+    private static importCalendarDates(filename: string): void {
         console.time('import calendar dates table');
-        const importedCalendarDates = [];
-        const calendarDatesData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_FOLDER, 'calendar_dates.txt'), 'utf-8').toString().split('\n');
+        const importedCalendarDates = GoogleTransitData.CALENDAR_DATES;
+        const calendarDatesData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_DIRECTORY, filename), 'utf-8').toString().split('\n');
         for(let i = 1; i < calendarDatesData.length - 1; i++){
             const currentCalendarDatesAsArray: string[] = calendarDatesData[i].split(',');
             // mapping to the new id
@@ -123,10 +140,11 @@ export class Importer {
     /**
      * Imports the routes table.
      */
-    private static importRoutes(): void {
+    private static importRoutes(filename: string): void {
         console.time('import route table');
-        const importedRoutes = [];
-        const routeData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_FOLDER, 'routes.txt'), 'utf-8').toString().split('\n');
+        const importedRoutes = GoogleTransitData.ROUTES;
+        this.routeIdMap = new Map<number, number>();
+        const routeData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_DIRECTORY, filename), 'utf-8').toString().split('\n');
         for(let i = 1; i < routeData.length - 1; i++){
             const currentRouteAsArray: string[] = routeData[i].split(',');
             const id = Number(currentRouteAsArray[4]);
@@ -152,10 +170,11 @@ export class Importer {
     /**
      * Imports the stop table.
      */
-    private static importStops(): void {
+    private static importStops(filename: string): void {
         console.time('import stops table');
-        const importedStops = [];
-        const stopData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_FOLDER, 'stops.txt'), 'utf-8').toString().split('\n');
+        const importedStops = GoogleTransitData.STOPS;
+        this.stopIdMap = new Map<number, number>();
+        const stopData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_DIRECTORY, filename), 'utf-8').toString().split('\n');
         for(let i = 1; i < stopData.length - 1; i++){
             const currentStopAsArray: string[] = stopData[i].split(',');
             const id = Number(currentStopAsArray[1]);
@@ -179,10 +198,10 @@ export class Importer {
     /**
      * Imports the stop times table.
      */
-    private static importStopTimes(): void {
+    private static importStopTimes(filename: string): void {
         console.time('import stop times table');
-        const importedStopTimes = [];
-        const stopTimeData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_FOLDER, 'stop_times.txt'), 'utf-8').toString().split('\n');
+        const importedStopTimes = GoogleTransitData.STOPTIMES;
+        const stopTimeData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_DIRECTORY, filename), 'utf-8').toString().split('\n');
         for(let i = 1; i < stopTimeData.length - 1; i++){
             const currentStopTimeAsArray: string[] = stopTimeData[i].split(',');
             const tripId = Number(currentStopTimeAsArray[0]);
@@ -213,10 +232,11 @@ export class Importer {
         console.timeEnd('import stop times table');
     }
 
-    private static importTrips(): void {
+    private static importTrips(filename: string): void {
         console.time('import trips table');
-        const importedTrips = [];
-        const tripData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_FOLDER, 'trips.txt'), 'utf-8').toString().split('\n');
+        const importedTrips = GoogleTransitData.TRIPS;
+        this.tripIdMap = new Map<number, number>();
+        const tripData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_DIRECTORY, filename), 'utf-8').toString().split('\n');
         for(let i = 1; i < tripData.length - 1; i++){
             const currentTripAsArray: string[] = tripData[i].split(',');
             const routeId = Number(currentTripAsArray[0]);

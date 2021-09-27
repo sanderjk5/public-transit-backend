@@ -380,7 +380,6 @@ export class ConnectionScanAlgorithmController {
                     departureDate: departureDate,
                     arrivalDate: arrivalDate,
                 }
-    
                 journey.legs.push(leg); 
             }
 

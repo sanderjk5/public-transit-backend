@@ -4,6 +4,7 @@ import cors from 'cors';
 import { Importer } from './data/importer';
 import { Generator } from './data/generator';
 import { TestController } from './server/controller/testController';
+import { GoogleTransitData } from './data/google-transit-data';
 
 const app = express();
 
