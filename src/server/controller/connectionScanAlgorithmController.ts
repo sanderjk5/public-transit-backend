@@ -407,7 +407,6 @@ export class ConnectionScanAlgorithmController {
      */
     private static getJourneyResponse(journeyCSA: JourneyCSA, sourceTime: number, sourceDate: Date): JourneyResponse {
         const sections: Section[] = [];
-        let initialFootpath = 0;
         // adds the first transfer if it is a footpath between different stops
         if(journeyCSA.transfers[0].departureStop.name !== journeyCSA.transfers[0].arrivalStop.name){
             let section = {
@@ -419,7 +418,6 @@ export class ConnectionScanAlgorithmController {
                 type: 'Footpath'
             }
             sections.push(section);
-            initialFootpath = journeyCSA.transfers[0].duration;
         }
         
         //loops over all legs and transfers and uses them to generate sections.
