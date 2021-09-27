@@ -24,9 +24,6 @@ export class Generator {
             let lastStopTime = GoogleTransitData.STOPTIMES[firstStopTimeOfTrip];
             for(let j = firstStopTimeOfTrip + 1; j < GoogleTransitData.STOPTIMES.length; j++) {
                 let stopTime = GoogleTransitData.STOPTIMES[j];
-                // if(tripId === 19308) {
-                //     console.log(GoogleTransitData.STOPS[lastStopTime.stopId].name + ', ' + GoogleTransitData.STOPS[stopTime.stopId].name)
-                // }
                 if(tripId !== stopTime.tripId){
                     break;
                 }
@@ -172,22 +169,6 @@ export class Generator {
     }
 
     /**
-     * Calculates the approximated distance between two coordinates.
-     * @param lat1 
-     * @param lat2 
-     * @param lon1 
-     * @param lon2 
-     * @returns 
-     */
-    private static calculateDistance(lat1: number, lat2: number, lon1: number, lon2: number): number {
-        const R = 111.319;
-        const x = (lon2 - lon1) * Math.cos(0.00872664626*(lat2+lat1));
-        const y = lat2 - lat1;
-        const d = R * Math.sqrt(x*x + y*y);
-        return d;
-    }
-
-    /**
      * Generates a pointer array which stores the first footpath of each stop.
      */
     private static generateFootpathPointers() {
@@ -253,6 +234,7 @@ export class Generator {
                         GoogleTransitData.ROUTESSERVINGSTOPS[stops[j]].push({routeId: newRouteId, stopSequence: j})
                     }
                     GoogleTransitData.TRIPSOFAROUTE.push([lastTripId]);
+                    // checks if the route contains duplicate stops
                     if(duplicatedStops.length > 0) {
                         newStopMap.set(newRouteId, duplicatedStops);
                     }
@@ -269,6 +251,7 @@ export class Generator {
             }
             // adds the stop id to the stop sequence string
             stopIdString += stopTime.stopId.toString() + ','
+            // checks if the route contains already the stop
             if(stops.includes(stopTime.stopId)){
                 duplicatedStops.push({stopId: stopTime.stopId, stopSequence: stopSequence});
             }
@@ -276,6 +259,7 @@ export class Generator {
             stops.push(stopTime.stopId);
             lastTripId = stopTime.tripId;
         }
+        // replaces the duplicated stops with new stops at the same location and the same name
         for(let routeId of newStopMap.keys()){
             let duplicatedStops = newStopMap.get(routeId);
             let trips = GoogleTransitData.TRIPSOFAROUTE[routeId];
@@ -283,6 +267,7 @@ export class Generator {
                 let duplicatedStop = duplicatedStops[j];
                 let relatedStop = GoogleTransitData.STOPS[duplicatedStop.stopId];
                 let newStopId = GoogleTransitData.STOPS.length
+                // uses the data of the replaced stop
                 let newStop: Stop = {
                     id: newStopId,
                     name: relatedStop.name,
@@ -290,6 +275,7 @@ export class Generator {
                     lon: relatedStop.lon,
                 }
                 GoogleTransitData.STOPS.push(newStop);
+                // sets the pointer of trip, stop and route
                 for(let k = 0; k < trips.length; k++){
                     let firstStopTimeOfTrip = GoogleTransitData.STOPTIMESOFATRIP[trips[k]];
                     GoogleTransitData.STOPTIMES[firstStopTimeOfTrip + duplicatedStop.stopSequence].stopId = newStopId;

@@ -85,6 +85,7 @@ export class Importer {
                 startDate: startDate,
                 endDate: endDate
             }
+            // sets the new id
             this.serviceIdMap.set(serviceId, calendar.serviceId);
             importedCalendar.push(calendar);
         }
@@ -101,6 +102,7 @@ export class Importer {
         const calendarDatesData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_FOLDER, 'calendar_dates.txt'), 'utf-8').toString().split('\n');
         for(let i = 1; i < calendarDatesData.length - 1; i++){
             const currentCalendarDatesAsArray: string[] = calendarDatesData[i].split(',');
+            // mapping to the new id
             const serviceId = Number(currentCalendarDatesAsArray[0]);
             const exceptionType = currentCalendarDatesAsArray[1];
             const date = currentCalendarDatesAsArray[2];
@@ -224,6 +226,7 @@ export class Importer {
             const trip: Trip = {
                 // mapping to the new id
                 routeId: this.routeIdMap.get(routeId),
+                // mapping to the new id
                 serviceId: this.serviceIdMap.get(serviceId),
                 id: importedTrips.length,
                 directionId: directionId,

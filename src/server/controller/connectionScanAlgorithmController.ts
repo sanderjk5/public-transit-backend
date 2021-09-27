@@ -28,7 +28,7 @@ interface TEntry {
 export class ConnectionScanAlgorithmController {
     // earliest arrival time of each stop
     private static s: number[];
-    // enter connection of each trip
+    // enter connection of each trip for each day
     private static tCurrentDay: TEntry[];
     private static tPreviousDay: TEntry[];
     private static tNextDay: TEntry[];
@@ -73,6 +73,14 @@ export class ConnectionScanAlgorithmController {
         }
     }
 
+    /**
+     * Can be used by the TestController to get the result of a random request.
+     * @param sourceStop 
+     * @param targetStop 
+     * @param sourceDate 
+     * @param sourceTimeInSeconds 
+     * @returns 
+     */
     public static testAlgorithm(sourceStop: string, targetStop: string, sourceDate: Date, sourceTimeInSeconds: number){
         // gets the source and target stops
         const sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
@@ -258,7 +266,7 @@ export class ConnectionScanAlgorithmController {
             dayDifference += 24 * 3600;
             
             // termination condition
-            if(dayDifference > 4 * (24*3600)){
+            if(dayDifference > 7 * (24*3600)){
                 throw new Error('Too many iterations.');
             }
 
@@ -329,8 +337,6 @@ export class ConnectionScanAlgorithmController {
         }
 
         const journeyPointersOfRoute: JourneyPointer[] = [];
-        // console.log(GoogleTransitData.STOPS[targetStop]);
-        // console.log(Converter.secondsToTime(this.s[targetStop]))
         let currentStop = targetStop;
 
         // goes backward until it reaches a source stop which has a undefined connection in journey pointer
@@ -344,7 +350,6 @@ export class ConnectionScanAlgorithmController {
             throw new Error("Couldn't find a connection")
             
         }
-        // console.log(journeyPointersOfRoute);
 
         const journey: JourneyCSA = {
             legs: [],
@@ -364,16 +369,6 @@ export class ConnectionScanAlgorithmController {
                 let arrivalTime = exitConnection.arrivalTime;
                 const departureDate = journeyPointersOfRoute[i].departureDate;
                 const arrivalDate = journeyPointersOfRoute[i].arrivalDate;
-                // console.log('departureTime: ' + departureTime)
-                // console.log('arrivalTime: ' + arrivalTime)
-                // console.log(GoogleTransitData.STOPS[enterConnection.departureStop].name);
-                // //console.log(GoogleTransitData.STOPS[enterConnection.arrivalStop].name);
-                // console.log(Converter.secondsToTime(enterConnection.departureTime));
-                //console.log(enterConnection.trip);
-                // // console.log(exitConnection.trip);
-                // //console.log(GoogleTransitData.STOPS[exitConnection.departureStop].name);
-                // console.log(arrivalStop.name);
-                // console.log(Converter.secondsToTime(exitConnection.arrivalTime));
                 
                 let duration: string = Converter.secondsToTime(arrivalTime - departureTime);
                 

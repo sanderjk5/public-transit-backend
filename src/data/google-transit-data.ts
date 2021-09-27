@@ -20,7 +20,7 @@ export class GoogleTransitData {
     public static STOPTIMES: StopTime[] = [];
     public static FOOTPATHS: Footpath[] = [];
     public static TRIPS: Trip[] = [];
-    // connections connection scan algorithm
+    // connections of connection scan algorithm
     public static CONNECTIONS: Connection[] = [];
     // pointer to optimize the raptor algorithm
     public static ROUTESSERVINGSTOPS: RouteStopMapping[][];

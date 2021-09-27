@@ -4,6 +4,10 @@ import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmCont
 import { RaptorAlgorithmController } from "./raptorAlgorithmController";
 
 export class TestController {
+
+    /**
+     * Creates random requests and compares the results of Raptor and CSA. Calculates the average time of both algorithms.
+     */
     public static testAlgorithms() {
         let raptorTimes = 0;
         let numberOfSuccessfulRequestsRaptor = 0;
@@ -46,6 +50,11 @@ export class TestController {
         console.log('average csa: ' + csaTimes/numberOfSuccessfulRequestsCSA)
     }
 
+    /**
+     * Returns a random integer of the interval [0, max).
+     * @param max 
+     * @returns 
+     */
     private static getRandomInt(max: number) {
         return Math.floor(Math.random() * max);
       }
