@@ -462,15 +462,16 @@ export class RaptorAlgorithmController {
         
         // generates the sections
         const sections: Section[] = []
-        let numberOfFootpaths = 0;
+        let numberOfLegs = 0;
         for(let i = (journeyPointers.length - 1); i >= 0; i--){
             let departureTime = journeyPointers[i].departureTime;
             let arrivalTime = journeyPointers[i].arrivalTime;
             let arrivalStop = journeyPointers[i].exitTripAtStop;
             let type = 'Train'
             if(journeyPointers[i].footpath !== null) {
-                numberOfFootpaths++;
                 type = 'Footpath'
+            } else {
+                numberOfLegs++;
             }
             let section: Section = {
                 departureTime: Converter.secondsToTime(departureTime),
@@ -488,7 +489,6 @@ export class RaptorAlgorithmController {
                 let nextDepartureStop = journeyPointers[i-1].enterTripAtStop;
                 // raptor doesn't saves changes at stops. create them as footpath with a duration of 0 seconds.
                 if(arrivalStop === nextDepartureStop && type === 'Train' && journeyPointers[i-1].footpath === null){
-                    numberOfFootpaths++;
                     let stopName = GoogleTransitData.STOPS[nextDepartureStop].name;
                     let section: Section = {
                         departureTime: Converter.secondsToTime(arrivalTime),
@@ -519,7 +519,7 @@ export class RaptorAlgorithmController {
             arrivalTime: sections[sections.length-1].arrivalTime,
             departureDate: departureDateAsString,
             arrivalDate: arrivalDateAsString,
-            changes: Math.max(sections.length - numberOfFootpaths - 1, 0),
+            changes: Math.max(numberOfLegs - 1, 0),
             sections: sections
         }
         return journeyResponse;

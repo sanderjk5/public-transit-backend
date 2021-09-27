@@ -12,7 +12,7 @@ import { Agency } from '../models/Agency';
 
 export class Importer {
     // directory of the gtfs files.
-    public static readonly GOOGLE_TRANSIT_FOLDER: string = path.join(__dirname, '../../google_transit');
+    public static readonly GOOGLE_TRANSIT_FOLDER: string = path.join(__dirname, '../../data/latest_schienenregionalverkehr');
     // maps to set the new ids. New ids should be equal to the position of the entry in the array.
     private static stopIdMap = new Map<number, number>();
     private static tripIdMap = new Map<number, number>();
