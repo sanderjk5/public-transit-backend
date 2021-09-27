@@ -4,6 +4,7 @@ import { Footpath } from "../models/Footpath";
 import { GoogleTransitData } from "./google-transit-data";
 import { Sorter } from "./sorter";
 import { Stop } from "../models/Stop";
+import { Calculator } from "./calculator";
 
 interface newStopMapEntry {
     stopId: number,
@@ -68,26 +69,17 @@ export class Generator {
                 duration: 0
             }
             GoogleTransitData.FOOTPATHS.push(footpath);
-            // reflexive footpaths between stop entries of the same stop
+            // reflexive footpaths between stops with a distance less than 1km
             for(let j = i+1; j < GoogleTransitData.STOPS.length; j++) {
                 const stop2 = GoogleTransitData.STOPS[j];
-                let createStops = false;
                 let duration: number;
-                if(stop1.name === GoogleTransitData.STOPS[j].name){
-                    createStops = true;
-                    duration = 120;
-                } else {
-                    // calculates the distance between the stops
-                    // const distance = this.calculateDistance(stop1.lat, stop2.lat, stop1.lon, stop2.lon);
-                    // // adds only foothpaths with a distance smaller than 200m
-                    // if(distance < 0.2){
-                    //     createStops = true;
-                    //     // assume a speed of 4km/h
-                    //     duration = Math.floor(15 * distance) * 60;
-                    // }
-                }
-                // creates reflexive footpaths
-                if(createStops) {
+                // calculates the distance between the stops
+                const distance = Calculator.calculateDistance(stop1.lat, stop2.lat, stop1.lon, stop2.lon);
+                // adds only foothpaths with a distance smaller than 1km
+                if(distance < 1){
+                    // assume a speed of 4km/h
+                    duration = Math.floor(15 * distance) * 60;
+                    // creates reflexive footpaths
                     let footpath: Footpath = {
                         id: GoogleTransitData.FOOTPATHS.length,
                         departureStop: stop1.id,
@@ -112,53 +104,6 @@ export class Generator {
         })
 
         this.generateFootpathPointers();
-
-        // adds all footpaths which are needed to satisfy the transitivity
-        // while(true) {
-        //     const newFootpaths: Footpath[] = [];
-        //     for(let i = 0; i < GoogleTransitData.STOPS.length; i++){
-        //         const stop = GoogleTransitData.STOPS[i];
-        //         const footPathsOfStop = GoogleTransitData.getAllFootpathsOfAStop(stop.id);
-        //         const arrivalStops = [];
-        //         for(let j = 0; j < footPathsOfStop.length; j++){
-        //             arrivalStops.push(footPathsOfStop[j].arrivalStop);
-        //         }
-        //         for(let j = 0; j < arrivalStops.length; j++){
-        //             const arrivalStopId = arrivalStops[j]
-        //             const footPathsOfArrivalStop = GoogleTransitData.getAllFootpathsOfAStop(arrivalStopId);
-        //             for(let k = 0; k < footPathsOfArrivalStop.length; k++) {
-        //                 const nextArrivalStop = GoogleTransitData.STOPS[footPathsOfArrivalStop[k].arrivalStop];
-        //                 if(!arrivalStops.includes(nextArrivalStop.id)) {
-        //                     const distance = this.calculateDistance(stop.lat, nextArrivalStop.lat, stop.lon, nextArrivalStop.lon);
-        //                     // assume a speed of 4km/h
-        //                     const duration = Math.floor(15 * distance) * 60;
-        //                     const footpath = {
-        //                         id: GoogleTransitData.FOOTPATHS.length + newFootpaths.length,
-        //                         departureStop: stop.id,
-        //                         arrivalStop: nextArrivalStop.id,
-        //                         duration: duration
-        //                     }
-        //                     newFootpaths.push(footpath);
-        //                 }
-        //             }
-        //         }
-        //     }
-        //     // adds the new footpaths to the array
-        //     for(let i = 0; i < newFootpaths.length; i++){
-        //         GoogleTransitData.FOOTPATHS.push(newFootpaths[i])
-        //     }
-            
-        //     GoogleTransitData.FOOTPATHS.sort((a: Footpath, b: Footpath) => {
-        //         return Sorter.sortFootpathsByDepartureStop(a, b);
-        //     })
-    
-        //     this.generateFootpathPointers();
-
-        //     // termination condition
-        //     if(newFootpaths.length === 0){
-        //         break;
-        //     }
-        // }
 
         // sets the correct footpath ids
         for(let i = 0; i < GoogleTransitData.FOOTPATHS.length; i++){

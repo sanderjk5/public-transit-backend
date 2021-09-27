@@ -64,7 +64,7 @@ export class ConnectionScanAlgorithmController {
             // gets the journey in csa format
             const journey: JourneyCSA = this.getJourney(sourceStops, targetStops, sourceTimeInSeconds);
             // generates the http response which includes all information of the journey
-            const journeyResponse = this.getJourneyResponse(journey, sourceTimeInSeconds);
+            const journeyResponse = this.getJourneyResponse(journey, sourceTimeInSeconds, sourceDate);
             res.send(journeyResponse);
         } catch(error) {
             console.log(error)
@@ -348,7 +348,6 @@ export class ConnectionScanAlgorithmController {
         journeyPointersOfRoute.push(this.j[currentStop]);
         if(!sourceStops.includes(GoogleTransitData.FOOTPATHS[this.j[currentStop].footpath].departureStop)){
             throw new Error("Couldn't find a connection")
-            
         }
 
         const journey: JourneyCSA = {
@@ -406,7 +405,7 @@ export class ConnectionScanAlgorithmController {
      * @param initialDate 
      * @returns 
      */
-    private static getJourneyResponse(journeyCSA: JourneyCSA, sourceTime: number): JourneyResponse {
+    private static getJourneyResponse(journeyCSA: JourneyCSA, sourceTime: number, sourceDate: Date): JourneyResponse {
         const sections: Section[] = [];
         let initialFootpath = 0;
         // adds the first transfer if it is a footpath between different stops
@@ -451,9 +450,19 @@ export class ConnectionScanAlgorithmController {
         }
         
         // calculates departure and arrival date
-        const departureDateAsString = journeyCSA.legs[0].departureDate.toLocaleDateString('de-DE');
-        const arrivalDateAsString = journeyCSA.legs[journeyCSA.legs.length-1].arrivalDate.toLocaleDateString('de-DE');
-
+        let departureDateAsString: string;
+        let arrivalDateAsString: string
+        if(journeyCSA.legs[0]){
+            departureDateAsString = journeyCSA.legs[0].departureDate.toLocaleDateString('de-DE');
+            arrivalDateAsString = journeyCSA.legs[journeyCSA.legs.length-1].arrivalDate.toLocaleDateString('de-DE');
+        } else {
+            departureDateAsString = sourceDate.toLocaleDateString('de-DE');
+            if(sourceTime + journeyCSA.transfers[0].duration >= (24*3600)){
+                sourceDate.setDate(sourceDate.getDate() + 1);
+            }
+            arrivalDateAsString = sourceDate.toLocaleDateString('de-DE');
+        }
+       
         // creates the journey response
         const journeyResponse: JourneyResponse = {
             sourceStop: sections[0].departureStop,
@@ -462,7 +471,7 @@ export class ConnectionScanAlgorithmController {
             arrivalTime: sections[sections.length-1].arrivalTime,
             departureDate: departureDateAsString,
             arrivalDate: arrivalDateAsString,
-            changes: journeyCSA.legs.length-1,
+            changes: Math.max(journeyCSA.legs.length-1, 0),
             sections: sections
         }
         return journeyResponse;

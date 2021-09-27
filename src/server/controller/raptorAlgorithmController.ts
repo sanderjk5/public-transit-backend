@@ -448,8 +448,6 @@ export class RaptorAlgorithmController {
             }
         }
 
-        
-
         if(earliestTargetStopArrival === Number.MAX_VALUE){
             throw new Error("Couldn't find a connection.");
         }
@@ -482,6 +480,9 @@ export class RaptorAlgorithmController {
                 arrivalStop: GoogleTransitData.STOPS[arrivalStop].name,
                 duration: Converter.secondsToTime((arrivalTime - departureTime)),
                 type: type
+            }
+            if(i === 0 && section.departureStop === section.arrivalStop){
+                break;
             }
             sections.push(section);
             if(i > 0){
@@ -519,7 +520,7 @@ export class RaptorAlgorithmController {
             arrivalTime: sections[sections.length-1].arrivalTime,
             departureDate: departureDateAsString,
             arrivalDate: arrivalDateAsString,
-            changes: sections.length - numberOfFootpaths - 1,
+            changes: Math.max(sections.length - numberOfFootpaths - 1, 0),
             sections: sections
         }
         return journeyResponse;
