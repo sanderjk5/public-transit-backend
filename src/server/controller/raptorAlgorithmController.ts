@@ -375,9 +375,8 @@ export class RaptorAlgorithmController {
         let previousDay = false;
         let currentWeekday = Calculator.moduloSeven(this.sourceWeekday + Converter.getDayDifference(earliestArrival));
         let previousWeekday = Calculator.moduloSeven(currentWeekday - 1);
-
         // loops over all stop times until it finds the first departure after the earliestArrival
-        for(let i = 0; i < 7; i ++) {
+        for(let i = 0; i < 8; i ++) {
             for(let j = 0; j < stopTimes.length; j++) {
                 let stopTime = stopTimes[j];
                 let departureTime = stopTime.departureTime;
@@ -448,8 +447,6 @@ export class RaptorAlgorithmController {
             }
         }
 
-        
-
         if(earliestTargetStopArrival === Number.MAX_VALUE){
             throw new Error("Couldn't find a connection.");
         }
@@ -482,6 +479,9 @@ export class RaptorAlgorithmController {
                 arrivalStop: GoogleTransitData.STOPS[arrivalStop].name,
                 duration: Converter.secondsToTime((arrivalTime - departureTime)),
                 type: type
+            }
+            if(i === 0 && section.departureStop === section.arrivalStop){
+                break;
             }
             sections.push(section);
             if(i > 0){
@@ -519,7 +519,7 @@ export class RaptorAlgorithmController {
             arrivalTime: sections[sections.length-1].arrivalTime,
             departureDate: departureDateAsString,
             arrivalDate: arrivalDateAsString,
-            changes: sections.length - numberOfFootpaths - 1,
+            changes: Math.max(sections.length - numberOfFootpaths - 1, 0),
             sections: sections
         }
         return journeyResponse;
