@@ -31,14 +31,17 @@ interface TEntry {
 export class ConnectionScanAlgorithmController {
     // earliest arrival time of each stop
     private static s: number[];
-    // enter connection of each trip for each day
+    // enter connection of each trip for previous, current and next day
     private static t: TEntry[][];
     // journey pointer of each stop
     private static j: JourneyPointer[];
-
+    // weekday of previous, current and next day
     private static weekdays: number[];
+    // date of previous, current and next day
     private static dates: Date[];
+    // index of previous, current and next day
     private static indices: number[];
+    // connection of previous, current and next day
     private static connections: Connection[];
 
     /**
@@ -149,7 +152,7 @@ export class ConnectionScanAlgorithmController {
                 this.indices[dayOfCurrentConnection] += 1;
                 let dayDifference2 = (dayOfCurrentConnection - 1) * SECONDS_OF_A_DAY;
                 
-                //checks if connection available on this weekday
+                //checks if the connection is available on this weekday
                 let serviceId = GoogleTransitData.TRIPS[currentConnection.trip].serviceId;
                 if(!GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday]){
                     continue;
@@ -210,6 +213,7 @@ export class ConnectionScanAlgorithmController {
             // updates the required arrays
             this.updateArraysForNextRound();
         }
+        // throws an error if it didn't find a connection after seven days.
         if(!reachedTargetStop){
             throw new Error("Couldn't find a connection in the next seven days.")
         }
