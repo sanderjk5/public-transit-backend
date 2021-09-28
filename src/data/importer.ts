@@ -19,7 +19,9 @@ export class Importer {
     private static routeIdMap = new Map<number, number>();
     private static serviceIdMap = new Map<number, number>();
 
-    // Imports all relevant files and stores the data.
+    /**
+     * Imports the files of all gtfs directories.
+     */
     public static importGoogleTransitData(): void {
         console.time('complete import')
         this.resetArrays();
@@ -28,6 +30,10 @@ export class Importer {
         console.timeEnd('complete import')
     }
 
+    /**
+     * Imports all relevant files of the given directory.
+     * @param directoryName 
+     */
     private static importDirectory(directoryName: string): void {
         Importer.importAgency(directoryName + '/agency.txt');
         Importer.importCalendar(directoryName + '/calendar.txt');
@@ -38,6 +44,9 @@ export class Importer {
         Importer.importStopTimes(directoryName + '/stop_times.txt');
     }
 
+    /**
+     * Resets all data arrays.
+     */
     private static resetArrays() {
         GoogleTransitData.AGENCIES = [];
         GoogleTransitData.CALENDAR = [];

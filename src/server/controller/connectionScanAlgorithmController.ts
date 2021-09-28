@@ -11,7 +11,9 @@ import { Section } from '../../models/Section';
 import { performance } from 'perf_hooks';
 import { Connection } from '../../models/Connection';
 import { Calculator } from '../../data/calculator';
+import { SECONDS_OF_A_DAY } from '../../constants';
 
+// Pointer to reconstruct the journey.
 interface JourneyPointer {
     enterConnection?: number,
     exitConnection?: number,
@@ -20,6 +22,7 @@ interface JourneyPointer {
     arrivalDate?: Date,
 }
 
+// Entry of the t-Array.
 interface TEntry {
     connectionId: number,
     departureDate: Date,
@@ -28,12 +31,18 @@ interface TEntry {
 export class ConnectionScanAlgorithmController {
     // earliest arrival time of each stop
     private static s: number[];
-    // enter connection of each trip for each day
-    private static tCurrentDay: TEntry[];
-    private static tPreviousDay: TEntry[];
-    private static tNextDay: TEntry[];
+    // enter connection of each trip for previous, current and next day
+    private static t: TEntry[][];
     // journey pointer of each stop
     private static j: JourneyPointer[];
+    // weekday of previous, current and next day
+    private static weekdays: number[];
+    // date of previous, current and next day
+    private static dates: Date[];
+    // index of previous, current and next day
+    private static indices: number[];
+    // connection of previous, current and next day
+    private static connections: Connection[];
 
     /**
      * Initializes and calls the connection scan algorithm.
@@ -59,7 +68,7 @@ export class ConnectionScanAlgorithmController {
             this.init(sourceStops, sourceTimeInSeconds, sourceDate);
             // calls the csa
             console.time('connection scan algorithm')
-            this.performAlgorithm(targetStops, sourceTimeInSeconds, sourceDate);
+            this.performAlgorithm(targetStops);
             console.timeEnd('connection scan algorithm')
             // gets the journey in csa format
             const journey: JourneyCSA = this.getJourney(sourceStops, targetStops, sourceTimeInSeconds);
@@ -91,7 +100,7 @@ export class ConnectionScanAlgorithmController {
             this.init(sourceStops, sourceTimeInSeconds, sourceDate);
             const startTime = performance.now();
             // calls the csa
-            this.performAlgorithm(targetStops, sourceTimeInSeconds, sourceDate);
+            this.performAlgorithm(targetStops);
             const duration = performance.now() - startTime;
             // gets the earliest arrival time at the target stops
             let earliestTargetStopArrival = this.s[targetStops[0]];
@@ -113,63 +122,37 @@ export class ConnectionScanAlgorithmController {
      * @param sourceTime 
      * @returns 
      */
-    private static performAlgorithm(targetStops: number[], sourceTime: number, sourceDate: Date){
+    private static performAlgorithm(targetStops: number[]){
         let reachedTargetStop = false;
         // gets the first connection id
         let dayDifference = 0;
         const numberOfConnections = GoogleTransitData.CONNECTIONS.length;
-        let currentDayIndex = Searcher.binarySearchOfConnections(sourceTime);
         // typescript date format starts the week with sunday, gtfs with monday
-        let currentDayWeekday = Calculator.moduloSeven((sourceDate.getDay() - 1));
-        let currentDayDate = sourceDate;
-        let nextDayIndex = 0;
-        let nextDayWeekday = Calculator.moduloSeven(currentDayWeekday + 1); 
-        let nextDayDate = new Date(sourceDate);
-        nextDayDate.setDate(sourceDate.getDate() + 1);
-        let previousDayIndex = Searcher.binarySearchOfConnections(sourceTime + (24*3600));
-        let previousDayWeekday = Calculator.moduloSeven(currentDayWeekday - 1); 
-        let previousDayDate = new Date(sourceDate);
         let dayOfCurrentConnection: number;
-        // while loop until it founds a solution or it checked connections of the next two days
-        while(true){
+        // while loop until it founds a solution or it checked connections of the next seven days
+        for(let i = 0; i < 8; i++){
             // loop over all connections
-            while(currentDayIndex < numberOfConnections){
-                let currentDayConnection = GoogleTransitData.CONNECTIONS[currentDayIndex];
-                let nextDayConnection = GoogleTransitData.CONNECTIONS[nextDayIndex];
-                let previousDayConnection: Connection;
-                let currentConnection: Connection;
-                let currentWeekday: number;
-                let currentDate: Date;
-                let dayDifference2 = 0;
-                if(previousDayIndex  < numberOfConnections){
-                    previousDayConnection = GoogleTransitData.CONNECTIONS[previousDayIndex];
-                }
-                if(previousDayConnection && ((previousDayConnection.departureTime - (24*3600)) < currentDayConnection.departureTime)) {
-                    currentConnection = previousDayConnection;
-                    previousDayIndex++;
-                    dayDifference2 = -(24*3600);
-                    dayOfCurrentConnection = -1;
-                    currentWeekday = previousDayWeekday;
-                    currentDate = new Date(previousDayDate);
-                } else if((nextDayConnection.departureTime + (24*3600)) < currentDayConnection.departureTime) {
-                    currentConnection = nextDayConnection;
-                    nextDayIndex++;
-                    dayDifference2 = (24*3600);
-                    dayOfCurrentConnection = 1;
-                    currentWeekday = nextDayWeekday;
-                    currentDate = new Date(nextDayDate);
-                } else {
-                    currentConnection = currentDayConnection;
-                    currentDayIndex++;
-                    dayOfCurrentConnection = 0;
-                    currentWeekday = currentDayWeekday;
-                    if(currentConnection.departureTime >= (24*3600)){
-                        currentDate = new Date(nextDayDate);
+            while(this.indices[1] < numberOfConnections){
+                // sets the next connection of previous, current and next day
+                for(let j = 0; j < 3; j++) {
+                    if(this.indices[j] < numberOfConnections){
+                        this.connections[j] = GoogleTransitData.CONNECTIONS[this.indices[j]];
                     } else {
-                        currentDate = new Date(currentDayDate);
+                        this.connections[j] = null;
                     }
                 }
-
+                // sets information of current connection
+                dayOfCurrentConnection = this.getNextConnection();
+                let currentConnection = this.connections[dayOfCurrentConnection];
+                let currentWeekday = this.weekdays[dayOfCurrentConnection];
+                let currentDate = this.dates[dayOfCurrentConnection];
+                if(dayOfCurrentConnection === 1 && currentConnection.departureTime >= SECONDS_OF_A_DAY){
+                    currentDate = this.dates[2];
+                }
+                this.indices[dayOfCurrentConnection] += 1;
+                let dayDifference2 = (dayOfCurrentConnection - 1) * SECONDS_OF_A_DAY;
+                
+                //checks if the connection is available on this weekday
                 let serviceId = GoogleTransitData.TRIPS[currentConnection.trip].serviceId;
                 if(!GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday]){
                     continue;
@@ -177,52 +160,27 @@ export class ConnectionScanAlgorithmController {
                 // sets departure and arrival time
                 let currentConnectionDepartureTime = currentConnection.departureTime + dayDifference + dayDifference2;
                 let currentConnectionArrivalTime = currentConnection.arrivalTime + dayDifference + dayDifference2;
+                // sets departure and arrival date
                 let currentDepartureDate = new Date(currentDate);
                 let currentArrivalDate = new Date(currentDate);
                 if(Converter.getDayDifference(currentConnection.departureTime) === 0 && Converter.getDayDifference(currentConnection.arrivalTime) === 1){
                     currentArrivalDate.setDate(currentArrivalDate.getDate() + 1);
                 }
+
                 // checks if it found already a connection for one of the target stops
-                for(let j = 0; j < targetStops.length; j++){
-                    if(this.s[targetStops[j]] <= currentConnectionDepartureTime){
-                        reachedTargetStop = true;
-                        break;
-                    }
-                }
+                reachedTargetStop = this.foundJourneyToTarget(targetStops, currentConnectionDepartureTime);
                 // termination condition
                 if(reachedTargetStop){
                     break;
                 }
                 
-                let currentTrip: number; 
-                if(dayOfCurrentConnection === -1 && this.tPreviousDay[currentConnection.trip]){
-                    currentTrip = this.tPreviousDay[currentConnection.trip].connectionId;
-                } else if (dayOfCurrentConnection === 0 && this.tCurrentDay[currentConnection.trip]) {
-                    currentTrip = this.tCurrentDay[currentConnection.trip].connectionId;
-                } else if (dayOfCurrentConnection === 1 && this.tNextDay[currentConnection.trip]) {
-                    currentTrip = this.tNextDay[currentConnection.trip].connectionId;
-                } else {
-                    currentTrip = undefined;
-                }
                 // checks if the trip is already used or if the trip can be reached at stop s
-                if(currentTrip !== undefined || this.s[currentConnection.departureStop] <= currentConnectionDepartureTime){
+                if(this.t[dayOfCurrentConnection][currentConnection.trip] !== undefined || this.s[currentConnection.departureStop] <= currentConnectionDepartureTime){
                     // sets enter connection of a trip
-                    if(currentTrip === undefined){
-                        if(dayOfCurrentConnection === -1){
-                            this.tPreviousDay[currentConnection.trip] = {
-                                connectionId: currentConnection.id,
-                                departureDate: currentDepartureDate,
-                            };
-                        } else if (dayOfCurrentConnection === 0) {
-                            this.tCurrentDay[currentConnection.trip] = {
-                                connectionId: currentConnection.id,
-                                departureDate: currentDepartureDate,
-                            };
-                        } else if (dayOfCurrentConnection === 1) {
-                            this.tNextDay[currentConnection.trip] = {
-                                connectionId: currentConnection.id,
-                                departureDate: currentDepartureDate,
-                            };
+                    if(this.t[dayOfCurrentConnection][currentConnection.trip] === undefined){
+                        this.t[dayOfCurrentConnection][currentConnection.trip] = {
+                            connectionId: currentConnection.id,
+                            departureDate: currentDepartureDate,
                         }
                     }
                     // checks if the stop can be reached earlier with the current connection
@@ -234,23 +192,11 @@ export class ConnectionScanAlgorithmController {
                                 // sets the earliest arrival time
                                 this.s[footpaths[j].arrivalStop] = currentConnectionArrivalTime + footpaths[j].duration;
                                 // sets the journey pointer
-                                let enterConnection: number;
-                                let departureDate: Date;
-                                if(dayOfCurrentConnection === -1){
-                                    enterConnection = this.tPreviousDay[currentConnection.trip].connectionId;
-                                    departureDate = this.tPreviousDay[currentConnection.trip].departureDate;
-                                } else if (dayOfCurrentConnection === 0) {
-                                    enterConnection = this.tCurrentDay[currentConnection.trip].connectionId;
-                                    departureDate = this.tCurrentDay[currentConnection.trip].departureDate;
-                                } else if (dayOfCurrentConnection === 1) {
-                                    enterConnection = this.tNextDay[currentConnection.trip].connectionId;
-                                    departureDate = this.tNextDay[currentConnection.trip].departureDate;
-                                }
                                 this.j[footpaths[j].arrivalStop] = {
-                                    enterConnection: enterConnection,
+                                    enterConnection: this.t[dayOfCurrentConnection][currentConnection.trip].connectionId,
                                     exitConnection: currentConnection.id,
                                     footpath: footpaths[j].id,
-                                    departureDate: departureDate,
+                                    departureDate: this.t[dayOfCurrentConnection][currentConnection.trip].departureDate,
                                     arrivalDate: currentArrivalDate,
                                 }
                             }
@@ -262,31 +208,68 @@ export class ConnectionScanAlgorithmController {
             if(reachedTargetStop){
                 break;
             }
-            // tries connections of the next day if it didn't find a journey to one of the target stops.
-            dayDifference += 24 * 3600;
-            
-            // termination condition
-            if(dayDifference > 7 * (24*3600)){
-                throw new Error('Too many iterations.');
-            }
-
-            this.tCurrentDay = this.tNextDay;
-            this.tNextDay = new Array(GoogleTransitData.TRIPS.length);
-
-            currentDayWeekday = nextDayWeekday;
-            nextDayWeekday = Calculator.moduloSeven(nextDayWeekday + 1);
-
-            currentDayDate = new Date(nextDayDate);
-            nextDayDate.setDate(nextDayDate.getDate() + 1);
-            
-            currentDayIndex = nextDayIndex;
-            nextDayIndex = 0;
+            // tries connections of the next day if it didn't find a journey to one of the target stops
+            dayDifference += SECONDS_OF_A_DAY;
+            // updates the required arrays
+            this.updateArraysForNextRound();
         }
-        
+        // throws an error if it didn't find a connection after seven days.
+        if(!reachedTargetStop){
+            throw new Error("Couldn't find a connection in the next seven days.")
+        }
     }
 
     /**
-     * Initializes the required array of the algorithm.
+     * Gets the next connection of previous, current and next day which has the smallest departure time.
+     * @returns 
+     */
+    private static getNextConnection(){
+        if(this.connections[0] && ((this.connections[0].departureTime - SECONDS_OF_A_DAY) < this.connections[1].departureTime)) {
+            return 0;
+        } else if((this.connections[2].departureTime + SECONDS_OF_A_DAY) < this.connections[1].departureTime) {
+            return 2;
+        } else {
+            return 1;
+        }
+    }
+
+    /**
+     * Checks if the stopping criterion of the algorithm is fullfilled.
+     * @param targetStops 
+     * @param currentConnectionDepartureTime 
+     * @returns 
+     */
+    private static foundJourneyToTarget(targetStops: number[], currentConnectionDepartureTime: number): boolean{
+        let reachedTargetStop = false;
+        // checks if it found already a connection for one of the target stops
+        for(let j = 0; j < targetStops.length; j++){
+            if(this.s[targetStops[j]] <= currentConnectionDepartureTime){
+                reachedTargetStop = true;
+                break;
+            }
+        }
+        return reachedTargetStop;
+    }
+
+    /**
+     * Updates the arrays.
+     */
+    private static updateArraysForNextRound() {
+        this.t[1] = this.t[2];
+        this.t[2] = new Array(GoogleTransitData.TRIPS.length)
+
+        this.weekdays[1] = this.weekdays[2];
+        this.weekdays[2] = Calculator.moduloSeven(this.weekdays[2] + 1);
+
+        this.dates[1] = new Date(this.dates[2]);
+        this.dates[2].setDate(this.dates[2].getDate() + 1);
+        
+        this.indices[1] = this.indices[2];
+        this.indices[2] = 0;
+    }
+
+    /**
+     * Initializes the required arrays of the algorithm.
      * @param sourceStops 
      * @param sourceTime 
      */
@@ -304,17 +287,36 @@ export class ConnectionScanAlgorithmController {
             }
         }
 
-        this.tCurrentDay = new Array(GoogleTransitData.TRIPS.length);
-        this.tPreviousDay = new Array(GoogleTransitData.TRIPS.length);
-        this.tNextDay = new Array(GoogleTransitData.TRIPS.length);
+        this.t = new Array(3);
+        this.t[0] = new Array(GoogleTransitData.TRIPS.length);
+        this.t[1] = new Array(GoogleTransitData.TRIPS.length);
+        this.t[2] = new Array(GoogleTransitData.TRIPS.length);
 
-        for(let j = 0; j < sourceStops.length; j++){
-            const footpathsOfSourceStop = GoogleTransitData.getAllFootpathsOfAStop(sourceStops[j]);
-            for(let i = 0; i < footpathsOfSourceStop.length; i++){
-                if(this.s[footpathsOfSourceStop[i].arrivalStop] > sourceTime + footpathsOfSourceStop[i].duration){
-                    this.s[footpathsOfSourceStop[i].arrivalStop] = sourceTime + footpathsOfSourceStop[i].duration;
-                    this.j[footpathsOfSourceStop[i].arrivalStop].footpath = footpathsOfSourceStop[i].id;
-                    this.j[footpathsOfSourceStop[i].arrivalStop].departureDate = new Date(sourceDate);
+        this.weekdays = new Array(3);
+        this.weekdays[0] = Calculator.moduloSeven((sourceDate.getDay() - 2));
+        this.weekdays[1] = Calculator.moduloSeven((sourceDate.getDay() - 1));
+        this.weekdays[2] = Calculator.moduloSeven((sourceDate.getDay() - 0));
+        
+        this.dates = new Array(3);
+        this.dates[0] = new Date(sourceDate);
+        this.dates[1] = new Date(sourceDate);
+        this.dates[2] = new Date(sourceDate);
+        this.dates[2].setDate(this.dates[2].getDate() + 1);
+
+        this.indices = new Array(3);
+        this.indices[0] = Searcher.binarySearchOfConnections(sourceTime + SECONDS_OF_A_DAY);
+        this.indices[1] = Searcher.binarySearchOfConnections(sourceTime);
+        this.indices[2] = 0;
+
+        this.connections = new Array(3);
+
+        for(let i = 0; i < sourceStops.length; i++){
+            const footpathsOfSourceStop = GoogleTransitData.getAllFootpathsOfAStop(sourceStops[i]);
+            for(let j = 0; j < footpathsOfSourceStop.length; j++){
+                if(this.s[footpathsOfSourceStop[j].arrivalStop] > sourceTime + footpathsOfSourceStop[j].duration){
+                    this.s[footpathsOfSourceStop[j].arrivalStop] = sourceTime + footpathsOfSourceStop[j].duration;
+                    this.j[footpathsOfSourceStop[j].arrivalStop].footpath = footpathsOfSourceStop[j].id;
+                    this.j[footpathsOfSourceStop[j].arrivalStop].departureDate = new Date(sourceDate);
                 }
             }
         }
@@ -454,7 +456,7 @@ export class ConnectionScanAlgorithmController {
             arrivalDateAsString = journeyCSA.legs[journeyCSA.legs.length-1].arrivalDate.toLocaleDateString('de-DE');
         } else {
             departureDateAsString = sourceDate.toLocaleDateString('de-DE');
-            if(sourceTime + journeyCSA.transfers[0].duration >= (24*3600)){
+            if(sourceTime + journeyCSA.transfers[0].duration >= SECONDS_OF_A_DAY){
                 sourceDate.setDate(sourceDate.getDate() + 1);
             }
             arrivalDateAsString = sourceDate.toLocaleDateString('de-DE');

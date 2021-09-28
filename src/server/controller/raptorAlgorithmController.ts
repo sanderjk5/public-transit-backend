@@ -7,6 +7,7 @@ import { Section } from "../../models/Section";
 import express from "express";
 import { performance } from 'perf_hooks';
 import { Calculator } from "../../data/calculator";
+import { SECONDS_OF_A_DAY } from "../../constants";
 
 // entries of the q array
 interface QEntry {
@@ -82,6 +83,14 @@ export class RaptorAlgorithmController {
         }
     }
 
+    /**
+     * Calls the raptor algorithm. Can be used by the random request test.
+     * @param sourceStop 
+     * @param targetStop 
+     * @param sourceDate 
+     * @param sourceTimeInSeconds 
+     * @returns 
+     */
     public static testAlgorithm(sourceStop: string, targetStop: string, sourceDate: Date, sourceTimeInSeconds: number){
         // gets the source and target stops
         const sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
@@ -118,159 +127,21 @@ export class RaptorAlgorithmController {
     private static performAlgorithm(targetStops: number[]){
         let k = 0;
         while(true){
+            // increases round counter
             k++;
+            // adds an empty array to the earliest arrival times
             this.addNextArrivalTimeRound();
-            
-            this.Q = [];
-            let qTemp: QEntry[] = [];
-            // stores the first stop of each round
-            let routeSequenceMinima = new Array(GoogleTransitData.ROUTES.length);
-            // loop over all marked stops
-            while(this.markedStops.length > 0){
-                let markedStop = this.markedStops.pop();
-                // gets all routes which serves the current stop
-                let routesServingStop: RouteStopMapping[] = GoogleTransitData.ROUTESSERVINGSTOPS[markedStop];
-                // adds all route-stop pairs with the related sequence number to qTemp
-                for(let i = 0; i < routesServingStop.length; i++) {
-                    let routeId = routesServingStop[i].routeId;
-                    let stopSequence = routesServingStop[i].stopSequence;
-                    // sets the minimal sequence number for each route
-                    if(routeSequenceMinima[routeId] === undefined || stopSequence < routeSequenceMinima[routeId]){
-                        routeSequenceMinima[routeId] = stopSequence;
-                    }
-                    qTemp.push({r: routeId, p: markedStop, stopSequence: stopSequence});
-                }
-            }
-            // uses qTemp and routeSequenceMinima to add the first route-stop pair of each route to Q
-            for(let i = 0; i < qTemp.length; i++){
-                let qEntry = qTemp[i];
-                if(routeSequenceMinima[qEntry.r] === qEntry.stopSequence){
-                    this.Q.push(qEntry);
-                    routeSequenceMinima[qEntry.r] = - 1;
-                }
-            }
-
-            // loop over all elements of q
-            for(let i= 0; i < this.Q.length; i++){
-                let r = this.Q[i].r;
-                let p = this.Q[i].p;
-                // get the earliest trip or r which can be catched at p in round k
-                let tripInfo = this.getEarliestTrip(r, p, k);
-                let t = tripInfo.tripId;
-                let dayOffset = tripInfo.dayOffset;
-                let enterTripAtStop = p;
-                if(!t){
-                    continue;
-                }
-                let reachedP = false;
-                // loop over all stops of r beggining with p
-                for(let j = 0; j < GoogleTransitData.STOPSOFAROUTE[r].length; j++){     
-                    let pi = GoogleTransitData.STOPSOFAROUTE[r][j];
-                    if(pi === p){
-                        reachedP = true;
-                        continue;
-                    }
-                    if(!reachedP){
-                        continue;
-                    }
-
-                    // gets stop time of stop pi in trip t
-                    let stopTime = GoogleTransitData.getStopTimeByTripAndStop(t, pi);
-
-                    if(!stopTime){
-                        continue;
-                    }
-
-                    // sets the arrival and departure time at stop pi
-                    let arrivalTime = stopTime.arrivalTime + tripInfo.dayOffset;
-                    let departureTime = stopTime.departureTime + tripInfo.dayOffset;
-                    if(arrivalTime < tripInfo.tripDeparture){
-                        arrivalTime += (24*3600);
-                    }
-                    if(departureTime < tripInfo.tripDeparture){
-                        departureTime += (24*3600);
-                    }
-
-                    // gets the earliest arrival time at the target stops
-                    let earliestTargetStopArrival = this.earliestArrivalTime[targetStops[0]];
-                    for(let l = 1; l < targetStops.length; l++){
-                        if(this.earliestArrivalTime[targetStops[l]] < earliestTargetStopArrival){
-                            earliestTargetStopArrival = this.earliestArrivalTime[targetStops[l]];
-                        }
-                    }
-                    // sets the arrival time + journey pointer
-                    if(stopTime && arrivalTime < Math.min(this.earliestArrivalTime[pi], earliestTargetStopArrival)){
-                        this.earliestArrivalTimePerRound[k][pi] = arrivalTime;
-                        this.earliestArrivalTime[pi] = arrivalTime;
-                        this.j[pi] = {
-                            enterTripAtStop: enterTripAtStop,
-                            departureTime: tripInfo.tripDeparture,
-                            arrivalTime: arrivalTime,
-                            tripId: t,
-                            footpath: null
-                        }
-                        // adds pi to the marked stops
-                        if(!this.markedStops.includes(pi)){
-                            this.markedStops.push(pi);
-                        }
-                    }
-                    
-                    // checks if it is possible to catch an earlier trip at pi in round k
-                    if(stopTime && this.earliestArrivalTimePerRound[k-1][pi] < departureTime){
-                        let newT = this.getEarliestTrip(r, pi, k);
-                        if(t !== newT.tripId || dayOffset !== newT.dayOffset){
-                            tripInfo = newT;
-                            t = tripInfo.tripId;
-                            enterTripAtStop = stopTime.stopId;
-                            dayOffset = tripInfo.dayOffset;
-                        }
-                    }
-                }
-            }
-            
-            // updates arrival times with footpaths of marked stops
-            let numberOfMarkedStops = this.markedStops.length;
-            let arrivalTimesInRoundK = [];
-            for(let i = 0; i < numberOfMarkedStops; i++){
-                let markedStop = this.markedStops[i];
-                arrivalTimesInRoundK.push(this.earliestArrivalTimePerRound[k][markedStop])
-            }
-
-            for(let i = 0; i < numberOfMarkedStops; i++){
-                let markedStop = this.markedStops[i];
-                let arrivalTimeOfMarkedStop = arrivalTimesInRoundK[i];
-                let footPaths = GoogleTransitData.getAllFootpathsOfAStop(markedStop);
-                for(let j = 0; j < footPaths.length; j++){
-                    let p = footPaths[j].departureStop;
-                    let pN = footPaths[j].arrivalStop;
-                    // checks if the footpath minimizes the arrival time in round k
-                    if(p !== pN && this.earliestArrivalTimePerRound[k][pN] > (arrivalTimeOfMarkedStop + footPaths[j].duration)){
-                        this.earliestArrivalTimePerRound[k][pN] = arrivalTimeOfMarkedStop + footPaths[j].duration;
-                        if(!this.markedStops.includes(pN)){
-                            this.markedStops.push(pN);
-                        }
-                        // checks if the new arrival time is smaller than the overall earliest arrival time
-                        if(this.earliestArrivalTimePerRound[k][pN] < this.earliestArrivalTime[pN]){
-                            this.earliestArrivalTime[pN] = this.earliestArrivalTimePerRound[k][pN];
-                            // updates the journey pointer
-                            this.j[pN] = {
-                                enterTripAtStop: p,
-                                departureTime: arrivalTimeOfMarkedStop,
-                                arrivalTime: this.earliestArrivalTime[pN],
-                                tripId: null,
-                                footpath: footPaths[j].id
-                            }
-                        }
-                    }
-                }
-            }
-
+            // fills the array of route-stop pairs
+            this.fillQ();
+            // traverses each route and updates earliest arrival times
+            this.traverseRoutes(k, targetStops);
+            // updates earliest arrival times with footpaths of marked stops
+            this.handleFootpaths(k);
             // termination condition
             if(this.markedStops.length === 0){
                 break;
             }
         }
-
     }
 
     /**
@@ -341,6 +212,169 @@ export class RaptorAlgorithmController {
     }
 
     /**
+     * Fills the Q-Array with route-stop pairs.
+     */
+    private static fillQ() {
+        this.Q = [];
+        let qTemp: QEntry[] = [];
+        // stores the first stop of each round
+        let routeSequenceMinima = new Array(GoogleTransitData.ROUTES.length);
+        // loop over all marked stops
+        while(this.markedStops.length > 0){
+            let markedStop = this.markedStops.pop();
+            // gets all routes which serves the current stop
+            let routesServingStop: RouteStopMapping[] = GoogleTransitData.ROUTESSERVINGSTOPS[markedStop];
+            // adds all route-stop pairs with the related sequence number to qTemp
+            for(let i = 0; i < routesServingStop.length; i++) {
+                let routeId = routesServingStop[i].routeId;
+                let stopSequence = routesServingStop[i].stopSequence;
+                // sets the minimal sequence number for each route
+                if(routeSequenceMinima[routeId] === undefined || stopSequence < routeSequenceMinima[routeId]){
+                    routeSequenceMinima[routeId] = stopSequence;
+                }
+                qTemp.push({r: routeId, p: markedStop, stopSequence: stopSequence});
+            }
+        }
+        // uses qTemp and routeSequenceMinima to add the first route-stop pair of each route to Q
+        for(let i = 0; i < qTemp.length; i++){
+            let qEntry = qTemp[i];
+            if(routeSequenceMinima[qEntry.r] === qEntry.stopSequence){
+                this.Q.push(qEntry);
+                routeSequenceMinima[qEntry.r] = - 1;
+            }
+        }
+    }
+
+    /**
+     * Traverses each route and updates the earliest arrival times after k changes.
+     * @param k 
+     * @param targetStops 
+     */
+    private static traverseRoutes(k: number, targetStops: number[]) {
+        // loop over all elements of q
+        for(let i= 0; i < this.Q.length; i++){
+            let r = this.Q[i].r;
+            let p = this.Q[i].p;
+            // get the earliest trip or r which can be catched at p in round k
+            let tripInfo = this.getEarliestTrip(r, p, k);
+            let t = tripInfo.tripId;
+            let dayOffset = tripInfo.dayOffset;
+            let enterTripAtStop = p;
+            if(!t){
+                continue;
+            }
+            let reachedP = false;
+            // loop over all stops of r beggining with p
+            for(let j = 0; j < GoogleTransitData.STOPSOFAROUTE[r].length; j++){     
+                let pi = GoogleTransitData.STOPSOFAROUTE[r][j];
+                if(pi === p){
+                    reachedP = true;
+                    continue;
+                }
+                if(!reachedP){
+                    continue;
+                }
+
+                // gets stop time of stop pi in trip t
+                let stopTime = GoogleTransitData.getStopTimeByTripAndStop(t, pi);
+
+                if(!stopTime){
+                    continue;
+                }
+
+                // sets the arrival and departure time at stop pi
+                let arrivalTime = stopTime.arrivalTime + tripInfo.dayOffset;
+                let departureTime = stopTime.departureTime + tripInfo.dayOffset;
+                if(arrivalTime < tripInfo.tripDeparture){
+                    arrivalTime += SECONDS_OF_A_DAY;
+                }
+                if(departureTime < tripInfo.tripDeparture){
+                    departureTime += SECONDS_OF_A_DAY;
+                }
+
+                // gets the earliest arrival time at the target stops
+                let earliestTargetStopArrival = this.earliestArrivalTime[targetStops[0]];
+                for(let l = 1; l < targetStops.length; l++){
+                    if(this.earliestArrivalTime[targetStops[l]] < earliestTargetStopArrival){
+                        earliestTargetStopArrival = this.earliestArrivalTime[targetStops[l]];
+                    }
+                }
+                // sets the arrival time + journey pointer
+                if(stopTime && arrivalTime < Math.min(this.earliestArrivalTime[pi], earliestTargetStopArrival)){
+                    this.earliestArrivalTimePerRound[k][pi] = arrivalTime;
+                    this.earliestArrivalTime[pi] = arrivalTime;
+                    this.j[pi] = {
+                        enterTripAtStop: enterTripAtStop,
+                        departureTime: tripInfo.tripDeparture,
+                        arrivalTime: arrivalTime,
+                        tripId: t,
+                        footpath: null
+                    }
+                    // adds pi to the marked stops
+                    if(!this.markedStops.includes(pi)){
+                        this.markedStops.push(pi);
+                    }
+                }
+                
+                // checks if it is possible to catch an earlier trip at pi in round k
+                if(stopTime && this.earliestArrivalTimePerRound[k-1][pi] < departureTime){
+                    let newT = this.getEarliestTrip(r, pi, k);
+                    if(t !== newT.tripId || dayOffset !== newT.dayOffset){
+                        tripInfo = newT;
+                        t = tripInfo.tripId;
+                        enterTripAtStop = stopTime.stopId;
+                        dayOffset = tripInfo.dayOffset;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Uses the footpaths to update the earliest arrival times.
+     * @param k 
+     */
+    private static handleFootpaths(k: number) {
+        // uses the arrival times before they are updated by footpaths
+        let numberOfMarkedStops = this.markedStops.length;
+        let arrivalTimesInRoundK = [];
+        for(let i = 0; i < numberOfMarkedStops; i++){
+            let markedStop = this.markedStops[i];
+            arrivalTimesInRoundK.push(this.earliestArrivalTimePerRound[k][markedStop])
+        }
+
+        // loop over all marked stops
+        for(let i = 0; i < numberOfMarkedStops; i++){
+            let markedStop = this.markedStops[i];
+            let arrivalTimeOfMarkedStop = arrivalTimesInRoundK[i];
+            let footPaths = GoogleTransitData.getAllFootpathsOfAStop(markedStop);
+            for(let j = 0; j < footPaths.length; j++){
+                let p = footPaths[j].departureStop;
+                let pN = footPaths[j].arrivalStop;
+                // checks if the footpath minimizes the arrival time in round k
+                if(p !== pN && this.earliestArrivalTimePerRound[k][pN] > (arrivalTimeOfMarkedStop + footPaths[j].duration)){
+                    this.earliestArrivalTimePerRound[k][pN] = arrivalTimeOfMarkedStop + footPaths[j].duration;
+                    if(!this.markedStops.includes(pN)){
+                        this.markedStops.push(pN);
+                    }
+                    // checks if the new arrival time is smaller than the overall earliest arrival time
+                    if(this.earliestArrivalTimePerRound[k][pN] < this.earliestArrivalTime[pN]){
+                        this.earliestArrivalTime[pN] = this.earliestArrivalTimePerRound[k][pN];
+                        // updates the journey pointer
+                        this.j[pN] = {
+                            enterTripAtStop: p,
+                            departureTime: arrivalTimeOfMarkedStop,
+                            arrivalTime: this.earliestArrivalTime[pN],
+                            tripId: null,
+                            footpath: footPaths[j].id
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Gets the earliest trip of route r which can be catched at stop pi in round k.
      * @param r 
      * @param pi 
@@ -374,13 +408,15 @@ export class RaptorAlgorithmController {
                 let stopTime = stopTimes[j];
                 let departureTime = stopTime.departureTime;
                 let serviceId = GoogleTransitData.TRIPS[stopTime.tripId].serviceId;
+                // checks if the trip is available and if it is a candidat for the earliest trip
                 if(GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday] && (departureTime + earliestArrivalDayOffset) >= earliestArrival 
                     && (departureTime + earliestArrivalDayOffset) < tripDeparture) {
                     tripId = stopTime.tripId;
                     tripDeparture = departureTime + earliestArrivalDayOffset;
                     previousDay = false;
                 }
-                let departureTimeOfPreviousDay = departureTime - (24*3600);
+                // checks if the trip corresponds to the previous day but could be catched at the current day
+                let departureTimeOfPreviousDay = departureTime - SECONDS_OF_A_DAY;
                 if(GoogleTransitData.CALENDAR[serviceId].isAvailable[previousWeekday] && departureTimeOfPreviousDay >= 0 
                     && (departureTimeOfPreviousDay + earliestArrivalDayOffset) >= earliestArrival && (departureTimeOfPreviousDay + earliestArrivalDayOffset) < tripDeparture){
                     tripId = stopTime.tripId;
@@ -393,14 +429,15 @@ export class RaptorAlgorithmController {
             }
             previousWeekday = currentWeekday;
             currentWeekday = Calculator.moduloSeven(currentWeekday + 1);
-            earliestArrivalDayOffset += (24*3600);
+            earliestArrivalDayOffset += SECONDS_OF_A_DAY;
         }
         
-        // checks if it found a trip at the same day
+        
         if(tripId){
+            // checks if it found a trip at the same day
             let dayOffset: number;
             if(previousDay) {
-                dayOffset = earliestArrivalDayOffset-(24*3600);
+                dayOffset = earliestArrivalDayOffset-SECONDS_OF_A_DAY;
             } else {
                 dayOffset = earliestArrivalDayOffset;
             }

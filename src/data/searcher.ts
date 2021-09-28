@@ -1,7 +1,12 @@
 import { GoogleTransitData } from "./google-transit-data";
 
 export class Searcher {
-    // Uses binary search to find the first connection with a departure after the given value.
+    
+    /**
+     * Uses binary search to find the first connection with a departure after the given value.
+     * @param value 
+     * @returns 
+     */
     public static binarySearchOfConnections(value: number): number{
         let start = 0;
         let end = GoogleTransitData.CONNECTIONS.length -1;

@@ -1,3 +1,4 @@
+import { SECONDS_OF_A_DAY } from "../../constants";
 import { Converter } from "../../data/converter";
 import { GoogleTransitData } from "../../data/google-transit-data";
 import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmController";
@@ -14,7 +15,7 @@ export class TestController {
         let csaTimes = 0;
         let numberOfSuccessfulRequestsCSA = 0;
         const numberOfStops = GoogleTransitData.STOPS.length;
-        const numberOfSeconds = 24*3600;
+        const numberOfSeconds = SECONDS_OF_A_DAY;
         const numberOfDates = 7;
         const dates = [];
         const initialDate = new Date(Date.now());
