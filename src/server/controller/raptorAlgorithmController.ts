@@ -8,6 +8,7 @@ import express from "express";
 import { performance } from 'perf_hooks';
 import { Calculator } from "../../data/calculator";
 import { SECONDS_OF_A_DAY } from "../../constants";
+import { Reliability } from "../../data/reliability";
 
 // entries of the q array
 interface QEntry {
@@ -283,8 +284,8 @@ export class RaptorAlgorithmController {
                 }
 
                 // sets the arrival and departure time at stop pi
-                let arrivalTime = stopTime.arrivalTime + tripInfo.dayOffset;
-                let departureTime = stopTime.departureTime + tripInfo.dayOffset;
+                let arrivalTime = stopTime.arrivalTime + dayOffset;
+                let departureTime = stopTime.departureTime + dayOffset;
                 if(arrivalTime < tripInfo.tripDeparture){
                     arrivalTime += SECONDS_OF_A_DAY;
                 }
@@ -489,6 +490,10 @@ export class RaptorAlgorithmController {
             journeyPointers.push(this.j[stopId]);
             stopId = this.j[stopId].enterTripAtStop;
         }
+
+        let reliability = 1;
+        let lastTripId = null;
+        let lastArrivalTime = null;
         
         // generates the sections
         const sections: Section[] = []
@@ -501,6 +506,10 @@ export class RaptorAlgorithmController {
             if(journeyPointers[i].footpath !== null) {
                 type = 'Footpath'
             } else {
+                if(lastArrivalTime !== null && lastTripId !== null) {
+                    reliability *= Reliability.getReliability(departureTime - lastArrivalTime, GoogleTransitData.TRIPS[lastTripId].isLongDistance);
+                }
+                lastTripId = journeyPointers[i].tripId;
                 numberOfLegs++;
             }
             let section: Section = {
@@ -511,10 +520,14 @@ export class RaptorAlgorithmController {
                 duration: Converter.secondsToTime((arrivalTime - departureTime)),
                 type: type
             }
+
+            lastArrivalTime = arrivalTime;
+            
             if(i === 0 && section.departureStop === section.arrivalStop){
                 break;
             }
             sections.push(section);
+
             if(i > 0){
                 let nextDepartureStop = journeyPointers[i-1].enterTripAtStop;
                 // raptor doesn't saves changes at stops. create them as footpath with a duration of 0 seconds.
@@ -533,6 +546,8 @@ export class RaptorAlgorithmController {
             }
         }
 
+        reliability = Math.floor(reliability * 100);
+
         // calculates departure and arrival date
         let departureDate = new Date(initialDate);
         let arrivalDate = new Date(initialDate);
@@ -550,6 +565,7 @@ export class RaptorAlgorithmController {
             departureDate: departureDateAsString,
             arrivalDate: arrivalDateAsString,
             changes: Math.max(numberOfLegs - 1, 0),
+            reliability: reliability.toString() + '%',
             sections: sections
         }
         return journeyResponse;

@@ -4,6 +4,7 @@ import cors from 'cors';
 import { Importer } from './data/importer';
 import { Generator } from './data/generator';
 import { TestController } from './server/controller/testController';
+import { Reliability } from './data/reliability';
 
 const app = express();
 
@@ -15,6 +16,7 @@ Generator.generateValidRoutes();
 Generator.generateSortedConnections();
 // generates footpaths which can be used by raptor and csa
 Generator.generateFootpaths();
+Reliability.initReliability();
 //TestController.testAlgorithms();
 
 const port = 1337;

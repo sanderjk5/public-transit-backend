@@ -12,6 +12,7 @@ import { performance } from 'perf_hooks';
 import { Connection } from '../../models/Connection';
 import { Calculator } from '../../data/calculator';
 import { SECONDS_OF_A_DAY } from '../../constants';
+import { Reliability } from '../../data/reliability';
 
 // Pointer to reconstruct the journey.
 interface JourneyPointer {
@@ -20,12 +21,14 @@ interface JourneyPointer {
     footpath?: number,
     departureDate?: Date,
     arrivalDate?: Date,
+    reliability: number,
 }
 
 // Entry of the t-Array.
 interface TEntry {
     connectionId: number,
     departureDate: Date,
+    reliability: number,
 }
 
 export class ConnectionScanAlgorithmController {
@@ -173,14 +176,22 @@ export class ConnectionScanAlgorithmController {
                 if(reachedTargetStop){
                     break;
                 }
-                
+                const departureStop = currentConnection.departureStop;
                 // checks if the trip is already used or if the trip can be reached at stop s
-                if(this.t[dayOfCurrentConnection][currentConnection.trip] !== undefined || this.s[currentConnection.departureStop] <= currentConnectionDepartureTime){
+                if(this.t[dayOfCurrentConnection][currentConnection.trip] !== undefined || this.s[departureStop] <= currentConnectionDepartureTime){
                     // sets enter connection of a trip
                     if(this.t[dayOfCurrentConnection][currentConnection.trip] === undefined){
+                        let reliability = 1;
+                        if(this.j[departureStop].enterConnection !== null){
+                            const bufferTime = currentConnectionDepartureTime - this.s[departureStop];
+                            const tripId = GoogleTransitData.CONNECTIONS[this.j[departureStop].enterConnection].trip;
+                            reliability = Reliability.getReliability(bufferTime, GoogleTransitData.TRIPS[tripId].isLongDistance)
+                        }
+                        
                         this.t[dayOfCurrentConnection][currentConnection.trip] = {
                             connectionId: currentConnection.id,
                             departureDate: currentDepartureDate,
+                            reliability: this.j[departureStop].reliability * reliability,
                         }
                     }
                     // checks if the stop can be reached earlier with the current connection
@@ -198,6 +209,7 @@ export class ConnectionScanAlgorithmController {
                                     footpath: footpaths[j].id,
                                     departureDate: this.t[dayOfCurrentConnection][currentConnection.trip].departureDate,
                                     arrivalDate: currentArrivalDate,
+                                    reliability: this.t[dayOfCurrentConnection][currentConnection.trip].reliability,
                                 }
                             }
                         }
@@ -284,6 +296,7 @@ export class ConnectionScanAlgorithmController {
                 footpath: null,
                 departureDate: null,
                 arrivalDate: null,
+                reliability: null,
             }
         }
 
@@ -316,6 +329,7 @@ export class ConnectionScanAlgorithmController {
                 if(this.s[footpathsOfSourceStop[j].arrivalStop] > sourceTime + footpathsOfSourceStop[j].duration){
                     this.s[footpathsOfSourceStop[j].arrivalStop] = sourceTime + footpathsOfSourceStop[j].duration;
                     this.j[footpathsOfSourceStop[j].arrivalStop].footpath = footpathsOfSourceStop[j].id;
+                    this.j[footpathsOfSourceStop[j].arrivalStop].reliability = 1;
                     this.j[footpathsOfSourceStop[j].arrivalStop].departureDate = new Date(sourceDate);
                 }
             }
@@ -342,7 +356,7 @@ export class ConnectionScanAlgorithmController {
         let currentStop = targetStop;
 
         // goes backward until it reaches a source stop which has a undefined connection in journey pointer
-        while(this.j[currentStop].enterConnection){
+        while(this.j[currentStop].enterConnection !== null){
             journeyPointersOfRoute.push(this.j[currentStop]);
             currentStop = GoogleTransitData.CONNECTIONS[this.j[currentStop].enterConnection].departureStop;
         }
@@ -354,12 +368,13 @@ export class ConnectionScanAlgorithmController {
 
         const journey: JourneyCSA = {
             legs: [],
-            transfers: []
+            transfers: [],
+            reliability: journeyPointersOfRoute[0].reliability,
         }
         
         // generates the legs and transfers for the csa journey representation
         for(let i = journeyPointersOfRoute.length - 1; i >= 0; i--) {
-            if(journeyPointersOfRoute[i].enterConnection && journeyPointersOfRoute[i].exitConnection){
+            if(journeyPointersOfRoute[i].enterConnection !== null && journeyPointersOfRoute[i].exitConnection !== null){
                 const enterConnection = GoogleTransitData.CONNECTIONS[journeyPointersOfRoute[i].enterConnection];
                 const exitConnection = GoogleTransitData.CONNECTIONS[journeyPointersOfRoute[i].exitConnection];
                 const departureStop = GoogleTransitData.STOPS[enterConnection.departureStop];
@@ -385,7 +400,9 @@ export class ConnectionScanAlgorithmController {
                 journey.legs.push(leg); 
             }
 
-            if(journeyPointersOfRoute[i].footpath){
+            
+
+            if(journeyPointersOfRoute[i].footpath !== null){
                 const footpath = GoogleTransitData.FOOTPATHS[journeyPointersOfRoute[i].footpath];
 
                 const transfer: Transfer = {
@@ -461,7 +478,7 @@ export class ConnectionScanAlgorithmController {
             }
             arrivalDateAsString = sourceDate.toLocaleDateString('de-DE');
         }
-       
+        const reliability = Math.floor(journeyCSA.reliability * 100)
         // creates the journey response
         const journeyResponse: JourneyResponse = {
             sourceStop: sections[0].departureStop,
@@ -471,7 +488,8 @@ export class ConnectionScanAlgorithmController {
             departureDate: departureDateAsString,
             arrivalDate: arrivalDateAsString,
             changes: Math.max(journeyCSA.legs.length-1, 0),
-            sections: sections
+            sections: sections,
+            reliability: reliability.toString() + '%',
         }
         return journeyResponse;
     }

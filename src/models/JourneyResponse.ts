@@ -9,4 +9,5 @@ export interface JourneyResponse {
     sourceStop: string,
     targetStop: string,
     sections: Section[],
+    reliability?: string,
 }
