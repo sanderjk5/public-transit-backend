@@ -25,8 +25,8 @@ export class Importer {
     public static importGoogleTransitData(): void {
         console.time('complete import')
         this.resetArrays();
-        this.importDirectory('latest_schienenregionalverkehr')
-        this.importDirectory('latest_schienenfernverkehr')
+        this.importDirectory('latest_schienenregionalverkehr', false)
+        this.importDirectory('latest_schienenfernverkehr', true)
         console.timeEnd('complete import')
     }
 
@@ -34,13 +34,13 @@ export class Importer {
      * Imports all relevant files of the given directory.
      * @param directoryName 
      */
-    private static importDirectory(directoryName: string): void {
+    private static importDirectory(directoryName: string, isLongDistance: boolean): void {
         Importer.importAgency(directoryName + '/agency.txt');
         Importer.importCalendar(directoryName + '/calendar.txt');
         Importer.importCalendarDates(directoryName + '/calendar_dates.txt');
         Importer.importRoutes(directoryName + '/routes.txt');
         Importer.importStops(directoryName + '/stops.txt');
-        Importer.importTrips(directoryName + '/trips.txt');
+        Importer.importTrips(directoryName + '/trips.txt', isLongDistance);
         Importer.importStopTimes(directoryName + '/stop_times.txt');
     }
 
@@ -241,7 +241,7 @@ export class Importer {
         console.timeEnd('import stop times table');
     }
 
-    private static importTrips(filename: string): void {
+    private static importTrips(filename: string, isLongDistance: boolean): void {
         console.time('import trips table');
         const importedTrips = GoogleTransitData.TRIPS;
         this.tripIdMap = new Map<number, number>();
@@ -259,6 +259,7 @@ export class Importer {
                 serviceId: this.serviceIdMap.get(serviceId),
                 id: importedTrips.length,
                 directionId: directionId,
+                isLongDistance: isLongDistance,
             }
             // adds the trip only when a related route exists
             if(trip.routeId && trip.serviceId){
