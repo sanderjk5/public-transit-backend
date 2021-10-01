@@ -24,12 +24,12 @@ Reliability.initReliability();
 //TestController.testAlgorithms();
 
 let sourceStop = GoogleTransitData.getStopIdByName('Stuttgart-Rohr')
-let targetStop = GoogleTransitData.getStopIdByName('Hamburg Hbf')
+let targetStop = GoogleTransitData.getStopIdByName('Aachen Hbf')
 let minDepartureTime = Converter.timeToSeconds('08:40:00');
 console.log(minDepartureTime)
-let maxArrivalTime = Converter.timeToSeconds('15:40:00');
+let maxArrivalTime = Converter.timeToSeconds('15:20:00');
 console.log(maxArrivalTime)
-ProfileConnectionScanAlgorithmController.init();
+ProfileConnectionScanAlgorithmController.init(targetStop);
 ProfileConnectionScanAlgorithmController.performAlgorithm(sourceStop, targetStop, minDepartureTime, maxArrivalTime);
 
 const port = 1337;

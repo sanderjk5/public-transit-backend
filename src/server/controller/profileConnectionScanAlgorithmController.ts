@@ -17,6 +17,7 @@ interface TEntry {
 export class ProfileConnectionScanAlgorithmController {
     private static s: SEntry[][];
     private static t: TEntry[];
+    private static d: number[];
     private static sourceStopPointer: number;
     private static sourceStop: number;
     private static targetStop: number;
@@ -30,17 +31,15 @@ export class ProfileConnectionScanAlgorithmController {
         let firstConnectionIndex = Searcher.binarySearchOfConnections(minDepartureTime);
         for(let i = lastConnectionIndex; i >= firstConnectionIndex; i--){
             let currentConnection = GoogleTransitData.CONNECTIONS[i];
-            let isObserved = false;
             this.updateSourceStopPointer(currentConnection.departureTime);
-            
             let time1: number;
             let time2: number;
             let time3: number;
             let timeC: number;
             let p: SEntry;
             let q: SEntry;
-            if(currentConnection.arrivalStop === targetStop) {
-                time1 = currentConnection.arrivalTime;
+            if(this.d[currentConnection.arrivalStop] !== Number.MAX_VALUE) {
+                time1 = currentConnection.arrivalTime + this.d[currentConnection.arrivalStop];
             } else {
                 time1 = Number.MAX_VALUE;
             }
@@ -52,10 +51,7 @@ export class ProfileConnectionScanAlgorithmController {
                 p = this.s[currentConnection.arrivalStop][j];
             }
             time3 = p.arrivalTime;
-            if(isObserved){
-                console.log(time1 + ', ' + time2 + ', ' + time3)
-            }
-            
+
             timeC = Math.min(time1, time2, time3);
 
             p = {
@@ -69,16 +65,40 @@ export class ProfileConnectionScanAlgorithmController {
                 p.lExit = currentConnection.id;
             }
             
-            if(this.dominates(this.s[sourceStop][this.sourceStopPointer], p)){
-                continue;
-            }
+            // if(this.dominates(this.s[sourceStop][this.sourceStopPointer], p)){
+            //     continue;
+            // }
             q = this.s[currentConnection.departureStop][0];
             
-            if(p.lExit !== undefined && p.arrivalTime !== Number.MAX_VALUE && !this.dominates(q, p)) {
-                if(q.departureTime !== p.departureTime) {
-                    this.s[currentConnection.departureStop].unshift(p)
-                } else {
-                    this.s[currentConnection.departureStop][0] = p;
+            if(p.lExit !== undefined && p.arrivalTime !== Number.MAX_VALUE && this.notDominatedInProfile(p, currentConnection.departureStop)) {
+                let footpaths = GoogleTransitData.getAllFootpathsOfAArrivalStop(currentConnection.departureStop);
+                for(let footpath of footpaths) {
+                    let pNew: SEntry= {
+                        departureTime: currentConnection.departureTime - footpath.duration,
+                        arrivalTime: p.arrivalTime,
+                        lEnter: p.lEnter,
+                        lExit: p.lExit
+                    }
+                    //p.departureTime = currentConnection.departureTime - footpath.duration;
+                    
+                    if(this.notDominatedInProfile(pNew, footpath.departureStop)){
+                        
+                        // let shiftedPairs = [];
+                        // let currentPair = this.s[footpath.departureStop][0];
+                        // while(p.departureTime > currentPair.departureTime){
+                        //     shiftedPairs.unshift(this.s[footpath.departureStop].shift());
+                        //     currentPair = this.s[footpath.departureStop][0];
+                        // }
+                        // this.s[footpath.departureStop].unshift(p);
+                        // for(i = 0; i < shiftedPairs.length; i++) {
+                        //     this.s[footpath.departureStop].unshift(shiftedPairs[i]);
+                        // }
+                        this.s[footpath.departureStop].unshift(pNew);
+                        this.s[footpath.departureStop].sort((a, b) => {
+                            return this.sortSEntriesByDepartureTime(a, b);
+                        })
+                    }
+                    
                 }
             }
             if(timeC !== Number.MAX_VALUE && timeC < this.t[currentConnection.trip].arrivalTime){
@@ -90,25 +110,33 @@ export class ProfileConnectionScanAlgorithmController {
         }
         console.log(this.s[this.sourceStop])
         console.log(Converter.secondsToTime(this.s[sourceStop][0].arrivalTime))
+        console.log(this.s[sourceStop][0].arrivalTime)
         this.getJourney();
     }
 
-    public static init(){
+    public static init(targetStop: number){
         this.s = new Array(GoogleTransitData.STOPS.length);
         this.t = new Array(GoogleTransitData.TRIPS.length);
+        this.d = new Array(GoogleTransitData.STOPS.length);
         this.sourceStopPointer = 0;
 
         const defaultSEntry: SEntry = {
             departureTime: Number.MAX_VALUE,
             arrivalTime: Number.MAX_VALUE,
         }
-        for(let i = 0; i < this.s.length; i++) {
+        for(let i = 0; i < GoogleTransitData.STOPS.length; i++) {
             this.s[i] = [defaultSEntry];
+            this.d[i] = Number.MAX_VALUE;
         }
         for(let i = 0; i < this.t.length; i++) {
             this.t[i] = {
                 arrivalTime: Number.MAX_VALUE
             };
+        }
+        
+        let finalFootpaths = GoogleTransitData.getAllFootpathsOfAArrivalStop(targetStop);
+        for(let footpath of finalFootpaths){
+            this.d[footpath.departureStop] = footpath.duration;
         }
     }
 
@@ -120,6 +148,15 @@ export class ProfileConnectionScanAlgorithmController {
             return true;
         }
         return false;
+    }
+
+    private static notDominatedInProfile(p: SEntry, stopId: number): boolean{
+        for(let q of this.s[stopId]){
+            if(this.dominates(q, p)){
+                return false;
+            }
+        }
+        return true;
     }
 
 
@@ -135,7 +172,6 @@ export class ProfileConnectionScanAlgorithmController {
     private static getJourney() {
         let s = this.sourceStop;
         let timeS = this.minDepartureTime;
-        console.log(timeS)
         while(s !== this.targetStop){
             for(let i = 0; i < this.s[s].length; i++) {
                 let p = this.s[s][i];
@@ -153,6 +189,26 @@ export class ProfileConnectionScanAlgorithmController {
                 }
             }
             //console.log(GoogleTransitData.STOPS[s].name)
+        }
+    }
+
+    private static sortSEntriesByDepartureTime(a: SEntry, b: SEntry){
+        if(a.departureTime < b.departureTime){
+            return -1;
+        }
+        if(a.departureTime === b.departureTime){
+            if(a.arrivalTime < b.arrivalTime){
+                return -1;
+            }
+            if(a.arrivalTime === b.arrivalTime){
+                return 0;
+            }
+            if(a.arrivalTime > b.arrivalTime){
+                return 1;
+            }
+        }
+        if(a.departureTime > b.departureTime){
+            return 1;
         }
     }
 }

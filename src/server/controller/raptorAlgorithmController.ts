@@ -176,7 +176,7 @@ export class RaptorAlgorithmController {
         // updates the footpaths of the source stops
         for(let i = 0; i < sourceStops.length; i++) {
             let sourceStop = sourceStops[i];
-            let sourceFootpaths = GoogleTransitData.getAllFootpathsOfAStop(sourceStop);
+            let sourceFootpaths = GoogleTransitData.getAllFootpathsOfADepartureStop(sourceStop);
             for(let j = 0; j < sourceFootpaths.length; j++){
                 let p = sourceFootpaths[j].departureStop;
                 let pN = sourceFootpaths[j].arrivalStop;
@@ -224,7 +224,7 @@ export class RaptorAlgorithmController {
         while(this.markedStops.length > 0){
             let markedStop = this.markedStops.pop();
             // gets all routes which serves the current stop
-            let routesServingStop: RouteStopMapping[] = GoogleTransitData.ROUTESSERVINGSTOPS[markedStop];
+            let routesServingStop: RouteStopMapping[] = GoogleTransitData.ROUTES_SERVING_STOPS[markedStop];
             // adds all route-stop pairs with the related sequence number to qTemp
             for(let i = 0; i < routesServingStop.length; i++) {
                 let routeId = routesServingStop[i].routeId;
@@ -266,8 +266,8 @@ export class RaptorAlgorithmController {
             }
             let reachedP = false;
             // loop over all stops of r beggining with p
-            for(let j = 0; j < GoogleTransitData.STOPSOFAROUTE[r].length; j++){     
-                let pi = GoogleTransitData.STOPSOFAROUTE[r][j];
+            for(let j = 0; j < GoogleTransitData.STOPS_OF_A_ROUTE[r].length; j++){     
+                let pi = GoogleTransitData.STOPS_OF_A_ROUTE[r][j];
                 if(pi === p){
                     reachedP = true;
                     continue;
@@ -348,7 +348,7 @@ export class RaptorAlgorithmController {
         for(let i = 0; i < numberOfMarkedStops; i++){
             let markedStop = this.markedStops[i];
             let arrivalTimeOfMarkedStop = arrivalTimesInRoundK[i];
-            let footPaths = GoogleTransitData.getAllFootpathsOfAStop(markedStop);
+            let footPaths = GoogleTransitData.getAllFootpathsOfADepartureStop(markedStop);
             for(let j = 0; j < footPaths.length; j++){
                 let p = footPaths[j].departureStop;
                 let pN = footPaths[j].arrivalStop;
