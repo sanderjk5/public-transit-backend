@@ -5,6 +5,9 @@ import { Importer } from './data/importer';
 import { Generator } from './data/generator';
 import { TestController } from './server/controller/testController';
 import { Reliability } from './data/reliability';
+import { GoogleTransitData } from './data/google-transit-data';
+import { ProfileConnectionScanAlgorithmController } from './server/controller/profileConnectionScanAlgorithmController';
+import { Converter } from './data/converter';
 
 const app = express();
 
@@ -19,6 +22,15 @@ Generator.generateSortedConnections();
 Generator.generateFootpaths();
 Reliability.initReliability();
 //TestController.testAlgorithms();
+
+let sourceStop = GoogleTransitData.getStopIdByName('Stuttgart-Rohr')
+let targetStop = GoogleTransitData.getStopIdByName('Hamburg Hbf')
+let minDepartureTime = Converter.timeToSeconds('08:40:00');
+console.log(minDepartureTime)
+let maxArrivalTime = Converter.timeToSeconds('15:40:00');
+console.log(maxArrivalTime)
+ProfileConnectionScanAlgorithmController.init();
+ProfileConnectionScanAlgorithmController.performAlgorithm(sourceStop, targetStop, minDepartureTime, maxArrivalTime);
 
 const port = 1337;
 const corsOptions = {

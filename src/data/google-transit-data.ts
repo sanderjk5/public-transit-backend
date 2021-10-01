@@ -48,6 +48,22 @@ export class GoogleTransitData {
     }
 
     /**
+     * Gets all stop ids with a given stop name.
+     * @param name 
+     * @returns 
+     */
+     public static getStopIdByName(name: string): number{
+        const searchName = name.toLowerCase();
+        for(let i = 0; i < this.STOPS.length; i++){
+            const stopName = this.STOPS[i].name.toLowerCase();
+            if(stopName === searchName){
+                return this.STOPS[i].id;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Gets all footpaths of a given stop.
      * @param stopID 
      * @returns 
