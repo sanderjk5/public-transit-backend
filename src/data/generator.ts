@@ -230,4 +230,32 @@ export class Generator {
             }
         }
     }
+
+    public static combineStops() {
+        const oldStops = GoogleTransitData.STOPS;
+        const stopNameToNewIdMap = new Map<string, number>();
+        const oldStopIdToNewStopIdMap = new Map<number, number>();
+        GoogleTransitData.STOPS = [];
+
+        for(let stop of oldStops){
+            if(!stopNameToNewIdMap.get(stop.name)){
+                const newId = GoogleTransitData.STOPS.length;
+                stopNameToNewIdMap.set(stop.name, newId);
+                const newStop: Stop = {
+                    id: newId,
+                    name: stop.name,
+                    lat: stop.lat,
+                    lon: stop.lon,
+                }
+                GoogleTransitData.STOPS.push(newStop);
+                oldStopIdToNewStopIdMap.set(stop.id, newId);
+            } else {
+                oldStopIdToNewStopIdMap.set(stop.id, stopNameToNewIdMap.get(stop.name))
+            }
+        }
+
+        for(let stopTime of GoogleTransitData.STOPTIMES){
+            stopTime.stopId = oldStopIdToNewStopIdMap.get(stopTime.stopId);
+        }
+    }
 }

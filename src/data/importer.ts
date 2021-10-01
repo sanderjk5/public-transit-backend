@@ -137,7 +137,7 @@ export class Importer {
                 date: date,
                 exception_type: exceptionType
             }
-            if(calendarDate.serviceId){
+            if(calendarDate.serviceId !== undefined){
                 importedCalendarDates.push(calendarDate);
             }
             importedCalendarDates.push(calendarDate);
@@ -233,7 +233,7 @@ export class Importer {
                 dropOffType: dropOffType,
             }
             // adds the stop time only when related trips and stops exists.
-            if(stopTime.tripId && stopTime.stopId){
+            if(stopTime.tripId !== undefined && stopTime.stopId !== undefined){
                 importedStopTimes.push(stopTime);
             }
         }
@@ -262,7 +262,7 @@ export class Importer {
                 isLongDistance: isLongDistance,
             }
             // adds the trip only when a related route exists
-            if(trip.routeId && trip.serviceId){
+            if(trip.routeId !== undefined && trip.serviceId !== undefined){
                 // mapping to the new id
                 this.tripIdMap.set(id, trip.id);
                 importedTrips.push(trip);
