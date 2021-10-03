@@ -23,11 +23,13 @@ Generator.generateFootpaths();
 Reliability.initReliability();
 //TestController.testAlgorithms();
 
-let sourceStop = GoogleTransitData.getStopIdByName('Stuttgart-Rohr')
-let targetStop = GoogleTransitData.getStopIdByName('Aachen Hbf')
+let sourceStop = GoogleTransitData.getStopIdByName('Stuttgart central station (FlixTrain)')
+let targetStop = GoogleTransitData.getStopIdByName('Hamburg Airport')
+// let sourceStop = GoogleTransitData.getStopIdByName('Stuttgart-Rohr')
+// let targetStop = GoogleTransitData.getStopIdByName('Stuttgart Hbf')
 let minDepartureTime = Converter.timeToSeconds('08:40:00');
 console.log(minDepartureTime)
-let maxArrivalTime = Converter.timeToSeconds('15:20:00');
+let maxArrivalTime = Converter.timeToSeconds('23:20:00');
 console.log(maxArrivalTime)
 ProfileConnectionScanAlgorithmController.init(targetStop);
 ProfileConnectionScanAlgorithmController.performAlgorithm(sourceStop, targetStop, minDepartureTime, maxArrivalTime);

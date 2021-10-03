@@ -119,7 +119,7 @@ export class Generator {
 
         // sets the correct footpath ids
         for(let i = 0; i < GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP.length; i++){
-            GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[i].id = i;
+            GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[i].idArrival = i;
         }
 
         console.timeEnd('generate footpaths')

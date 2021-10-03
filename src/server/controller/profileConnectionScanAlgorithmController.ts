@@ -37,7 +37,6 @@ export class ProfileConnectionScanAlgorithmController {
             let time3: number;
             let timeC: number;
             let p: SEntry;
-            let q: SEntry;
             if(this.d[currentConnection.arrivalStop] !== Number.MAX_VALUE) {
                 time1 = currentConnection.arrivalTime + this.d[currentConnection.arrivalStop];
             } else {
@@ -68,7 +67,6 @@ export class ProfileConnectionScanAlgorithmController {
             // if(this.dominates(this.s[sourceStop][this.sourceStopPointer], p)){
             //     continue;
             // }
-            q = this.s[currentConnection.departureStop][0];
             
             if(p.lExit !== undefined && p.arrivalTime !== Number.MAX_VALUE && this.notDominatedInProfile(p, currentConnection.departureStop)) {
                 let footpaths = GoogleTransitData.getAllFootpathsOfAArrivalStop(currentConnection.departureStop);
@@ -79,24 +77,22 @@ export class ProfileConnectionScanAlgorithmController {
                         lEnter: p.lEnter,
                         lExit: p.lExit
                     }
-                    //p.departureTime = currentConnection.departureTime - footpath.duration;
-                    
                     if(this.notDominatedInProfile(pNew, footpath.departureStop)){
                         
-                        // let shiftedPairs = [];
-                        // let currentPair = this.s[footpath.departureStop][0];
-                        // while(p.departureTime > currentPair.departureTime){
-                        //     shiftedPairs.unshift(this.s[footpath.departureStop].shift());
-                        //     currentPair = this.s[footpath.departureStop][0];
-                        // }
-                        // this.s[footpath.departureStop].unshift(p);
-                        // for(i = 0; i < shiftedPairs.length; i++) {
-                        //     this.s[footpath.departureStop].unshift(shiftedPairs[i]);
-                        // }
+                        let shiftedPairs = [];
+                        let currentPair = this.s[footpath.departureStop][0];
+                        while(pNew.departureTime >= currentPair.departureTime){
+                            let removedPair = this.s[footpath.departureStop].shift()
+                            shiftedPairs.push(removedPair);
+                            currentPair = this.s[footpath.departureStop][0];
+                        }
                         this.s[footpath.departureStop].unshift(pNew);
-                        this.s[footpath.departureStop].sort((a, b) => {
-                            return this.sortSEntriesByDepartureTime(a, b);
-                        })
+                        for(let j = 0; j < shiftedPairs.length; j++) {
+                            let removedPair = shiftedPairs[j];
+                            if(!this.dominates(pNew, removedPair)){
+                                this.s[footpath.departureStop].unshift(removedPair);
+                            }
+                        }
                     }
                     
                 }
@@ -173,42 +169,35 @@ export class ProfileConnectionScanAlgorithmController {
         let s = this.sourceStop;
         let timeS = this.minDepartureTime;
         while(s !== this.targetStop){
+            console.log(GoogleTransitData.STOPS[s].name)
+            console.log(timeS)
+            let minArrivalTime = Number.MAX_VALUE;
+            let nextS: number;
+            let nextTimeS: number;
             for(let i = 0; i < this.s[s].length; i++) {
                 let p = this.s[s][i];
-                if(p.departureTime >= timeS){
-                    console.log(GoogleTransitData.STOPS[s].name)
-                    console.log(Converter.secondsToTime(p.departureTime))
-
+                if(p.arrivalTime === 54540){
+                    console.log(p)
+                }
+                if(p.departureTime >= timeS && p.arrivalTime < minArrivalTime){
+                    // if(GoogleTransitData.STOPS[s].name === 'Hamburg Hbf' && p.lExit === 352988){
+                    //     continue;
+                    // }
+                    console.log(Converter.secondsToTime(this.s[s][i].arrivalTime))
+                    console.log(this.s[s][i].arrivalTime)
                     const lExit = GoogleTransitData.CONNECTIONS[p.lExit];
-                    s = lExit.arrivalStop;
-                    timeS = lExit.arrivalTime;
-
-                    console.log(GoogleTransitData.STOPS[s].name)
-                    console.log(Converter.secondsToTime(timeS))
-                    break;
+                    nextS = lExit.arrivalStop;
+                    nextTimeS = lExit.arrivalTime;
+                    minArrivalTime = p.arrivalTime;
+                    //break;
                 }
             }
+            s = nextS;
+            timeS = nextTimeS;
+            console.log(minArrivalTime)
+            console.log(GoogleTransitData.STOPS[s].name)
+            console.log(Converter.secondsToTime(timeS))
             //console.log(GoogleTransitData.STOPS[s].name)
-        }
-    }
-
-    private static sortSEntriesByDepartureTime(a: SEntry, b: SEntry){
-        if(a.departureTime < b.departureTime){
-            return -1;
-        }
-        if(a.departureTime === b.departureTime){
-            if(a.arrivalTime < b.arrivalTime){
-                return -1;
-            }
-            if(a.arrivalTime === b.arrivalTime){
-                return 0;
-            }
-            if(a.arrivalTime > b.arrivalTime){
-                return 1;
-            }
-        }
-        if(a.departureTime > b.departureTime){
-            return 1;
         }
     }
 }
