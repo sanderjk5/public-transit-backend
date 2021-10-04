@@ -23,6 +23,16 @@ Generator.generateFootpaths();
 Reliability.initReliability();
 //TestController.testAlgorithms();
 
+let sourceStop = 'Stuttgart-Rohr'
+let targetStop = 'Aachen Hbf'
+// let sourceStop = 'Stuttgart central station (FlixTrain)'
+// let targetStop = 'Hamburg Airport'
+// let sourceStop = 'Stuttgart-Rohr'
+// let targetStop = 'Stuttgart Hbf'
+let minDepartureTime = '22:20:00';
+let maxArrivalTime = Converter.timeToSeconds('23:20:00');
+// let journey = ProfileConnectionScanAlgorithmController.testProfileConnectionScanAlgorithm(sourceStop, targetStop, minDepartureTime, new Date(Date.now()));
+// console.log(journey)
 const port = 1337;
 const corsOptions = {
   origin: 'http://localhost:4200',
