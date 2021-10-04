@@ -20,6 +20,6 @@ export class Searcher {
                 end = middle - 1;
             }
         }
-        return Number.MAX_VALUE;
+        return GoogleTransitData.CONNECTIONS.length;
     }
 }
