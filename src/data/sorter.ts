@@ -82,4 +82,22 @@ export class Sorter {
             return 1;
         }
     }
+
+    /**
+     * Sorts footpaths by their arrival stop.
+     * @param a 
+     * @param b 
+     * @returns 
+     */
+     public static sortFootpathsByArrivalStop(a: Footpath, b: Footpath){
+        if(a.arrivalStop < b.arrivalStop) {
+            return -1;
+        }
+        if(a.arrivalStop === b.arrivalStop) {
+            return 0;
+        }
+        if(a.arrivalStop > b.arrivalStop) {
+            return 1;
+        }
+    }
 }

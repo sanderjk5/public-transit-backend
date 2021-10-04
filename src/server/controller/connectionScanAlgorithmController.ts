@@ -197,7 +197,7 @@ export class ConnectionScanAlgorithmController {
                     // checks if the stop can be reached earlier with the current connection
                     if(currentConnectionArrivalTime < this.s[currentConnection.arrivalStop]){
                         // updates the footpaths of the stop
-                        let footpaths: Footpath[] = GoogleTransitData.getAllFootpathsOfAStop(currentConnection.arrivalStop);
+                        let footpaths: Footpath[] = GoogleTransitData.getAllFootpathsOfADepartureStop(currentConnection.arrivalStop);
                         for(let j = 0; j < footpaths.length; j++){
                             if(currentConnectionArrivalTime + footpaths[j].duration < this.s[footpaths[j].arrivalStop]){
                                 // sets the earliest arrival time
@@ -324,7 +324,7 @@ export class ConnectionScanAlgorithmController {
         this.connections = new Array(3);
 
         for(let i = 0; i < sourceStops.length; i++){
-            const footpathsOfSourceStop = GoogleTransitData.getAllFootpathsOfAStop(sourceStops[i]);
+            const footpathsOfSourceStop = GoogleTransitData.getAllFootpathsOfADepartureStop(sourceStops[i]);
             for(let j = 0; j < footpathsOfSourceStop.length; j++){
                 if(this.s[footpathsOfSourceStop[j].arrivalStop] > sourceTime + footpathsOfSourceStop[j].duration){
                     this.s[footpathsOfSourceStop[j].arrivalStop] = sourceTime + footpathsOfSourceStop[j].duration;
@@ -362,7 +362,7 @@ export class ConnectionScanAlgorithmController {
         }
         // stores the first journey pointer (contains the initial footpath)
         journeyPointersOfRoute.push(this.j[currentStop]);
-        if(!sourceStops.includes(GoogleTransitData.FOOTPATHS[this.j[currentStop].footpath].departureStop)){
+        if(!sourceStops.includes(GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP[this.j[currentStop].footpath].departureStop)){
             throw new Error("Couldn't find a connection")
         }
 
@@ -403,7 +403,7 @@ export class ConnectionScanAlgorithmController {
             
 
             if(journeyPointersOfRoute[i].footpath !== null){
-                const footpath = GoogleTransitData.FOOTPATHS[journeyPointersOfRoute[i].footpath];
+                const footpath = GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP[journeyPointersOfRoute[i].footpath];
 
                 const transfer: Transfer = {
                     departureStop: GoogleTransitData.STOPS[footpath.departureStop],

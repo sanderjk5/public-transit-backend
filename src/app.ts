@@ -5,6 +5,9 @@ import { Importer } from './data/importer';
 import { Generator } from './data/generator';
 import { TestController } from './server/controller/testController';
 import { Reliability } from './data/reliability';
+import { GoogleTransitData } from './data/google-transit-data';
+import { ProfileConnectionScanAlgorithmController } from './server/controller/profileConnectionScanAlgorithmController';
+import { Converter } from './data/converter';
 
 const app = express();
 

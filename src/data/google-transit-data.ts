@@ -18,17 +18,19 @@ export class GoogleTransitData {
     public static ROUTES: Route[] = [];
     public static STOPS: Stop[] = [];
     public static STOPTIMES: StopTime[] = [];
-    public static FOOTPATHS: Footpath[] = [];
+    public static FOOTPATHS_SORTED_BY_DEPARTURE_STOP: Footpath[] = [];
+    public static FOOTPATHS_SORTED_BY_ARRIVAL_STOP: Footpath[] = [];
     public static TRIPS: Trip[] = [];
     // connections of connection scan algorithm
     public static CONNECTIONS: Connection[] = [];
     // pointer to optimize the raptor algorithm
-    public static ROUTESSERVINGSTOPS: RouteStopMapping[][];
-    public static STOPSOFAROUTE: number[][];
-    public static STOPTIMESOFATRIP: number[];
-    public static TRIPSOFAROUTE: number[][];
+    public static ROUTES_SERVING_STOPS: RouteStopMapping[][];
+    public static STOPS_OF_A_ROUTE: number[][];
+    public static STOPTIMES_OF_A_TRIP: number[];
+    public static TRIPS_OF_A_ROUTE: number[][];
     // pointer to get faster all footpaths of a stop
-    public static FOOTPATHSOFASTOP: number[];
+    public static FOOTPATHS_OF_A_DEPARTURE_STOP: number[];
+    public static FOOTPATHS_OF_A_ARRIVAL_STOP: number[];
 
     /**
      * Gets all stop ids with a given stop name.
@@ -48,17 +50,53 @@ export class GoogleTransitData {
     }
 
     /**
+     * Gets all stop ids with a given stop name.
+     * @param name 
+     * @returns 
+     */
+     public static getStopIdByName(name: string): number{
+        const searchName = name.toLowerCase();
+        for(let i = 0; i < this.STOPS.length; i++){
+            const stopName = this.STOPS[i].name.toLowerCase();
+            if(stopName === searchName){
+                return this.STOPS[i].id;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Gets all footpaths of a given stop.
      * @param stopID 
      * @returns 
      */
-    public static getAllFootpathsOfAStop(stopID: number){
+    public static getAllFootpathsOfADepartureStop(stopID: number){
         let footpaths: Footpath[] = [];
-        let firstFootpathOfStop = GoogleTransitData.FOOTPATHSOFASTOP[stopID];
-        if(firstFootpathOfStop){
-            for(let i = firstFootpathOfStop; i < this.FOOTPATHS.length; i++){
-                if(this.FOOTPATHS[i].departureStop === stopID){
-                    footpaths.push(this.FOOTPATHS[i]);
+        let firstFootpathOfStop = GoogleTransitData.FOOTPATHS_OF_A_DEPARTURE_STOP[stopID];
+        if(firstFootpathOfStop !== undefined){
+            for(let i = firstFootpathOfStop; i < this.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.length; i++){
+                if(this.FOOTPATHS_SORTED_BY_DEPARTURE_STOP[i].departureStop === stopID){
+                    footpaths.push(this.FOOTPATHS_SORTED_BY_DEPARTURE_STOP[i]);
+                } else {
+                    break;
+                }
+            }
+        }
+        return footpaths;
+    }
+
+    /**
+     * Gets all footpaths of a given stop.
+     * @param stopID 
+     * @returns 
+     */
+     public static getAllFootpathsOfAArrivalStop(stopID: number){
+        let footpaths: Footpath[] = [];
+        let firstFootpathOfStop = GoogleTransitData.FOOTPATHS_OF_A_ARRIVAL_STOP[stopID];
+        if(firstFootpathOfStop !== undefined){
+            for(let i = firstFootpathOfStop; i < this.FOOTPATHS_SORTED_BY_ARRIVAL_STOP.length; i++){
+                if(this.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[i].arrivalStop === stopID){
+                    footpaths.push(this.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[i]);
                 } else {
                     break;
                 }
@@ -77,7 +115,7 @@ export class GoogleTransitData {
         if(!tripId || !stopId){
             return null;
         }
-        let firstStopTimeOfTrip = GoogleTransitData.STOPTIMESOFATRIP[tripId];
+        let firstStopTimeOfTrip = GoogleTransitData.STOPTIMES_OF_A_TRIP[tripId];
         for(let i = firstStopTimeOfTrip; i < GoogleTransitData.STOPTIMES.length; i++) {
             let stopTime = GoogleTransitData.STOPTIMES[i];
             if(stopTime.tripId !== tripId){
@@ -101,10 +139,10 @@ export class GoogleTransitData {
             return [];
         }
         let stopTimes = []
-        let tripsOfRoute = GoogleTransitData.TRIPSOFAROUTE[r];
+        let tripsOfRoute = GoogleTransitData.TRIPS_OF_A_ROUTE[r];
         for(let i = 0; i < tripsOfRoute.length; i++){
             let tripId = tripsOfRoute[i];
-            let firstStopTimeOfTrip = GoogleTransitData.STOPTIMESOFATRIP[tripId];
+            let firstStopTimeOfTrip = GoogleTransitData.STOPTIMES_OF_A_TRIP[tripId];
             for(let j = firstStopTimeOfTrip; j < GoogleTransitData.STOPTIMES.length; j++) {
                 let stopTime = GoogleTransitData.STOPTIMES[j];
                 if(tripId !== stopTime.tripId){

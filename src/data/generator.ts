@@ -20,7 +20,7 @@ export class Generator {
 
         for(let i = 0; i < GoogleTransitData.TRIPS.length; i++) {
             let tripId = GoogleTransitData.TRIPS[i].id
-            let firstStopTimeOfTrip = GoogleTransitData.STOPTIMESOFATRIP[tripId];
+            let firstStopTimeOfTrip = GoogleTransitData.STOPTIMES_OF_A_TRIP[tripId];
             
             let lastStopTime = GoogleTransitData.STOPTIMES[firstStopTimeOfTrip];
             for(let j = firstStopTimeOfTrip + 1; j < GoogleTransitData.STOPTIMES.length; j++) {
@@ -63,12 +63,13 @@ export class Generator {
             const stop1 = GoogleTransitData.STOPS[i];
             // change time at every stop
             let footpath: Footpath = {
-                id: GoogleTransitData.FOOTPATHS.length,
+                id: GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.length,
                 departureStop: stop1.id,
                 arrivalStop: stop1.id,
                 duration: 0
             }
-            GoogleTransitData.FOOTPATHS.push(footpath);
+            GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.push(footpath);
+            GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP.push(footpath);
             // reflexive footpaths between stops with a distance less than 1km
             for(let j = i+1; j < GoogleTransitData.STOPS.length; j++) {
                 const stop2 = GoogleTransitData.STOPS[j];
@@ -81,33 +82,44 @@ export class Generator {
                     duration = Math.floor(15 * distance) * 60;
                     // creates reflexive footpaths
                     let footpath: Footpath = {
-                        id: GoogleTransitData.FOOTPATHS.length,
+                        id: GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.length,
                         departureStop: stop1.id,
                         arrivalStop: stop2.id,
                         duration: duration
                     };
-                    GoogleTransitData.FOOTPATHS.push(footpath);
+                    GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.push(footpath);
+                    GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP.push(footpath);
                     footpath = {
-                        id: GoogleTransitData.FOOTPATHS.length,
+                        id: GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.length,
                         departureStop: stop2.id,
                         arrivalStop: stop1.id,
                         duration: duration
                     }
-                    GoogleTransitData.FOOTPATHS.push(footpath);
+                    GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.push(footpath);
+                    GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP.push(footpath);
                 }
             }
         }
 
         // sorts the footpaths by departure stop
-        GoogleTransitData.FOOTPATHS.sort((a: Footpath, b: Footpath) => {
+        GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.sort((a: Footpath, b: Footpath) => {
             return Sorter.sortFootpathsByDepartureStop(a, b);
+        })
+
+        GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP.sort((a: Footpath, b: Footpath) => {
+            return Sorter.sortFootpathsByArrivalStop(a, b);
         })
 
         this.generateFootpathPointers();
 
         // sets the correct footpath ids
-        for(let i = 0; i < GoogleTransitData.FOOTPATHS.length; i++){
-            GoogleTransitData.FOOTPATHS[i].id = i;
+        for(let i = 0; i < GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.length; i++){
+            GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP[i].id = i;
+        }
+
+        // sets the correct footpath ids
+        for(let i = 0; i < GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP.length; i++){
+            GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[i].idArrival = i;
         }
 
         console.timeEnd('generate footpaths')
@@ -117,16 +129,28 @@ export class Generator {
      * Generates a pointer array which stores the first footpath of each stop.
      */
     private static generateFootpathPointers() {
-        GoogleTransitData.FOOTPATHSOFASTOP = new Array(GoogleTransitData.STOPS.length);
+        GoogleTransitData.FOOTPATHS_OF_A_DEPARTURE_STOP = new Array(GoogleTransitData.STOPS.length);
         let lastDepartureStopId = 0;
-        GoogleTransitData.FOOTPATHSOFASTOP[lastDepartureStopId] = 0;
+        GoogleTransitData.FOOTPATHS_OF_A_DEPARTURE_STOP[lastDepartureStopId] = 0;
 
-        for(let i = 0; i < GoogleTransitData.FOOTPATHS.length; i++) {
-            let departureStop = GoogleTransitData.FOOTPATHS[i].departureStop
+        for(let i = 0; i < GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.length; i++) {
+            let departureStop = GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP[i].departureStop
             if(lastDepartureStopId !== departureStop){
-                GoogleTransitData.FOOTPATHSOFASTOP[departureStop] = i;
+                GoogleTransitData.FOOTPATHS_OF_A_DEPARTURE_STOP[departureStop] = i;
             }
             lastDepartureStopId = departureStop;
+        }
+
+        GoogleTransitData.FOOTPATHS_OF_A_ARRIVAL_STOP = new Array(GoogleTransitData.STOPS.length);
+        let lastArrivalStopId = 0;
+        GoogleTransitData.FOOTPATHS_OF_A_ARRIVAL_STOP[lastArrivalStopId] = 0;
+
+        for(let i = 0; i < GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP.length; i++) {
+            let arrivalStop = GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[i].arrivalStop
+            if(lastArrivalStopId !== arrivalStop){
+                GoogleTransitData.FOOTPATHS_OF_A_ARRIVAL_STOP[arrivalStop] = i;
+            }
+            lastArrivalStopId = arrivalStop;
         }
     }
 
@@ -142,12 +166,12 @@ export class Generator {
         })
 
         // creates array with pointers to optimize the raptor algorithm
-        GoogleTransitData.STOPTIMESOFATRIP = new Array(GoogleTransitData.TRIPS.length);
-        GoogleTransitData.TRIPSOFAROUTE = [];
-        GoogleTransitData.STOPSOFAROUTE = [];
-        GoogleTransitData.ROUTESSERVINGSTOPS = new Array(GoogleTransitData.STOPS.length);
+        GoogleTransitData.STOPTIMES_OF_A_TRIP = new Array(GoogleTransitData.TRIPS.length);
+        GoogleTransitData.TRIPS_OF_A_ROUTE = [];
+        GoogleTransitData.STOPS_OF_A_ROUTE = [];
+        GoogleTransitData.ROUTES_SERVING_STOPS = new Array(GoogleTransitData.STOPS.length);
         for(let i = 0; i < GoogleTransitData.STOPS.length; i++){
-            GoogleTransitData.ROUTESSERVINGSTOPS[i] = [];
+            GoogleTransitData.ROUTES_SERVING_STOPS[i] = [];
         }
 
         // id mapping for the new route
@@ -158,7 +182,7 @@ export class Generator {
         let stopSequence = 0;
         let duplicatedStops: newStopMapEntry[] = [];
         let newStopMap = new Map<number, newStopMapEntry[]>();
-        GoogleTransitData.STOPTIMESOFATRIP[GoogleTransitData.STOPTIMES[0].tripId] = 0;
+        GoogleTransitData.STOPTIMES_OF_A_TRIP[GoogleTransitData.STOPTIMES[0].tripId] = 0;
         for(let i = 0; i < GoogleTransitData.STOPTIMES.length; i++){
             let stopTime = GoogleTransitData.STOPTIMES[i];
             // checks for each trip of a new generated route has a trip with the same stop sequence
@@ -174,17 +198,17 @@ export class Generator {
                     routeIdMapping.set(stopIdString, newRouteId);
                     // adds the new route
                     GoogleTransitData.ROUTES.push(newRoute);
-                    GoogleTransitData.STOPSOFAROUTE.push(stops);
+                    GoogleTransitData.STOPS_OF_A_ROUTE.push(stops);
                     for(let j = 0; j < stops.length; j++){
-                        GoogleTransitData.ROUTESSERVINGSTOPS[stops[j]].push({routeId: newRouteId, stopSequence: j})
+                        GoogleTransitData.ROUTES_SERVING_STOPS[stops[j]].push({routeId: newRouteId, stopSequence: j})
                     }
-                    GoogleTransitData.TRIPSOFAROUTE.push([lastTripId]);
+                    GoogleTransitData.TRIPS_OF_A_ROUTE.push([lastTripId]);
                     // checks if the route contains duplicate stops
                     if(duplicatedStops.length > 0) {
                         newStopMap.set(newRouteId, duplicatedStops);
                     }
                 } else {
-                    GoogleTransitData.TRIPSOFAROUTE[newRouteId].push(lastTripId);
+                    GoogleTransitData.TRIPS_OF_A_ROUTE[newRouteId].push(lastTripId);
                 }
                 // sets the route id of the related trip
                 GoogleTransitData.TRIPS[lastTripId].routeId = newRouteId;
@@ -192,7 +216,7 @@ export class Generator {
                 stops = [];
                 duplicatedStops = [];
                 stopSequence = 0;
-                GoogleTransitData.STOPTIMESOFATRIP[stopTime.tripId] = i;
+                GoogleTransitData.STOPTIMES_OF_A_TRIP[stopTime.tripId] = i;
             }
             // adds the stop id to the stop sequence string
             stopIdString += stopTime.stopId.toString() + ','
@@ -207,7 +231,7 @@ export class Generator {
         // replaces the duplicated stops with new stops at the same location and the same name
         for(let routeId of newStopMap.keys()){
             let duplicatedStops = newStopMap.get(routeId);
-            let trips = GoogleTransitData.TRIPSOFAROUTE[routeId];
+            let trips = GoogleTransitData.TRIPS_OF_A_ROUTE[routeId];
             for(let j = 0; j < duplicatedStops.length; j++){
                 let duplicatedStop = duplicatedStops[j];
                 let relatedStop = GoogleTransitData.STOPS[duplicatedStop.stopId];
@@ -222,11 +246,11 @@ export class Generator {
                 GoogleTransitData.STOPS.push(newStop);
                 // sets the pointer of trip, stop and route
                 for(let k = 0; k < trips.length; k++){
-                    let firstStopTimeOfTrip = GoogleTransitData.STOPTIMESOFATRIP[trips[k]];
+                    let firstStopTimeOfTrip = GoogleTransitData.STOPTIMES_OF_A_TRIP[trips[k]];
                     GoogleTransitData.STOPTIMES[firstStopTimeOfTrip + duplicatedStop.stopSequence].stopId = newStopId;
                 }
-                GoogleTransitData.STOPSOFAROUTE[routeId][duplicatedStop.stopSequence] = newStopId;
-                GoogleTransitData.ROUTESSERVINGSTOPS.push([{routeId: routeId, stopSequence: duplicatedStop.stopSequence}]);
+                GoogleTransitData.STOPS_OF_A_ROUTE[routeId][duplicatedStop.stopSequence] = newStopId;
+                GoogleTransitData.ROUTES_SERVING_STOPS.push([{routeId: routeId, stopSequence: duplicatedStop.stopSequence}]);
             }
         }
     }

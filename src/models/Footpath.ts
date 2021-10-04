@@ -2,5 +2,6 @@ export interface Footpath {
     id: number,
     departureStop: number,
     arrivalStop: number,
-    duration: number
+    duration: number,
+    idArrival?: number,
 }
