@@ -53,7 +53,7 @@ export class ConnectionScanAlgorithmController {
      * @param res 
      * @returns 
      */
-    public static connectionScanAlgorithm(req: express.Request, res: express.Response){
+    public static connectionScanAlgorithmRoute(req: express.Request, res: express.Response){
         try {
             // checks the parameters of the http request
             if(!req.query || !req.query.sourceStop || !req.query.targetStop || !req.query.sourceTime || !req.query.date ||
@@ -113,6 +113,29 @@ export class ConnectionScanAlgorithmController {
                 }
             }
             return {arrivalTime: earliestTargetStopArrival, duration: duration};
+        } catch (err) {
+            return null;
+        }
+    }
+
+    public static getEarliestArrivalTime(sourceStop: string, targetStop: string, sourceDate: Date, sourceTimeInSeconds: number){
+        // gets the source and target stops
+        const sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
+        const targetStops = GoogleTransitData.getStopIdsByName(targetStop);
+        // sets the source Weekday
+        try {
+            // initializes the csa algorithm
+            this.init(sourceStops, sourceTimeInSeconds, sourceDate);
+            // calls the csa
+            this.performAlgorithm(targetStops);
+            // gets the earliest arrival time at the target stops
+            let earliestTargetStopArrival = this.s[targetStops[0]];
+            for(let l = 1; l < targetStops.length; l++){
+                if(this.s[targetStops[l]] < earliestTargetStopArrival){
+                    earliestTargetStopArrival = this.s[targetStops[l]];
+                }
+            }
+            return earliestTargetStopArrival;
         } catch (err) {
             return null;
         }
