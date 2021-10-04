@@ -5,10 +5,10 @@ import { ProfileConnectionScanAlgorithmController } from '../controller/profileC
 
 const router = express.Router();
 router.get('/earliestArrival', (req, res) => {
-    ConnectionScanAlgorithmController.connectionScanAlgorithm(req, res);
+    ConnectionScanAlgorithmController.connectionScanAlgorithmRoute(req, res);
 });
 router.get('/earliestArrivalProfile', (req, res) => {
-    ProfileConnectionScanAlgorithmController.profileConnectionScanAlgorithm(req, res);
+    ProfileConnectionScanAlgorithmController.profileConnectionScanAlgorithmRoute(req, res);
 });
 
 export default router
