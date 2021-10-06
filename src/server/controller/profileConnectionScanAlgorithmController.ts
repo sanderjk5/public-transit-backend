@@ -242,7 +242,9 @@ export class ProfileConnectionScanAlgorithmController {
         for(let targetStop of this.targetStops){
             let finalFootpaths = GoogleTransitData.getAllFootpathsOfAArrivalStop(targetStop);
             for(let footpath of finalFootpaths){
-                this.d[footpath.departureStop] = footpath.duration;
+                if(this.d[footpath.departureStop] > footpath.duration){
+                    this.d[footpath.departureStop] = footpath.duration;
+                }
             }
         }
         
@@ -281,8 +283,6 @@ export class ProfileConnectionScanAlgorithmController {
         let trainSectionCounter = 0;
         let departureDate: Date;
         let arrivalDate: Date;
-        console.log(earliestArrivalTime)
-        console.log(Converter.secondsToTime(earliestArrivalTime))
         while(!this.targetStops.includes(s)){
             for(let i = 0; i < this.s[s].length; i++) {
                 let p = this.s[s][i];
@@ -304,7 +304,7 @@ export class ProfileConnectionScanAlgorithmController {
                         arrivalDate = p.arrivalDate;
                         break;
                     }
-                    if(this.sourceStops.includes(GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath].departureStop) || this.sourceStops.includes(GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath].arrivalStop)){
+                    if(!this.sourceStops.includes(GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath].departureStop) || !this.sourceStops.includes(GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath].arrivalStop)){
                         const footpathSection: Section = {
                             departureTime: Converter.secondsToTime(timeS),
                             arrivalTime: Converter.secondsToTime(timeS + GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath].duration),
