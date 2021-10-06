@@ -7,6 +7,7 @@ import { Searcher } from "../../data/searcher";
 import { Connection } from "../../models/Connection";
 import { JourneyResponse } from "../../models/JourneyResponse";
 import { Section } from "../../models/Section";
+import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmController";
 
 interface SEntry {
     departureTime: number,
@@ -29,7 +30,7 @@ interface TEntry {
 
 export class ProfileConnectionScanAlgorithmController {
     private static s: SEntry[][];
-    private static t: TEntry[][];
+    private static t: TEntry[];
     private static d: number[];
     private static sourceStop: number;
     private static targetStop: number;
@@ -40,7 +41,7 @@ export class ProfileConnectionScanAlgorithmController {
     private static dayOffset: number;
 
 
-    public static profileConnectionScanAlgorithm(req: express.Request, res: express.Response){
+    public static profileConnectionScanAlgorithmRoute(req: express.Request, res: express.Response){
         try {
             // checks the parameters of the http request
             if(!req.query || !req.query.sourceStop || !req.query.targetStop || !req.query.sourceTime || !req.query.date ||
@@ -53,8 +54,15 @@ export class ProfileConnectionScanAlgorithmController {
             this.targetStop = GoogleTransitData.getStopIdByName(req.query.targetStop);
             // converts the source time
             this.minDepartureTime = Converter.timeToSeconds(req.query.sourceTime);
-            this.maxArrivalTime = 160000;
             this.currentDate = new Date(req.query.date);
+
+            const earliestArrivalTime = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.currentDate, this.minDepartureTime);
+            if(earliestArrivalTime === null) {
+                throw new Error("Couldn't find a connection.")
+            }
+
+            this.maxArrivalTime = earliestArrivalTime + 0.5 * (earliestArrivalTime - this.minDepartureTime);
+            
             this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
             this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
             // initializes the csa algorithm
@@ -103,7 +111,6 @@ export class ProfileConnectionScanAlgorithmController {
             let currentConnection: Connection;
             let currentConnectionDepartureTime: number;
             let currentConnectionArrivalTime: number;
-            let dayOfCurrentConnection: number;
             let currentWeekday: number;
             let currentArrivalDate = new Date(this.currentDate);
             if(currentDayConnection && currentDayConnection.departureTime >= Math.max(previousDayConnection.departureTime - SECONDS_OF_A_DAY, 0)){
@@ -113,16 +120,14 @@ export class ProfileConnectionScanAlgorithmController {
                 if(currentConnection.arrivalTime >= SECONDS_OF_A_DAY){
                     currentArrivalDate.setDate(currentArrivalDate.getDate() + 1);
                 }
-                dayOfCurrentConnection = 0;
                 currentDayIndex--;
                 currentWeekday = currentDayWeekday;
             } else if(previousDayConnection.departureTime >= SECONDS_OF_A_DAY) {
                 currentConnection = previousDayConnection;
                 currentConnectionDepartureTime = currentConnection.departureTime + this.dayOffset - SECONDS_OF_A_DAY;
                 currentConnectionArrivalTime = currentConnection.arrivalTime + this.dayOffset - SECONDS_OF_A_DAY;
-                dayOfCurrentConnection = 1;
                 previousDayIndex--;
-                currentWeekday = currentDayWeekday - 1;
+                currentWeekday = Calculator.moduloSeven(currentDayWeekday - 1);
             } else {
                 if(this.dayOffset === 0){
                     break;
@@ -132,13 +137,6 @@ export class ProfileConnectionScanAlgorithmController {
                 this.dayOffset -= SECONDS_OF_A_DAY;
                 currentDayWeekday = Calculator.moduloSeven(currentDayWeekday - 1);
                 this.currentDate.setDate(this.currentDate.getDate() - 1);
-                this.t[0] = this.t[1];
-                this.t[1] = new Array(GoogleTransitData.TRIPS.length);
-                for(let i = 0; i < this.t[1].length; i++) {
-                    this.t[1][i] = {
-                        arrivalTime: Number.MAX_VALUE,
-                    };
-                }
                 continue;
             }
             lastDepartureTime = currentConnectionDepartureTime;
@@ -156,7 +154,7 @@ export class ProfileConnectionScanAlgorithmController {
             } else {
                 time1 = Number.MAX_VALUE;
             }
-            time2 = this.t[dayOfCurrentConnection][currentConnection.trip].arrivalTime;
+            time2 = this.t[currentConnection.trip].arrivalTime;
             let j = 0;
             p = this.s[currentConnection.arrivalStop][j];
             while(p.departureTime < currentConnectionArrivalTime) {
@@ -167,24 +165,27 @@ export class ProfileConnectionScanAlgorithmController {
 
             timeC = Math.min(time1, time2, time3);
 
+            if(timeC !== Number.MAX_VALUE && timeC < this.t[currentConnection.trip].arrivalTime){
+                this.t[currentConnection.trip] = {
+                    arrivalTime: timeC,
+                    arrivalDate: currentArrivalDate,
+                    connectionArrivalTime: currentConnectionArrivalTime,
+                    connectionArrivalStop: currentConnection.arrivalStop,
+                };
+            }
+
             p = {
                 departureTime: currentConnectionDepartureTime,
                 arrivalTime: timeC,
                 departureDate: this.currentDate,
-                arrivalDate: this.t[dayOfCurrentConnection][currentConnection.trip].arrivalDate,
+                arrivalDate: this.t[currentConnection.trip].arrivalDate,
                 enterTime: currentConnectionDepartureTime,
                 enterStop: currentConnection.departureStop,
-                exitTime: this.t[dayOfCurrentConnection][currentConnection.trip].connectionArrivalTime,
-                exitStop: this.t[dayOfCurrentConnection][currentConnection.trip].connectionArrivalStop,
-            }
-
-            if(currentConnection.arrivalStop === this.targetStop && time1 === timeC) {
-                p.exitTime = currentConnectionArrivalTime;
-                p.exitStop = currentConnection.arrivalStop;
-                p.arrivalDate = currentArrivalDate;
+                exitTime: this.t[currentConnection.trip].connectionArrivalTime,
+                exitStop: this.t[currentConnection.trip].connectionArrivalStop,
             }
             
-            if(p.exitTime !== undefined && p.arrivalTime !== Number.MAX_VALUE && this.notDominatedInProfile(p, currentConnection.departureStop)) {
+            if(p.exitStop !== undefined && p.arrivalTime !== Number.MAX_VALUE && this.notDominatedInProfile(p, currentConnection.departureStop)) {
                 let footpaths = GoogleTransitData.getAllFootpathsOfAArrivalStop(currentConnection.departureStop);
                 for(let footpath of footpaths) {
                     let pNew: SEntry= {
@@ -198,6 +199,7 @@ export class ProfileConnectionScanAlgorithmController {
                         exitStop: p.exitStop,
                         transferFootpath: footpath.idArrival,
                     }
+                    
                     if(this.notDominatedInProfile(pNew, footpath.departureStop)){
                         let shiftedPairs = [];
                         let currentPair = this.s[footpath.departureStop][0];
@@ -214,25 +216,14 @@ export class ProfileConnectionScanAlgorithmController {
                             }
                         }
                     }
-                    
                 }
-            }
-            if(timeC !== Number.MAX_VALUE && timeC < this.t[dayOfCurrentConnection][currentConnection.trip].arrivalTime){
-                this.t[dayOfCurrentConnection][currentConnection.trip] = {
-                    arrivalTime: timeC,
-                    arrivalDate: currentArrivalDate,
-                    connectionArrivalTime: currentConnectionArrivalTime,
-                    connectionArrivalStop: currentConnection.arrivalStop,
-                };
             }
         }
     }
 
     private static init(){
         this.s = new Array(GoogleTransitData.STOPS.length);
-        this.t = new Array(2);
-        this.t[0] = new Array(GoogleTransitData.TRIPS.length);
-        this.t[1] = new Array(GoogleTransitData.TRIPS.length);
+        this.t = new Array(GoogleTransitData.TRIPS.length);
         this.d = new Array(GoogleTransitData.STOPS.length);
 
         const defaultSEntry: SEntry = {
@@ -243,11 +234,8 @@ export class ProfileConnectionScanAlgorithmController {
             this.s[i] = [defaultSEntry];
             this.d[i] = Number.MAX_VALUE;
         }
-        for(let i = 0; i < this.t[0].length; i++) {
-            this.t[0][i] = {
-                arrivalTime: Number.MAX_VALUE
-            };
-            this.t[1][i] = {
+        for(let i = 0; i < this.t.length; i++) {
+            this.t[i] = {
                 arrivalTime: Number.MAX_VALUE
             };
         }

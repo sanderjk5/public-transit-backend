@@ -137,6 +137,7 @@ export class ConnectionScanAlgorithmController {
             }
             return earliestTargetStopArrival;
         } catch (err) {
+            console.log(err)
             return null;
         }
     }
