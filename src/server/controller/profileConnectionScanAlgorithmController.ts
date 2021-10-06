@@ -1,21 +1,31 @@
 import express from "express";
+import { SECONDS_OF_A_DAY } from "../../constants";
+import { Calculator } from "../../data/calculator";
 import { Converter } from "../../data/converter";
 import { GoogleTransitData } from "../../data/google-transit-data";
 import { Searcher } from "../../data/searcher";
+import { Connection } from "../../models/Connection";
 import { JourneyResponse } from "../../models/JourneyResponse";
 import { Section } from "../../models/Section";
+import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmController";
 
 interface SEntry {
     departureTime: number,
     arrivalTime: number,
-    lEnter?: number,
-    lExit?: number,
+    departureDate?: Date,
+    arrivalDate?: Date,
+    enterTime?: number,
+    enterStop?: number,
+    exitTime?: number,
+    exitStop?: number,
     transferFootpath?: number,
 }
 
 interface TEntry {
     arrivalTime: number,
-    connectionId?: number,
+    arrivalDate?: Date,
+    connectionArrivalTime?: number,
+    connectionArrivalStop?: number,
 }
 
 export class ProfileConnectionScanAlgorithmController {
@@ -26,9 +36,12 @@ export class ProfileConnectionScanAlgorithmController {
     private static targetStop: number;
     private static minDepartureTime: number;
     private static maxArrivalTime: number;
-    private static sourceDate: Date;
+    private static currentDate: Date;
 
-    public static profileConnectionScanAlgorithm(req: express.Request, res: express.Response){
+    private static dayOffset: number;
+
+
+    public static profileConnectionScanAlgorithmRoute(req: express.Request, res: express.Response){
         try {
             // checks the parameters of the http request
             if(!req.query || !req.query.sourceStop || !req.query.targetStop || !req.query.sourceTime || !req.query.date ||
@@ -41,8 +54,17 @@ export class ProfileConnectionScanAlgorithmController {
             this.targetStop = GoogleTransitData.getStopIdByName(req.query.targetStop);
             // converts the source time
             this.minDepartureTime = Converter.timeToSeconds(req.query.sourceTime);
-            this.maxArrivalTime = Converter.timeToSeconds('23:59:59');
-            this.sourceDate = new Date(req.query.date);
+            this.currentDate = new Date(req.query.date);
+
+            const earliestArrivalTime = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.currentDate, this.minDepartureTime);
+            if(earliestArrivalTime === null) {
+                throw new Error("Couldn't find a connection.")
+            }
+
+            this.maxArrivalTime = earliestArrivalTime + 0.5 * (earliestArrivalTime - this.minDepartureTime);
+            
+            this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
+            this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
             // initializes the csa algorithm
             this.init();
             // calls the csa
@@ -59,25 +81,83 @@ export class ProfileConnectionScanAlgorithmController {
         }
     }
 
-    public static performAlgorithm() {
-        let lastConnectionIndex = Searcher.binarySearchOfConnections(this.maxArrivalTime) - 1;
-        let firstConnectionIndex = Searcher.binarySearchOfConnections(this.minDepartureTime);
-        for(let i = lastConnectionIndex; i >= firstConnectionIndex; i--){
-            let currentConnection = GoogleTransitData.CONNECTIONS[i];
+    public static testProfileConnectionScanAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
+        this.sourceStop = GoogleTransitData.getStopIdByName(sourceStop);
+        this.targetStop = GoogleTransitData.getStopIdByName(targetStop);
+        // converts the source time
+        this.minDepartureTime = Converter.timeToSeconds(sourceTime);
+        this.maxArrivalTime = 160000;
+        this.currentDate = new Date(sourceDate);
+        this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
+        this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
+        // initializes the csa algorithm
+        this.init();
+        // calls the csa
+        console.time('connection scan profile algorithm')
+        this.performAlgorithm();
+        console.timeEnd('connection scan profile algorithm')
+        // generates the http response which includes all information of the journey
+        return this.getJourney();
+    }
+
+    private static performAlgorithm() {
+        let currentDayIndex = Searcher.binarySearchOfConnections(this.maxArrivalTime - this.dayOffset) - 1;
+        let previousDayIndex = Searcher.binarySearchOfConnections(this.maxArrivalTime - this.dayOffset + SECONDS_OF_A_DAY) - 1;
+        let lastDepartureTime = this.maxArrivalTime;
+        let currentDayWeekday = Calculator.moduloSeven(this.currentDate.getDay() - 1);
+        while(lastDepartureTime >= this.minDepartureTime){
+            const currentDayConnection = GoogleTransitData.CONNECTIONS[currentDayIndex];
+            const previousDayConnection = GoogleTransitData.CONNECTIONS[previousDayIndex];
+            let currentConnection: Connection;
+            let currentConnectionDepartureTime: number;
+            let currentConnectionArrivalTime: number;
+            let currentWeekday: number;
+            let currentArrivalDate = new Date(this.currentDate);
+            if(currentDayConnection && currentDayConnection.departureTime >= Math.max(previousDayConnection.departureTime - SECONDS_OF_A_DAY, 0)){
+                currentConnection = currentDayConnection;
+                currentConnectionDepartureTime = currentConnection.departureTime + this.dayOffset;
+                currentConnectionArrivalTime = currentConnection.arrivalTime + this.dayOffset;
+                if(currentConnection.arrivalTime >= SECONDS_OF_A_DAY){
+                    currentArrivalDate.setDate(currentArrivalDate.getDate() + 1);
+                }
+                currentDayIndex--;
+                currentWeekday = currentDayWeekday;
+            } else if(previousDayConnection.departureTime >= SECONDS_OF_A_DAY) {
+                currentConnection = previousDayConnection;
+                currentConnectionDepartureTime = currentConnection.departureTime + this.dayOffset - SECONDS_OF_A_DAY;
+                currentConnectionArrivalTime = currentConnection.arrivalTime + this.dayOffset - SECONDS_OF_A_DAY;
+                previousDayIndex--;
+                currentWeekday = Calculator.moduloSeven(currentDayWeekday - 1);
+            } else {
+                if(this.dayOffset === 0){
+                    break;
+                }
+                currentDayIndex = previousDayIndex;
+                previousDayIndex = GoogleTransitData.CONNECTIONS.length-1;
+                this.dayOffset -= SECONDS_OF_A_DAY;
+                currentDayWeekday = Calculator.moduloSeven(currentDayWeekday - 1);
+                this.currentDate.setDate(this.currentDate.getDate() - 1);
+                continue;
+            }
+            lastDepartureTime = currentConnectionDepartureTime;
+            let serviceId = GoogleTransitData.TRIPS[currentConnection.trip].serviceId;
+            if(!GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday]){
+                continue;
+            }
             let time1: number;
             let time2: number;
             let time3: number;
             let timeC: number;
             let p: SEntry;
             if(this.d[currentConnection.arrivalStop] !== Number.MAX_VALUE) {
-                time1 = currentConnection.arrivalTime + this.d[currentConnection.arrivalStop];
+                time1 = currentConnectionArrivalTime + this.d[currentConnection.arrivalStop];
             } else {
                 time1 = Number.MAX_VALUE;
             }
             time2 = this.t[currentConnection.trip].arrivalTime;
             let j = 0;
             p = this.s[currentConnection.arrivalStop][j];
-            while(p.departureTime < currentConnection.arrivalTime) {
+            while(p.departureTime < currentConnectionArrivalTime) {
                 j++;
                 p = this.s[currentConnection.arrivalStop][j];
             }
@@ -85,27 +165,41 @@ export class ProfileConnectionScanAlgorithmController {
 
             timeC = Math.min(time1, time2, time3);
 
-            p = {
-                departureTime: currentConnection.departureTime,
-                arrivalTime: timeC,
-                lEnter: currentConnection.id,
-                lExit: this.t[currentConnection.trip].connectionId,
+            if(timeC !== Number.MAX_VALUE && timeC < this.t[currentConnection.trip].arrivalTime){
+                this.t[currentConnection.trip] = {
+                    arrivalTime: timeC,
+                    arrivalDate: currentArrivalDate,
+                    connectionArrivalTime: currentConnectionArrivalTime,
+                    connectionArrivalStop: currentConnection.arrivalStop,
+                };
             }
 
-            if(currentConnection.arrivalStop === this.targetStop && time1 === timeC) {
-                p.lExit = currentConnection.id;
+            p = {
+                departureTime: currentConnectionDepartureTime,
+                arrivalTime: timeC,
+                departureDate: this.currentDate,
+                arrivalDate: this.t[currentConnection.trip].arrivalDate,
+                enterTime: currentConnectionDepartureTime,
+                enterStop: currentConnection.departureStop,
+                exitTime: this.t[currentConnection.trip].connectionArrivalTime,
+                exitStop: this.t[currentConnection.trip].connectionArrivalStop,
             }
             
-            if(p.lExit !== undefined && p.arrivalTime !== Number.MAX_VALUE && this.notDominatedInProfile(p, currentConnection.departureStop)) {
+            if(p.exitStop !== undefined && p.arrivalTime !== Number.MAX_VALUE && this.notDominatedInProfile(p, currentConnection.departureStop)) {
                 let footpaths = GoogleTransitData.getAllFootpathsOfAArrivalStop(currentConnection.departureStop);
                 for(let footpath of footpaths) {
                     let pNew: SEntry= {
-                        departureTime: currentConnection.departureTime - footpath.duration,
+                        departureTime: currentConnectionDepartureTime - footpath.duration,
                         arrivalTime: p.arrivalTime,
-                        lEnter: p.lEnter,
-                        lExit: p.lExit,
+                        departureDate: p.departureDate,
+                        arrivalDate: p.arrivalDate,
+                        enterTime: p.enterTime,
+                        enterStop: p.enterStop,
+                        exitTime: p.exitTime,
+                        exitStop: p.exitStop,
                         transferFootpath: footpath.idArrival,
                     }
+                    
                     if(this.notDominatedInProfile(pNew, footpath.departureStop)){
                         let shiftedPairs = [];
                         let currentPair = this.s[footpath.departureStop][0];
@@ -122,20 +216,12 @@ export class ProfileConnectionScanAlgorithmController {
                             }
                         }
                     }
-                    
                 }
             }
-            if(timeC !== Number.MAX_VALUE && timeC < this.t[currentConnection.trip].arrivalTime){
-                this.t[currentConnection.trip] = {
-                    arrivalTime: timeC,
-                    connectionId: currentConnection.id,
-                };
-            }
         }
-        this.getJourney();
     }
 
-    public static init(){
+    private static init(){
         this.s = new Array(GoogleTransitData.STOPS.length);
         this.t = new Array(GoogleTransitData.TRIPS.length);
         this.d = new Array(GoogleTransitData.STOPS.length);
@@ -185,6 +271,8 @@ export class ProfileConnectionScanAlgorithmController {
         let timeS = this.minDepartureTime;
         let foundFinalFootpath = false;
         let trainSectionCounter = 0;
+        let departureDate: Date;
+        let arrivalDate: Date;
         while(s !== this.targetStop){
             for(let i = 0; i < this.s[s].length; i++) {
                 let p = this.s[s][i];
@@ -200,10 +288,12 @@ export class ProfileConnectionScanAlgorithmController {
                         }
                         sections.push(finalFootpathSection);
                         foundFinalFootpath = true;
+                        if(s === this.sourceStop){
+                            departureDate = this.currentDate;
+                        }
+                        arrivalDate = p.arrivalDate;
                         break;
                     }
-                    const lEnter = GoogleTransitData.CONNECTIONS[p.lEnter];
-                    const lExit = GoogleTransitData.CONNECTIONS[p.lExit];
                     if(GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath].departureStop !== this.sourceStop || GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath].arrivalStop !== this.sourceStop){
                         const footpathSection: Section = {
                             departureTime: Converter.secondsToTime(timeS),
@@ -216,17 +306,23 @@ export class ProfileConnectionScanAlgorithmController {
                         sections.push(footpathSection);
                     }
                     const trainSection: Section = {
-                        departureTime: Converter.secondsToTime(lEnter.departureTime),
-                        arrivalTime: Converter.secondsToTime(lExit.arrivalTime),
-                        duration: Converter.secondsToTime(lExit.arrivalTime - lEnter.departureTime),
-                        departureStop: GoogleTransitData.STOPS[lEnter.departureStop].name,
-                        arrivalStop: GoogleTransitData.STOPS[lExit.arrivalStop].name,
+                        departureTime: Converter.secondsToTime(p.enterTime),
+                        arrivalTime: Converter.secondsToTime(p.exitTime),
+                        duration: Converter.secondsToTime(p.exitTime - p.enterTime),
+                        departureStop: GoogleTransitData.STOPS[p.enterStop].name,
+                        arrivalStop: GoogleTransitData.STOPS[p.exitStop].name,
                         type: 'Train',
                     }
                     sections.push(trainSection);
                     trainSectionCounter++;
-                    s = lExit.arrivalStop;
-                    timeS = lExit.arrivalTime;
+                    if(s === this.sourceStop){
+                        departureDate = p.departureDate;
+                    }
+                    if(p.exitStop === this.targetStop) {
+                        arrivalDate = p.arrivalDate;
+                    }
+                    s = p.exitStop;
+                    timeS = p.exitTime;
                     break;
                 }
             }
@@ -237,8 +333,8 @@ export class ProfileConnectionScanAlgorithmController {
         const journeyResponse: JourneyResponse = {
             departureTime: sections[0].departureTime,
             arrivalTime: sections[sections.length-1].arrivalTime,
-            departureDate: this.sourceDate.toLocaleDateString('de-DE'),
-            arrivalDate: this.sourceDate.toLocaleDateString('de-DE'),
+            departureDate: departureDate.toLocaleDateString('de-DE'),
+            arrivalDate: arrivalDate.toLocaleDateString('de-DE'),
             changes: Math.max(0, trainSectionCounter - 1),
             sourceStop: GoogleTransitData.STOPS[this.sourceStop].name,
             targetStop: GoogleTransitData.STOPS[this.targetStop].name,

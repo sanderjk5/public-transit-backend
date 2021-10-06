@@ -5,4 +5,6 @@ export interface Section {
     departureStop: string,
     arrivalStop: string,
     type: string,
+    departureDate?: Date,
+    arrivalDate?: Date,
 }
