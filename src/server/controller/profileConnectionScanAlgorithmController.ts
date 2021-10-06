@@ -161,7 +161,7 @@ export class ProfileConnectionScanAlgorithmController {
                 j++;
                 p = this.s[currentConnection.arrivalStop][j];
             }
-            time3 = p.arrivalTime;
+            time3 = p.arrivalTime + 0.1;
 
             timeC = Math.min(time1, time2, time3);
 
