@@ -301,7 +301,11 @@ export class ProfileConnectionScanAlgorithmController {
                         if(this.sourceStops.includes(s)){
                             departureDate = this.currentDate;
                         }
-                        arrivalDate = p.arrivalDate;
+                        if(p.arrivalDate){
+                            arrivalDate = p.arrivalDate;
+                        } else {
+                            arrivalDate = this.currentDate;
+                        }
                         break;
                     }
                     if(!this.sourceStops.includes(GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath].departureStop) || !this.sourceStops.includes(GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath].arrivalStop)){
