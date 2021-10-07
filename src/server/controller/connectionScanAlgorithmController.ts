@@ -11,7 +11,7 @@ import { Section } from '../../models/Section';
 import { performance } from 'perf_hooks';
 import { Connection } from '../../models/Connection';
 import { Calculator } from '../../data/calculator';
-import { SECONDS_OF_A_DAY } from '../../constants';
+import { MAX_D_C_LONG, MAX_D_C_NORMAL, SECONDS_OF_A_DAY } from '../../constants';
 import { Reliability } from '../../data/reliability';
 
 // Pointer to reconstruct the journey.
@@ -117,7 +117,7 @@ export class ConnectionScanAlgorithmController {
         }
     }
 
-    public static getEarliestArrivalTime(sourceStop: string, targetStop: string, sourceDate: Date, sourceTimeInSeconds: number){
+    public static getEarliestSafeArrivalTime(sourceStop: string, targetStop: string, sourceDate: Date, sourceTimeInSeconds: number){
         // gets the source and target stops
         const sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
         const targetStops = GoogleTransitData.getStopIdsByName(targetStop);
@@ -126,15 +126,32 @@ export class ConnectionScanAlgorithmController {
             // initializes the csa algorithm
             this.init(sourceStops, sourceTimeInSeconds, sourceDate);
             // calls the csa
-            this.performAlgorithm(targetStops);
+            this.performAlgorithm(targetStops, true);
             // gets the earliest arrival time at the target stops
             let earliestTargetStopArrival = this.s[targetStops[0]];
-            for(let l = 1; l < targetStops.length; l++){
-                if(this.s[targetStops[l]] < earliestTargetStopArrival){
-                    earliestTargetStopArrival = this.s[targetStops[l]];
+            for(let i = 1; i < targetStops.length; i++){
+                if(this.s[targetStops[i]] < earliestTargetStopArrival){
+                    earliestTargetStopArrival = this.s[targetStops[i]];
                 }
             }
             return earliestTargetStopArrival;
+        } catch (err) {
+            return null;
+        }
+    }
+
+    public static getEarliestArrivalTimes(sourceStop: string, sourceDate: Date, sourceTimeInSeconds: number, maxArrivalTime: number){
+        // gets the source and target stops
+        const sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
+        // sets the source Weekday
+        try {
+            // initializes the csa algorithm
+            this.init(sourceStops, sourceTimeInSeconds, sourceDate);
+            // calls the csa
+            this.performAlgorithm(undefined, true, maxArrivalTime);
+            // gets the earliest arrival time at each stop
+            let earliestArrivalTimes = this.s;
+            return earliestArrivalTimes;
         } catch (err) {
             return null;
         }
@@ -147,8 +164,9 @@ export class ConnectionScanAlgorithmController {
      * @param sourceTime 
      * @returns 
      */
-    private static performAlgorithm(targetStops: number[]){
+    private static performAlgorithm(targetStops: number[], safeVariant?: boolean, maxArrivalTime?: number){
         let reachedTargetStop = false;
+        let reachedMaxArrivalTime = false;
         // gets the first connection id
         let dayDifference = 0;
         const numberOfConnections = GoogleTransitData.CONNECTIONS.length;
@@ -182,9 +200,27 @@ export class ConnectionScanAlgorithmController {
                 if(!GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday]){
                     continue;
                 }
-                // sets departure and arrival time
+                // sets departure time
                 let currentConnectionDepartureTime = currentConnection.departureTime + dayDifference + dayDifference2;
+
+                if(maxArrivalTime !== undefined && currentConnectionDepartureTime > maxArrivalTime){
+                    reachedMaxArrivalTime = true;
+                    break;
+                }
+                if(targetStops !== undefined) {
+                    // checks if it found already a connection for one of the target stops
+                    reachedTargetStop = this.foundJourneyToTarget(targetStops, currentConnectionDepartureTime);
+                    // termination condition
+                    if(reachedTargetStop){
+                        break;
+                    }
+                }
+                
+                // sets arrival time
                 let currentConnectionArrivalTime = currentConnection.arrivalTime + dayDifference + dayDifference2;
+                if(maxArrivalTime !== undefined && currentConnectionArrivalTime > maxArrivalTime) {
+                    continue;
+                }
                 // sets departure and arrival date
                 let currentDepartureDate = new Date(currentDate);
                 let currentArrivalDate = new Date(currentDate);
@@ -192,22 +228,30 @@ export class ConnectionScanAlgorithmController {
                     currentArrivalDate.setDate(currentArrivalDate.getDate() + 1);
                 }
 
-                // checks if it found already a connection for one of the target stops
-                reachedTargetStop = this.foundJourneyToTarget(targetStops, currentConnectionDepartureTime);
-                // termination condition
-                if(reachedTargetStop){
-                    break;
-                }
                 const departureStop = currentConnection.departureStop;
+                let tripIdOfEnterConnectionAtDepartureStop: number;
+                let isLastConnectionLongDistance: boolean;
+                let currentMaxDelay: number;
+                if(this.j[departureStop].enterConnection !== null){
+                    tripIdOfEnterConnectionAtDepartureStop = GoogleTransitData.CONNECTIONS[this.j[departureStop].enterConnection].trip;
+                    isLastConnectionLongDistance = GoogleTransitData.TRIPS[tripIdOfEnterConnectionAtDepartureStop].isLongDistance;
+                } 
+                if(safeVariant && isLastConnectionLongDistance){
+                    currentMaxDelay = MAX_D_C_LONG;
+                } else if (safeVariant) {
+                    currentMaxDelay = MAX_D_C_NORMAL;
+                } else {
+                    currentMaxDelay = 0;
+                }
+                
                 // checks if the trip is already used or if the trip can be reached at stop s
-                if(this.t[dayOfCurrentConnection][currentConnection.trip] !== undefined || this.s[departureStop] <= currentConnectionDepartureTime){
+                if(this.t[dayOfCurrentConnection][currentConnection.trip] !== undefined || this.s[departureStop] + currentMaxDelay <= currentConnectionDepartureTime){
                     // sets enter connection of a trip
                     if(this.t[dayOfCurrentConnection][currentConnection.trip] === undefined){
                         let reliability = 1;
                         if(this.j[departureStop].enterConnection !== null){
                             const bufferTime = currentConnectionDepartureTime - this.s[departureStop];
-                            const tripId = GoogleTransitData.CONNECTIONS[this.j[departureStop].enterConnection].trip;
-                            reliability = Reliability.getReliability(bufferTime, GoogleTransitData.TRIPS[tripId].isLongDistance)
+                            reliability = Reliability.getReliability(0, bufferTime, isLastConnectionLongDistance)
                         }
                         
                         this.t[dayOfCurrentConnection][currentConnection.trip] = {
@@ -239,7 +283,7 @@ export class ConnectionScanAlgorithmController {
                 }
             }
             // termination condition
-            if(reachedTargetStop){
+            if(reachedTargetStop || reachedMaxArrivalTime){
                 break;
             }
             // tries connections of the next day if it didn't find a journey to one of the target stops
@@ -248,7 +292,7 @@ export class ConnectionScanAlgorithmController {
             this.updateArraysForNextRound();
         }
         // throws an error if it didn't find a connection after seven days.
-        if(!reachedTargetStop){
+        if(targetStops !== undefined && !reachedTargetStop){
             throw new Error("Couldn't find a connection in the next seven days.")
         }
     }
