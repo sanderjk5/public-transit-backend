@@ -79,7 +79,6 @@ export class ConnectionScanAlgorithmController {
             const journeyResponse = this.getJourneyResponse(journey, sourceTimeInSeconds, sourceDate);
             res.send(journeyResponse);
         } catch(error) {
-            console.log(error)
             console.timeEnd('connection scan algorithm')
             res.status(500).send(error);
         }
@@ -137,7 +136,6 @@ export class ConnectionScanAlgorithmController {
             }
             return earliestTargetStopArrival;
         } catch (err) {
-            console.log(err)
             return null;
         }
     }

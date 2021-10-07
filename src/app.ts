@@ -20,7 +20,7 @@ Generator.generateSortedConnections();
 // generates footpaths which can be used by raptor and csa
 Generator.generateFootpaths();
 Reliability.initReliability();
-//TestController.testAlgorithms();
+//TestController.testProfileScanAlgorithm();
 
 const port = 1337;
 const corsOptions = {

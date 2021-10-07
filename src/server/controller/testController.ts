@@ -2,6 +2,7 @@ import { SECONDS_OF_A_DAY } from "../../constants";
 import { Converter } from "../../data/converter";
 import { GoogleTransitData } from "../../data/google-transit-data";
 import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmController";
+import { ProfileConnectionScanAlgorithmController } from "./profileConnectionScanAlgorithmController";
 import { RaptorAlgorithmController } from "./raptorAlgorithmController";
 
 export class TestController {
@@ -49,6 +50,37 @@ export class TestController {
         }
         console.log('average raptor: ' + raptorTimes/numberOfSuccessfulRequestsRaptor)
         console.log('average csa: ' + csaTimes/numberOfSuccessfulRequestsCSA)
+    }
+
+    public static testProfileScanAlgorithm() {
+        let csaProfileTimes = 0;
+        let numberOfSuccessfulRequestsCSAProfile = 0;
+        const numberOfStops = GoogleTransitData.STOPS.length;
+        const numberOfSeconds = SECONDS_OF_A_DAY;
+        const numberOfDates = 7;
+        const dates = [];
+        const initialDate = new Date(Date.now());
+        for(let i = 0; i < numberOfDates; i++){
+            let newDate = new Date(initialDate);
+            newDate.setDate(initialDate.getDate() + i);
+            dates.push(newDate);
+        }
+        for(let i = 0; i < 1000; i++){
+            const randomSourceStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
+            const randomTargetStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
+            const randomSourceTime = Converter.secondsToTime(this.getRandomInt(numberOfSeconds));
+            const randomSourceDate = dates[this.getRandomInt(numberOfDates)];
+            const csaProfileResponse = ProfileConnectionScanAlgorithmController.testProfileConnectionScanAlgorithm(randomSourceStop, randomTargetStop, randomSourceTime, randomSourceDate);
+            if(csaProfileResponse.sameResult){
+                if(csaProfileResponse.duration !== undefined){
+                    csaProfileTimes += csaProfileResponse.duration;
+                    numberOfSuccessfulRequestsCSAProfile++;
+                }
+            } else {
+                console.log(randomSourceStop + ', ' + randomTargetStop + ', ' + randomSourceDate + ', ' + randomSourceTime);
+            }
+        }
+        console.log('average csa profile: ' + csaProfileTimes/numberOfSuccessfulRequestsCSAProfile)
     }
 
     /**

@@ -8,6 +8,7 @@ import { Connection } from "../../models/Connection";
 import { JourneyResponse } from "../../models/JourneyResponse";
 import { Section } from "../../models/Section";
 import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmController";
+import { performance } from 'perf_hooks';
 
 interface SEntry {
     departureTime: number,
@@ -39,6 +40,7 @@ export class ProfileConnectionScanAlgorithmController {
     private static currentDate: Date;
 
     private static dayOffset: number;
+    private static earliestArrivalTimeCSA: number;
 
 
     public static profileConnectionScanAlgorithmRoute(req: express.Request, res: express.Response){
@@ -56,12 +58,12 @@ export class ProfileConnectionScanAlgorithmController {
             this.minDepartureTime = Converter.timeToSeconds(req.query.sourceTime);
             this.currentDate = new Date(req.query.date);
 
-            const earliestArrivalTime = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.currentDate, this.minDepartureTime);
-            if(earliestArrivalTime === null) {
+            this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.currentDate, this.minDepartureTime);
+            if(this.earliestArrivalTimeCSA === null) {
                 throw new Error("Couldn't find a connection.")
             }
 
-            this.maxArrivalTime = earliestArrivalTime + 0.5 * (earliestArrivalTime - this.minDepartureTime);
+            this.maxArrivalTime = this.earliestArrivalTimeCSA + 0.5 * (this.earliestArrivalTimeCSA - this.minDepartureTime);
             
             this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
             this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
@@ -75,7 +77,6 @@ export class ProfileConnectionScanAlgorithmController {
             const journeyResponse = this.getJourney();
             res.send(journeyResponse);
         } catch(error) {
-            console.log(error)
             console.timeEnd('connection scan algorithm')
             res.status(500).send(error);
         }
@@ -86,18 +87,34 @@ export class ProfileConnectionScanAlgorithmController {
         this.targetStops = GoogleTransitData.getStopIdsByName(targetStop);
         // converts the source time
         this.minDepartureTime = Converter.timeToSeconds(sourceTime);
-        this.maxArrivalTime = 160000;
-        this.currentDate = new Date(sourceDate);
+        this.currentDate = sourceDate;
+
+        try {
+            this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.currentDate, this.minDepartureTime);
+            if(this.earliestArrivalTimeCSA === null) {
+                return {sameResult: true}
+            }
+        } catch (err) {
+            return {sameResult: true}
+        }
+        
+        this.maxArrivalTime = this.earliestArrivalTimeCSA + 0.5 * (this.earliestArrivalTimeCSA - this.minDepartureTime);
+        
         this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
         this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
         // initializes the csa algorithm
         this.init();
         // calls the csa
-        console.time('connection scan profile algorithm')
+        const startTime = performance.now();
         this.performAlgorithm();
-        console.timeEnd('connection scan profile algorithm')
+        const duration = performance.now() - startTime;
         // generates the http response which includes all information of the journey
-        return this.getJourney();
+        const earliestArrivalTimeProfile = this.getEarliestArrivalTime();
+        if(this.earliestArrivalTimeCSA === earliestArrivalTimeProfile){
+            return {sameResult: true, duration: duration}
+        } else {
+            return {sameResult: false}
+        }
     }
 
     private static performAlgorithm() {
@@ -161,9 +178,12 @@ export class ProfileConnectionScanAlgorithmController {
                 j++;
                 p = this.s[currentConnection.arrivalStop][j];
             }
-            time3 = p.arrivalTime + 0.1;
+            time3 = p.arrivalTime //+ 0.1;
 
             timeC = Math.min(time1, time2, time3);
+            if(timeC < this.earliestArrivalTimeCSA){
+                continue;
+            }
 
             if(timeC !== Number.MAX_VALUE && timeC < this.t[currentConnection.trip].arrivalTime){
                 this.t[currentConnection.trip] = {
@@ -185,7 +205,7 @@ export class ProfileConnectionScanAlgorithmController {
                 exitStop: this.t[currentConnection.trip].connectionArrivalStop,
             }
             
-            if(p.exitStop !== undefined && p.arrivalTime !== Number.MAX_VALUE && this.notDominatedInProfile(p, currentConnection.departureStop)) {
+            if(p.exitStop !== undefined && p.arrivalTime !== Number.MAX_VALUE) {
                 let footpaths = GoogleTransitData.getAllFootpathsOfAArrivalStop(currentConnection.departureStop);
                 for(let footpath of footpaths) {
                     let pNew: SEntry= {
@@ -199,7 +219,9 @@ export class ProfileConnectionScanAlgorithmController {
                         exitStop: p.exitStop,
                         transferFootpath: footpath.idArrival,
                     }
-                    
+                    if(pNew.departureTime < this.minDepartureTime){
+                        continue;
+                    }
                     if(this.notDominatedInProfile(pNew, footpath.departureStop)){
                         let shiftedPairs = [];
                         let currentPair = this.s[footpath.departureStop][0];
@@ -355,5 +377,37 @@ export class ProfileConnectionScanAlgorithmController {
             sections: sections,
         }
         return journeyResponse;
+    }
+
+    private static getEarliestArrivalTime(): number {
+        let s = this.sourceStops[0];
+        let earliestArrivalTime = this.s[s][0].arrivalTime;
+        for(let stopId of this.sourceStops){
+            if(this.s[stopId][0].arrivalTime < earliestArrivalTime){
+                s = stopId;
+            }
+        }
+        let timeS = this.minDepartureTime;
+        let foundFinalFootpath = false;
+        while(!this.targetStops.includes(s)){
+            for(let i = 0; i < this.s[s].length; i++) {
+                let p = this.s[s][i];
+                if(p.departureTime >= timeS){
+                    if(this.d[s] + timeS <= p.arrivalTime){
+                        earliestArrivalTime = timeS + this.d[s];
+                        foundFinalFootpath = true;
+                        break;
+                    }
+                    earliestArrivalTime = p.exitTime;
+                    s = p.exitStop;
+                    timeS = p.exitTime;
+                    break;
+                }
+            }
+            if(foundFinalFootpath){
+                break;
+            }
+        }
+        return earliestArrivalTime;
     }
 }

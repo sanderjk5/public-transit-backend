@@ -79,7 +79,6 @@ export class RaptorAlgorithmController {
             const journeyResponse = this.getJourneyResponse(sourceStops, targetStops, sourceDate);
             res.status(200).send(journeyResponse);
         } catch (err) {
-            console.log(err);
             res.status(500).send(err);
         }
     }
