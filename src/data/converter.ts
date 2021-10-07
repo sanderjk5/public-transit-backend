@@ -27,6 +27,7 @@ export class Converter {
         if(timeInSeconds === Number.MAX_VALUE){
             return timeInSeconds.toString();
         }
+        timeInSeconds = Math.floor(timeInSeconds);
         let time = '';
         let calculation = 0;
         // subtracts additional days

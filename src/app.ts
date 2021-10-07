@@ -13,7 +13,6 @@ const app = express();
 
 // imports the gtfs files
 Importer.importGoogleTransitData();
-Generator.combineStops();
 // generates routes which can be used by the raptor algorithm
 Generator.generateValidRoutes();
 // genreates connections which can be used by the csa
@@ -21,7 +20,7 @@ Generator.generateSortedConnections();
 // generates footpaths which can be used by raptor and csa
 Generator.generateFootpaths();
 Reliability.initReliability();
-//TestController.testAlgorithms();
+//TestController.testProfileScanAlgorithm();
 
 const port = 1337;
 const corsOptions = {
