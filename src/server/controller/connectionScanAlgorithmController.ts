@@ -117,7 +117,7 @@ export class ConnectionScanAlgorithmController {
         }
     }
 
-    public static getEarliestSafeArrivalTime(sourceStop: string, targetStop: string, sourceDate: Date, sourceTimeInSeconds: number){
+    public static getEarliestArrivalTime(sourceStop: string, targetStop: string, sourceDate: Date, sourceTimeInSeconds: number, safeVariant: boolean){
         // gets the source and target stops
         const sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
         const targetStops = GoogleTransitData.getStopIdsByName(targetStop);
@@ -126,7 +126,7 @@ export class ConnectionScanAlgorithmController {
             // initializes the csa algorithm
             this.init(sourceStops, sourceTimeInSeconds, sourceDate);
             // calls the csa
-            this.performAlgorithm(targetStops, true);
+            this.performAlgorithm(targetStops, safeVariant);
             // gets the earliest arrival time at the target stops
             let earliestTargetStopArrival = this.s[targetStops[0]];
             for(let i = 1; i < targetStops.length; i++){
@@ -148,7 +148,7 @@ export class ConnectionScanAlgorithmController {
             // initializes the csa algorithm
             this.init(sourceStops, sourceTimeInSeconds, sourceDate);
             // calls the csa
-            this.performAlgorithm(undefined, true, maxArrivalTime);
+            this.performAlgorithm(undefined, false, maxArrivalTime);
             // gets the earliest arrival time at each stop
             let earliestArrivalTimes = this.s;
             return earliestArrivalTimes;
@@ -216,6 +216,7 @@ export class ConnectionScanAlgorithmController {
                     }
                 }
                 
+                
                 // sets arrival time
                 let currentConnectionArrivalTime = currentConnection.arrivalTime + dayDifference + dayDifference2;
                 if(maxArrivalTime !== undefined && currentConnectionArrivalTime > maxArrivalTime) {
@@ -236,9 +237,9 @@ export class ConnectionScanAlgorithmController {
                     tripIdOfEnterConnectionAtDepartureStop = GoogleTransitData.CONNECTIONS[this.j[departureStop].enterConnection].trip;
                     isLastConnectionLongDistance = GoogleTransitData.TRIPS[tripIdOfEnterConnectionAtDepartureStop].isLongDistance;
                 } 
-                if(safeVariant && isLastConnectionLongDistance){
+                if(safeVariant && isLastConnectionLongDistance && this.j[departureStop].enterConnection !== null){
                     currentMaxDelay = MAX_D_C_LONG;
-                } else if (safeVariant) {
+                } else if (safeVariant && this.j[departureStop].enterConnection !== null) {
                     currentMaxDelay = MAX_D_C_NORMAL;
                 } else {
                     currentMaxDelay = 0;
