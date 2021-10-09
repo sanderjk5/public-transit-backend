@@ -252,7 +252,7 @@ export class ConnectionScanAlgorithmController {
                         let reliability = 1;
                         if(this.j[departureStop].enterConnection !== null){
                             const bufferTime = currentConnectionDepartureTime - this.s[departureStop];
-                            reliability = Reliability.getReliability(0, bufferTime, isLastConnectionLongDistance)
+                            reliability = Reliability.getReliability(-1, bufferTime, isLastConnectionLongDistance)
                         }
                         
                         this.t[dayOfCurrentConnection][currentConnection.trip] = {

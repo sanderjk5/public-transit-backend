@@ -51,7 +51,7 @@ export class Reliability {
                 reliability = this.normalDistanceValues[roundedMaxValue];
             }
         }
-        if(minValue > 0) {
+        if(minValue >= 0) {
             let roundedMinValue = Math.ceil(minValue/60);
             if(isLongDistance){
                 if(roundedMinValue < 31){

@@ -78,7 +78,7 @@ export class ProfileConnectionScanAlgorithmController {
                 throw new Error("Couldn't find a connection.")
             }
 
-            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 0.5 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
             
             this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(req.query.sourceStop, this.currentDate, this.minDepartureTime, this.maxArrivalTime)
             this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
@@ -214,53 +214,33 @@ export class ProfileConnectionScanAlgorithmController {
                 time1 = Number.MAX_VALUE;
             }
             time2 = this.t[currentConnection.trip].expectedArrivalTime;
-            let reliability = 0;
             let expectedArrivalTime = Number.MAX_VALUE;
             let pLastDepartureTime: number;
             let relevantPairs: SEntry[] = [];
-            let foundSafeJourney = false;
-            for(let j = 0; j < this.s[currentConnection.arrivalStop].length-1; j++) {
+            for(let j = 0; j < this.s[currentConnection.arrivalStop].length; j++) {
                 p = this.s[currentConnection.arrivalStop][j];
                 if(p.departureTime >= currentConnectionArrivalTime && p.departureTime <= currentConnectionArrivalTime + currentMaxDelay){
                     relevantPairs.push(p);
-                    // foundSafeJourney = true;
                 } else if(p.departureTime > currentConnectionArrivalTime + currentMaxDelay) {
-                    foundSafeJourney = true;
                     relevantPairs.push(p);
                     break;
                 }
             }
-            if(foundSafeJourney){
-                if(relevantPairs.length > 0){
-                    p = relevantPairs[0];
-                    reliability += Reliability.getReliability(0, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip);
-                    expectedArrivalTime = p.expectedArrivalTime * Reliability.getReliability(0, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip);
-                    pLastDepartureTime = p.departureTime;
-                }
-                for(let j = 1; j < relevantPairs.length; j++) {
-                    p = relevantPairs[j];
-                    reliability += Reliability.getReliability(0, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip);
-                    expectedArrivalTime += (p.expectedArrivalTime * Reliability.getReliability(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
-                    pLastDepartureTime = p.departureTime;
-                }
-                console.log(reliability)
+            if(relevantPairs.length > 0){
+                p = relevantPairs[0];
+                expectedArrivalTime = p.expectedArrivalTime * Reliability.getReliability(-1, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip);
+                pLastDepartureTime = p.departureTime;
             }
-            
+            for(let j = 1; j < relevantPairs.length; j++) {
+                p = relevantPairs[j];
+                expectedArrivalTime += (p.expectedArrivalTime * Reliability.getReliability(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
+                pLastDepartureTime = p.departureTime;
+            }
             time3 = expectedArrivalTime;
 
             timeC = Math.min(time1, time2, time3);
-            // if(timeC !== Number.MAX_VALUE){
-            //     console.log(timeC + ', ' + time1 + ', ' + time2 + ', ' + time3)
-            // }
-
-            // if(timeC < this.earliestArrivalTimeCSA){
-            //     continue;
-            // }
 
             if(timeC !== Number.MAX_VALUE && timeC < this.t[currentConnection.trip].expectedArrivalTime){
-                if(this.t[currentConnection.trip].expectedArrivalTime < 1){
-                    continue;
-                }
                 this.t[currentConnection.trip] = {
                     expectedArrivalTime: timeC,
                     arrivalDate: currentArrivalDate,
@@ -385,6 +365,9 @@ export class ProfileConnectionScanAlgorithmController {
         let priorityQueue = new FastPriorityQueue<SEntry>((a, b) => {
             return a.departureTime > b.departureTime
         });
+        if(this.s[this.sourceStops[0]][0].departureTime === Number.MAX_VALUE){
+            throw new Error("Couldn't find a connection.")
+        }
         priorityQueue.add(this.s[this.sourceStops[0]][0]);
         console.log(this.s[this.sourceStops[0]])
         while(!priorityQueue.isEmpty()){
@@ -449,126 +432,4 @@ export class ProfileConnectionScanAlgorithmController {
         }
         return true;
     }
-
-    // private static getJourney(): JourneyResponse {
-    //     const sections: Section[] = [];
-    //     let s = this.sourceStops[0];
-    //     let earliestArrivalTime = this.s[s][0].expectedArrivalTime;
-    //     for(let stopId of this.sourceStops){
-    //         if(this.s[stopId][0].expectedArrivalTime < earliestArrivalTime){
-    //             s = stopId;
-    //         }
-    //     }
-    //     let timeS = this.minDepartureTime;
-    //     let foundFinalFootpath = false;
-    //     let trainSectionCounter = 0;
-    //     let departureDate: Date;
-    //     let arrivalDate: Date;
-    //     while(!this.targetStops.includes(s)){
-    //         for(let i = 0; i < this.s[s].length; i++) {
-    //             let p = this.s[s][i];
-    //             if(p.departureTime >= timeS){
-    //                 if(this.d[s].duration + timeS <= p.expectedArrivalTime){
-    //                     const finalFootpathSection: Section = {
-    //                         departureTime: Converter.secondsToTime(timeS),
-    //                         arrivalTime: Converter.secondsToTime(timeS + this.d[s].duration),
-    //                         duration: Converter.secondsToTime(this.d[s].duration),
-    //                         departureStop: GoogleTransitData.STOPS[s].name,
-    //                         arrivalStop: GoogleTransitData.STOPS[this.targetStops[0]].name,
-    //                         type: 'Footpath',
-    //                     }
-    //                     sections.push(finalFootpathSection);
-    //                     foundFinalFootpath = true;
-    //                     if(this.sourceStops.includes(s)){
-    //                         departureDate = this.currentDate;
-    //                     }
-    //                     if(p.arrivalDate){
-    //                         arrivalDate = p.arrivalDate;
-    //                     } else {
-    //                         arrivalDate = this.currentDate;
-    //                     }
-    //                     break;
-    //                 }
-    //                 if(!this.sourceStops.includes(GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath].departureStop) || !this.sourceStops.includes(GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath].arrivalStop)){
-    //                     const footpathSection: Section = {
-    //                         departureTime: Converter.secondsToTime(timeS),
-    //                         arrivalTime: Converter.secondsToTime(timeS + GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath].duration),
-    //                         duration: Converter.secondsToTime(GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath].duration),
-    //                         departureStop: GoogleTransitData.STOPS[GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath].departureStop].name,
-    //                         arrivalStop: GoogleTransitData.STOPS[GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath].arrivalStop].name,
-    //                         type: 'Footpath',
-    //                     }
-    //                     sections.push(footpathSection);
-    //                 }
-    //                 const trainSection: Section = {
-    //                     departureTime: Converter.secondsToTime(p.connectionDepartureTime),
-    //                     arrivalTime: Converter.secondsToTime(p.exitTime),
-    //                     duration: Converter.secondsToTime(p.exitTime - p.connectionDepartureTime),
-    //                     departureStop: GoogleTransitData.STOPS[p.connectionDepartureStop].name,
-    //                     arrivalStop: GoogleTransitData.STOPS[p.exitStop].name,
-    //                     type: 'Train',
-    //                 }
-    //                 sections.push(trainSection);
-    //                 trainSectionCounter++;
-    //                 if(this.sourceStops.includes(s)){
-    //                     departureDate = p.departureDate;
-    //                 }
-    //                 if(this.targetStops.includes(p.exitStop)) {
-    //                     arrivalDate = p.arrivalDate;
-    //                 }
-    //                 s = p.exitStop;
-    //                 timeS = p.exitTime;
-    //                 break;
-    //             }
-    //         }
-    //         if(foundFinalFootpath){
-    //             break;
-    //         }
-    //     }
-    //     const journeyResponse: JourneyResponse = {
-    //         departureTime: sections[0].departureTime,
-    //         arrivalTime: sections[sections.length-1].arrivalTime,
-    //         departureDate: departureDate.toLocaleDateString('de-DE'),
-    //         arrivalDate: arrivalDate.toLocaleDateString('de-DE'),
-    //         changes: Math.max(0, trainSectionCounter - 1),
-    //         sourceStop: GoogleTransitData.STOPS[this.sourceStops[0]].name,
-    //         targetStop: GoogleTransitData.STOPS[this.targetStops[0]].name,
-    //         sections: sections,
-    //     }
-    //     return journeyResponse;
-    // }
-
-    // private static getEarliestArrivalTime(): number {
-    //     let s = this.sourceStops[0];
-    //     let earliestArrivalTime = this.s[s][0].expectedArrivalTime;
-    //     for(let stopId of this.sourceStops){
-    //         if(this.s[stopId][0].expectedArrivalTime < earliestArrivalTime){
-    //             s = stopId;
-    //         }
-    //     }
-    //     let timeS = this.minDepartureTime;
-    //     let foundFinalFootpath = false;
-    //     while(!this.targetStops.includes(s)){
-    //         for(let i = 0; i < this.s[s].length; i++) {
-    //             let p = this.s[s][i];
-    //             if(p.departureTime >= timeS){
-    //                 if(this.d[s].duration + timeS <= p.expectedArrivalTime){
-    //                     earliestArrivalTime = timeS + this.d[s].duration;
-    //                     foundFinalFootpath = true;
-    //                     break;
-    //                 }
-    //                 earliestArrivalTime = p.exitTime;
-    //                 s = p.exitStop;
-    //                 timeS = p.exitTime;
-    //                 break;
-    //             }
-    //         }
-    //         if(foundFinalFootpath){
-    //             break;
-    //         }
-    //     }
-    //     return earliestArrivalTime;
-    // }
-
-    
 }

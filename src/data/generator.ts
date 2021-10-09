@@ -71,34 +71,34 @@ export class Generator {
             GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.push(footpath);
             GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP.push(footpath);
             // reflexive footpaths between stops with a distance less than 1km
-            for(let j = i+1; j < GoogleTransitData.STOPS.length; j++) {
-                const stop2 = GoogleTransitData.STOPS[j];
-                let duration: number;
-                // calculates the distance between the stops
-                const distance = Calculator.calculateDistance(stop1.lat, stop2.lat, stop1.lon, stop2.lon);
-                // adds only foothpaths with a distance smaller than 1km
-                if(distance < 1){
-                    // assume a speed of 4km/h
-                    duration = Math.floor(15 * distance) * 60;
-                    // creates reflexive footpaths
-                    let footpath: Footpath = {
-                        id: GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.length,
-                        departureStop: stop1.id,
-                        arrivalStop: stop2.id,
-                        duration: duration
-                    };
-                    GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.push(footpath);
-                    GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP.push(footpath);
-                    footpath = {
-                        id: GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.length,
-                        departureStop: stop2.id,
-                        arrivalStop: stop1.id,
-                        duration: duration
-                    }
-                    GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.push(footpath);
-                    GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP.push(footpath);
-                }
-            }
+            // for(let j = i+1; j < GoogleTransitData.STOPS.length; j++) {
+            //     const stop2 = GoogleTransitData.STOPS[j];
+            //     let duration: number;
+            //     // calculates the distance between the stops
+            //     const distance = Calculator.calculateDistance(stop1.lat, stop2.lat, stop1.lon, stop2.lon);
+            //     // adds only foothpaths with a distance smaller than 1km
+            //     if(distance < 1){
+            //         // assume a speed of 4km/h
+            //         duration = Math.floor(15 * distance) * 60;
+            //         // creates reflexive footpaths
+            //         let footpath: Footpath = {
+            //             id: GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.length,
+            //             departureStop: stop1.id,
+            //             arrivalStop: stop2.id,
+            //             duration: duration
+            //         };
+            //         GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.push(footpath);
+            //         GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP.push(footpath);
+            //         footpath = {
+            //             id: GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.length,
+            //             departureStop: stop2.id,
+            //             arrivalStop: stop1.id,
+            //             duration: duration
+            //         }
+            //         GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.push(footpath);
+            //         GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP.push(footpath);
+            //     }
+            // }
         }
 
         // sorts the footpaths by departure stop
