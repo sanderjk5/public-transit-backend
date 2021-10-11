@@ -1,7 +1,9 @@
-import { Edge } from "./Edge";
+import { Cluster } from "./Cluster";
+import { Link } from "./Link";
 import { Node } from "./Node";
 
 export interface DecisionGraph {
     nodes: Node[],
-    edges: Edge[],
+    links: Link[],
+    clusters: Cluster[],
 }

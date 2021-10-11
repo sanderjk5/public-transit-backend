@@ -1,3 +1,4 @@
 export interface Node {
-    stop: string,
+    id: string,
+    label: string,
 }

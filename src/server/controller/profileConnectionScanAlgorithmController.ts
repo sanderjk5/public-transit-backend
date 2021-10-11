@@ -11,9 +11,10 @@ import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmCont
 import { performance } from 'perf_hooks';
 import { Reliability } from "../../data/reliability";
 import FastPriorityQueue from 'fastpriorityqueue';
-import { Edge } from "../../models/Edge";
+import { Link } from "../../models/Link";
 import { DecisionGraph } from "../../models/DecisionGraph";
 import {Node} from "../../models/Node";
+import { Cluster } from "../../models/Cluster";
 
 interface SEntry {
     departureTime: number,
@@ -39,6 +40,21 @@ interface TEntry {
 interface DEntry {
     duration: number,
     footpath: number,
+}
+
+interface TempEdge {
+    departureStop: string,
+    arrivalStop: string,
+    departureTime: number,
+    arrivalTime: number,
+    type: string,
+}
+
+interface TempNode {
+    id: string,
+    stop: string,
+    time: number,
+    type: string,
 }
 
 export class ProfileConnectionScanAlgorithmController {
@@ -95,8 +111,7 @@ export class ProfileConnectionScanAlgorithmController {
             console.log(this.s[this.sourceStops[0]][0].expectedArrivalTime + ', ' + Converter.secondsToTime(this.s[this.sourceStops[0]][0].expectedArrivalTime))
             // generates the http response which includes all information of the journey
             const decisionGraph = this.extractDecisionGraph();
-            console.log(decisionGraph);
-            res.send();
+            res.send(decisionGraph);
         } catch(error) {
             console.log(error);
             console.timeEnd('connection scan algorithm')
@@ -360,8 +375,10 @@ export class ProfileConnectionScanAlgorithmController {
     private static extractDecisionGraph() {
         let decisionGraph: DecisionGraph = {
             nodes: [],
-            edges: [],
+            links: [],
+            clusters: [],
         };     
+        let tempEdges: TempEdge[] = [];
         let priorityQueue = new FastPriorityQueue<SEntry>((a, b) => {
             return a.departureTime > b.departureTime
         });
@@ -369,18 +386,18 @@ export class ProfileConnectionScanAlgorithmController {
             throw new Error("Couldn't find a connection.")
         }
         priorityQueue.add(this.s[this.sourceStops[0]][0]);
-        console.log(this.s[this.sourceStops[0]])
+        // console.log(this.s[this.sourceStops[0]])
         while(!priorityQueue.isEmpty()){
             let p = priorityQueue.poll();
             let tripId = p.tripId;
-            let edge: Edge = {
+            let edge: TempEdge = {
                 departureStop: GoogleTransitData.STOPS[p.enterStop].name,
-                departureTime: Converter.secondsToTime(p.enterTime),
+                departureTime: p.enterTime,
                 arrivalStop: GoogleTransitData.STOPS[p.exitStop].name,
-                arrivalTime: Converter.secondsToTime(p.exitTime),
+                arrivalTime: p.exitTime,
                 type: 'Train',
             }
-            decisionGraph.edges.push(edge);
+            tempEdges.push(edge);
             if(p.exitStop !== this.targetStops[0]){
                 let maxDelay: number;
                 if(GoogleTransitData.TRIPS[tripId].isLongDistance){
@@ -404,21 +421,69 @@ export class ProfileConnectionScanAlgorithmController {
                 }
             }
         }
-        let nodes = [];
-        for(let edge of decisionGraph.edges){
-            if(!nodes.includes(edge.departureStop)){
-                let node: Node = {
-                    stop: edge.departureStop,
-                }
-                decisionGraph.nodes.push(node);
-                nodes.push(edge.departureStop);
+        let idCounter = 0;
+        let tempNodes: TempNode[] = [];
+        let tempNodeArr: TempNode;
+        let tempNodeDep: TempNode;
+        let edge: Link;
+        tempEdges.sort((a: TempEdge, b: TempEdge) => {
+            return this.sortByDepartureTime(a, b);
+        })
+        tempEdges = this.removeDuplicateEdges(tempEdges);
+        for(let tempEdge of tempEdges){
+            tempNodeDep = {
+                id: 'id_' + idCounter.toString(),
+                stop: tempEdge.departureStop,
+                time: tempEdge.departureTime,
+                type: 'departure',
             }
-            if(!nodes.includes(edge.arrivalStop)){
-                let node: Node = {
-                    stop: edge.arrivalStop,
+            tempNodes.push(tempNodeDep);
+            idCounter++;
+            tempNodeArr = {
+                id: 'id_' + idCounter.toString(),
+                stop: tempEdge.arrivalStop,
+                time: tempEdge.arrivalTime,
+                type: 'arrival',
+            }
+            tempNodes.push(tempNodeArr);
+            idCounter++;
+            edge = {
+                id: 'id_' + idCounter.toString(),
+                source: tempNodeDep.id,
+                target: tempNodeArr.id,
+                label: tempEdge.type,
+            }
+            decisionGraph.links.push(edge);
+            idCounter++;
+        }
+        tempNodes.sort((a: TempNode, b: TempNode) => {
+            return this.sortByTime(a, b);
+        })
+        tempNodes = this.removeDuplicateNodes(tempNodes, decisionGraph.links);
+        let node: Node;
+        let cluster: Cluster;
+        for(let tempNode of tempNodes){
+            node = {
+                id: tempNode.id,
+                label: Converter.secondsToTime(tempNode.time)
+            }
+            decisionGraph.nodes.push(node);
+            let createCluster = true;
+            for(let cluster of decisionGraph.clusters){
+                if(cluster.label === tempNode.stop){
+                    createCluster = false;
+                    cluster.childNodeIds.push(node.id);
+                    break;
                 }
-                decisionGraph.nodes.push(node);
-                nodes.push(edge.arrivalStop);
+            }
+            if(createCluster){
+                cluster = {
+                    id: 'id_' + idCounter.toString(),
+                    label: tempNode.stop,
+                    childNodeIds: [node.id],
+                }
+                decisionGraph.clusters.push(cluster);
+                idCounter++;
             }
         }
         return decisionGraph;
@@ -431,5 +496,80 @@ export class ProfileConnectionScanAlgorithmController {
             }
         }
         return true;
+    }
+
+    private static sortByDepartureTime(a: TempEdge, b: TempEdge){
+        if(a.departureTime < b.departureTime){
+            return -1;
+        }
+        if(a.departureTime === b.departureTime){
+            if(a.arrivalTime < b.arrivalTime){
+                return -1;
+            }
+            if(a.arrivalTime === b.arrivalTime){
+                return 0;
+            }
+            if(a.arrivalTime > b.arrivalTime){
+                return 1;
+            }
+        }
+        if(a.departureTime > b.departureTime){
+            return 1
+        }
+    }
+
+    private static sortByTime(a: TempNode, b: TempNode){
+        if(a.time < b.time){
+            return -1;
+        }
+        if(a.time === b.time){
+            return 0;
+        }
+        if(a.time > b.time){
+            return 1;
+        }
+    }
+
+    private static removeDuplicateEdges(edges: TempEdge[]){
+        if(edges.length === 0){
+            return;
+        }
+        let lastEdge = edges[0];
+        for(let i = 1; i < edges.length; i++){
+            let currentEdge = edges[i];
+            if(currentEdge.departureStop === lastEdge.departureStop && currentEdge.arrivalStop === lastEdge.arrivalStop && currentEdge.departureTime === lastEdge.departureTime &&
+                currentEdge.arrivalTime === lastEdge.arrivalTime){
+                edges[i] = undefined;
+            } else {
+                lastEdge = edges[i];
+            }
+        }
+        return edges.filter(edge => edge !== undefined);
+    }
+
+    private static removeDuplicateNodes(nodes: TempNode[], edges: Link[]){
+        if(nodes.length === 0){
+            return;
+        }
+        let idMap = new Map<string, string>();
+        let lastNode = nodes[0];
+        for(let i = 1; i < nodes.length; i++){
+            let currentNode = nodes[i];
+            if(currentNode.stop === lastNode.stop && currentNode.time === lastNode.time && currentNode.type === lastNode.type){
+                idMap.set(currentNode.id, lastNode.id);
+                nodes[i] = undefined;
+            } else {
+                lastNode = nodes[i];
+            }
+        }
+        for(let edge of edges){
+            if(idMap.get(edge.source) !== undefined){
+                edge.source = idMap.get(edge.source);
+            }
+            if(idMap.get(edge.target) !== undefined){
+                edge.target = idMap.get(edge.target);
+            }
+        }
+        return nodes.filter(node => node !== undefined);
     }
 }
