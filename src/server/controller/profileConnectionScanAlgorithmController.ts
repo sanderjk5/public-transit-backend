@@ -65,7 +65,12 @@ export class ProfileConnectionScanAlgorithmController {
     private static targetStops: number[];
     private static minDepartureTime: number;
     private static maxArrivalTime: number;
-    private static currentDate: Date;
+
+    private static sourceDate: Date = new Date();
+    private static eatDate: Date = new Date();
+    private static esatDate: Date = new Date();
+    private static meatDate: Date = new Date();
+    private static currentDate: Date = new Date();
 
     private static dayOffset: number;
     private static earliestArrivalTimeCSA: number;
@@ -86,7 +91,7 @@ export class ProfileConnectionScanAlgorithmController {
             this.targetStops = GoogleTransitData.getStopIdsByName(req.query.targetStop);
             // converts the source time
             this.minDepartureTime = Converter.timeToSeconds(req.query.sourceTime);
-            this.currentDate = new Date(req.query.date);
+            this.sourceDate = new Date(req.query.date);
 
             this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.currentDate, this.minDepartureTime, false);
             this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.currentDate, this.minDepartureTime, true);
@@ -96,9 +101,13 @@ export class ProfileConnectionScanAlgorithmController {
 
             this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 0.5 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
             
-            this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(req.query.sourceStop, this.currentDate, this.minDepartureTime, this.maxArrivalTime)
             this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
-            this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
+            this.currentDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
+            this.esatDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(this.earliestSafeArrivalTimeCSA));
+            this.eatDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(this.earliestArrivalTimeCSA));
+            
+
+            this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(req.query.sourceStop, this.currentDate, this.minDepartureTime, this.maxArrivalTime)
             // initializes the csa algorithm
             this.init();
             // calls the csa
@@ -373,7 +382,17 @@ export class ProfileConnectionScanAlgorithmController {
     }
 
     private static extractDecisionGraph() {
+        let meatTime = this.s[this.sourceStops[0]][0].expectedArrivalTime;
+        this.meatDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(meatTime));
         let decisionGraph: DecisionGraph = {
+            sourceStop: GoogleTransitData.STOPS[this.sourceStops[0]].name,
+            targetStop: GoogleTransitData.STOPS[this.targetStops[0]].name,
+            departureTime: Converter.secondsToTime(this.s[this.sourceStops[0]][0].departureTime),
+            departureDate: this.currentDate.toLocaleDateString('de-DE'),
+            meatTime: Converter.secondsToTime(meatTime),
+            meatDate: this.meatDate.toLocaleDateString('de-DE'),
+            eatTime: Converter.secondsToTime(this.earliestArrivalTimeCSA),
+            esatTime: Converter.secondsToTime(this.earliestSafeArrivalTimeCSA),
             nodes: [],
             links: [],
             clusters: [],
