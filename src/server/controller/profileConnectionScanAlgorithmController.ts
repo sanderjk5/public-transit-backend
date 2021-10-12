@@ -99,7 +99,7 @@ export class ProfileConnectionScanAlgorithmController {
                 throw new Error("Couldn't find a connection.")
             }
 
-            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 0.5 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
             
             this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
             this.currentDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
@@ -210,7 +210,7 @@ export class ProfileConnectionScanAlgorithmController {
             if(!GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday]){
                 continue;
             }
-            if(currentConnectionArrivalTime > this.earliestSafeArrivalTimeCSA || this.earliestArrivalTimes[currentConnection.departureStop] > currentConnectionDepartureTime) {
+            if(currentConnectionArrivalTime > this.maxArrivalTime || this.earliestArrivalTimes[currentConnection.departureStop] > currentConnectionDepartureTime) {
                 continue;
             }
             if(GoogleTransitData.TRIPS[currentConnection.trip].isLongDistance){
@@ -526,7 +526,23 @@ export class ProfileConnectionScanAlgorithmController {
                 return -1;
             }
             if(a.arrivalTime === b.arrivalTime){
-                return 0;
+                if(a.departureStop < b.departureStop){
+                    return -1;
+                }
+                if(a.departureStop === b.departureStop){
+                    if(a.arrivalStop < b.arrivalStop){
+                        return -1;
+                    }
+                    if(a.arrivalStop === b.arrivalStop){
+                        return 0;
+                    }
+                    if(a.arrivalStop > b.arrivalStop){
+                        return 1;
+                    }
+                }
+                if(a.departureStop > b.departureStop){
+                    return 1;
+                }
             }
             if(a.arrivalTime > b.arrivalTime){
                 return 1;
@@ -542,7 +558,23 @@ export class ProfileConnectionScanAlgorithmController {
             return -1;
         }
         if(a.time === b.time){
-            return 0;
+            if(a.stop < b.stop){
+                return -1;
+            }
+            if(a.stop === b.stop){
+                if(a.type < b.type){
+                    return -1;
+                }
+                if(a.type === b.type){
+                    return 0;
+                }
+                if(a.type > b.type){
+                    return 1;
+                }
+            }
+            if(a.stop > b.stop){
+                return 1;
+            }
         }
         if(a.time > b.time){
             return 1;
