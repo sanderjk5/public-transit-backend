@@ -16,6 +16,7 @@ import { DecisionGraph } from "../../models/DecisionGraph";
 import {Node} from "../../models/Node";
 import { Cluster } from "../../models/Cluster";
 
+// profile function entry
 interface SEntry {
     departureTime: number,
     expectedArrivalTime: number,
@@ -30,6 +31,7 @@ interface SEntry {
     finalFootpath?: number,
 }
 
+// information for each trip
 interface TEntry {
     expectedArrivalTime: number,
     arrivalDate?: Date,
@@ -37,11 +39,13 @@ interface TEntry {
     connectionArrivalStop?: number,
 }
 
+// duration to the target stop
 interface DEntry {
     duration: number,
     footpath: number,
 }
 
+// temporary edge to create the graph
 interface TempEdge {
     departureStop: string,
     arrivalStop: string,
@@ -50,6 +54,7 @@ interface TempEdge {
     type: string,
 }
 
+// temporary node to create the graph
 interface TempNode {
     id: string,
     stop: string,
@@ -58,14 +63,22 @@ interface TempNode {
 }
 
 export class ProfileConnectionScanAlgorithmController {
+    // the profile function of each stop
     private static s: SEntry[][];
+    // the earliest expected arrival time of each trip
     private static t: TEntry[];
+    // the duration of the shortest footpath to the target
     private static d: DEntry[];
+    // source stops
     private static sourceStops: number[];
+    // target stops
     private static targetStops: number[];
+    // minimum departure time of the journey
     private static minDepartureTime: number;
+    // maximum arrival time of the journey
     private static maxArrivalTime: number;
 
+    // relevant dates for the journey
     private static sourceDate: Date = new Date();
     private static eatDate: Date = new Date();
     private static esatDate: Date = new Date();
@@ -73,11 +86,18 @@ export class ProfileConnectionScanAlgorithmController {
     private static currentDate: Date = new Date();
 
     private static dayOffset: number;
+
+    // values which can be calculated by the normal csa algorithm
     private static earliestArrivalTimeCSA: number;
     private static earliestSafeArrivalTimeCSA: number;
-
     private static earliestArrivalTimes: number[];
 
+    /**
+     * Initializes and calls the algorithm to solve the minimum expected time problem.
+     * @param req 
+     * @param res 
+     * @returns 
+     */
     public static profileConnectionScanAlgorithmRoute(req: express.Request, res: express.Response){
         try {
             // checks the parameters of the http request
@@ -89,24 +109,26 @@ export class ProfileConnectionScanAlgorithmController {
             // gets the source and target stops
             this.sourceStops = GoogleTransitData.getStopIdsByName(req.query.sourceStop);
             this.targetStops = GoogleTransitData.getStopIdsByName(req.query.targetStop);
-            // converts the source time
+            // converts the minimum departure time and source date
             this.minDepartureTime = Converter.timeToSeconds(req.query.sourceTime);
             this.sourceDate = new Date(req.query.date);
 
+            // gets the minimum times from the normal csa algorithm
             this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.currentDate, this.minDepartureTime, false);
             this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.currentDate, this.minDepartureTime, true);
             if(this.earliestSafeArrivalTimeCSA === null || this.earliestArrivalTimeCSA === null) {
                 throw new Error("Couldn't find a connection.")
             }
 
+            // calculates the maximum arrival time of the alpha bounded version of the algorithm
             this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
             
+            // sets the relevant dates
             this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
             this.currentDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
             this.esatDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(this.earliestSafeArrivalTimeCSA));
             this.eatDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(this.earliestArrivalTimeCSA));
             
-
             this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(req.query.sourceStop, this.currentDate, this.minDepartureTime, this.maxArrivalTime)
             // initializes the csa algorithm
             this.init();
@@ -114,11 +136,8 @@ export class ProfileConnectionScanAlgorithmController {
             console.time('connection scan profile algorithm')
             this.performAlgorithm();
             console.timeEnd('connection scan profile algorithm')
-            console.log(this.earliestArrivalTimeCSA + ', ' + Converter.secondsToTime(this.earliestArrivalTimeCSA))
-            console.log(this.earliestSafeArrivalTimeCSA + ', ' + Converter.secondsToTime(this.earliestSafeArrivalTimeCSA))
-            console.log(this.maxArrivalTime + ', ' + Converter.secondsToTime(this.maxArrivalTime))
-            console.log(this.s[this.sourceStops[0]][0].expectedArrivalTime + ', ' + Converter.secondsToTime(this.s[this.sourceStops[0]][0].expectedArrivalTime))
-            // generates the http response which includes all information of the journey
+            
+            // generates the http response which includes all information of the graph
             const decisionGraph = this.extractDecisionGraph();
             res.send(decisionGraph);
         } catch(error) {
@@ -163,12 +182,18 @@ export class ProfileConnectionScanAlgorithmController {
     //     }
     // }
 
+    /**
+     * Performs the modified version of the profile algorithm to solve the minimum expected arrival time problem.
+     */
     private static performAlgorithm() {
+        // sets the indices of the current and previous day (starts with maximum arrival time)
         let currentDayIndex = Searcher.binarySearchOfConnections(this.maxArrivalTime - this.dayOffset) - 1;
         let previousDayIndex = Searcher.binarySearchOfConnections(this.maxArrivalTime - this.dayOffset + SECONDS_OF_A_DAY) - 1;
         let lastDepartureTime = this.maxArrivalTime;
         let currentDayWeekday = Calculator.moduloSeven(this.currentDate.getDay() - 1);
+        // evaluates connections until it reaches the minimum departure time
         while(lastDepartureTime >= this.minDepartureTime){
+            // sets the connections
             const currentDayConnection = GoogleTransitData.CONNECTIONS[currentDayIndex];
             const previousDayConnection = GoogleTransitData.CONNECTIONS[previousDayIndex];
             let currentConnection: Connection;
@@ -179,22 +204,27 @@ export class ProfileConnectionScanAlgorithmController {
             let currentExpectedDelay: number;
             let currentMaxDelay: number;
             let currentConnectionIsLongDistanceTrip: boolean;
+            // checks which connection is the next one
             if(currentDayConnection && currentDayConnection.departureTime >= Math.max(previousDayConnection.departureTime - SECONDS_OF_A_DAY, 0)){
+                // sets the values of the current day connection
                 currentConnection = currentDayConnection;
                 currentConnectionDepartureTime = currentConnection.departureTime + this.dayOffset;
                 currentConnectionArrivalTime = currentConnection.arrivalTime + this.dayOffset;
+                // checks if the connection arrives at the next day
                 if(currentConnection.arrivalTime >= SECONDS_OF_A_DAY){
                     currentArrivalDate.setDate(currentArrivalDate.getDate() + 1);
                 }
                 currentDayIndex--;
                 currentWeekday = currentDayWeekday;
             } else if(previousDayConnection.departureTime >= SECONDS_OF_A_DAY) {
+                // sets the values of the previous day connection
                 currentConnection = previousDayConnection;
                 currentConnectionDepartureTime = currentConnection.departureTime + this.dayOffset - SECONDS_OF_A_DAY;
                 currentConnectionArrivalTime = currentConnection.arrivalTime + this.dayOffset - SECONDS_OF_A_DAY;
                 previousDayIndex--;
                 currentWeekday = Calculator.moduloSeven(currentDayWeekday - 1);
             } else {
+                // shifts the previous and current day by one
                 if(this.dayOffset === 0){
                     break;
                 }
@@ -205,14 +235,18 @@ export class ProfileConnectionScanAlgorithmController {
                 this.currentDate.setDate(this.currentDate.getDate() - 1);
                 continue;
             }
+            // sets the last departure time
             lastDepartureTime = currentConnectionDepartureTime;
+            // checks if the connection is available on this weekday
             let serviceId = GoogleTransitData.TRIPS[currentConnection.trip].serviceId;
             if(!GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday]){
                 continue;
             }
+            // checks if the connection arrives earlier than the maximum arrival time and can be reached from the source stop
             if(currentConnectionArrivalTime > this.maxArrivalTime || this.earliestArrivalTimes[currentConnection.departureStop] > currentConnectionDepartureTime) {
                 continue;
             }
+            // sets the delay values (depends on the type of the trip)
             if(GoogleTransitData.TRIPS[currentConnection.trip].isLongDistance){
                 currentExpectedDelay = Reliability.longDistanceExpectedValue;
                 currentMaxDelay = MAX_D_C_LONG;
@@ -222,6 +256,7 @@ export class ProfileConnectionScanAlgorithmController {
                 currentMaxDelay = MAX_D_C_NORMAL;
                 currentConnectionIsLongDistanceTrip = false;
             }
+            // sets the three possible expected arrival times
             let time1: number;
             let time2: number;
             let time3: number;
@@ -232,15 +267,18 @@ export class ProfileConnectionScanAlgorithmController {
             // } else {
             //     time1 = Number.MAX_VALUE;
             // }
+            // checks if the arrival stop of the connection is a target stop (expected arrival time when walking to the target)
             if(currentConnection.arrivalStop === this.targetStops[0]) {
                 time1 = currentConnectionArrivalTime + currentExpectedDelay;
             } else {
                 time1 = Number.MAX_VALUE;
             }
+            // expected arrival time when remaining seated
             time2 = this.t[currentConnection.trip].expectedArrivalTime;
             let expectedArrivalTime = Number.MAX_VALUE;
             let pLastDepartureTime: number;
             let relevantPairs: SEntry[] = [];
+            // finds all outgoing trips which have a departure time between c_arr and c_arr + maxD_c (and the departure after max delay)
             for(let j = 0; j < this.s[currentConnection.arrivalStop].length; j++) {
                 p = this.s[currentConnection.arrivalStop][j];
                 if(p.departureTime >= currentConnectionArrivalTime && p.departureTime <= currentConnectionArrivalTime + currentMaxDelay){
@@ -250,6 +288,7 @@ export class ProfileConnectionScanAlgorithmController {
                     break;
                 }
             }
+            // calculates the expected arrival time when transfering at the arrival stop of the current connection
             if(relevantPairs.length > 0){
                 p = relevantPairs[0];
                 expectedArrivalTime = p.expectedArrivalTime * Reliability.getReliability(-1, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip);
@@ -260,10 +299,12 @@ export class ProfileConnectionScanAlgorithmController {
                 expectedArrivalTime += (p.expectedArrivalTime * Reliability.getReliability(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
                 pLastDepartureTime = p.departureTime;
             }
+            // expected arrival time when transferring
             time3 = expectedArrivalTime;
-
+            // finds the minimum expected arrival time
             timeC = Math.min(time1, time2, time3);
 
+            // sets the pointer of the t array
             if(timeC !== Number.MAX_VALUE && timeC < this.t[currentConnection.trip].expectedArrivalTime){
                 this.t[currentConnection.trip] = {
                     expectedArrivalTime: timeC,
@@ -273,6 +314,7 @@ export class ProfileConnectionScanAlgorithmController {
                 };
             }
 
+            // sets the new profile function of the departure stop of the connection
             p = {
                 departureTime: currentConnectionDepartureTime,
                 expectedArrivalTime: timeC,
@@ -289,10 +331,13 @@ export class ProfileConnectionScanAlgorithmController {
             //     p.finalFootpath = this.d[currentConnection.arrivalStop].footpath;
             // }
 
+            // profile function with minimum expected arrival time of departure stop
             let q = this.s[currentConnection.departureStop][0];
             
             if(p.expectedArrivalTime !== Number.MAX_VALUE) {
+                // checks if q dominates p
                 if(!this.dominates(q, p)){
+                    // adds p to the s entry of the departure stop
                     if(q.departureTime !== p.departureTime){
                         this.s[currentConnection.departureStop].unshift(p)
                     } else {
@@ -338,11 +383,17 @@ export class ProfileConnectionScanAlgorithmController {
         }
     }
 
+    /**
+     * Initializes the values of the algorithm.
+     */
     private static init(){
+        // sets the profile function array
         this.s = new Array(GoogleTransitData.STOPS.length);
+        // sets the trip array
         this.t = new Array(GoogleTransitData.TRIPS.length);
         // this.d = new Array(GoogleTransitData.STOPS.length);
 
+        // default entry for each stop
         const defaultSEntry: SEntry = {
             departureTime: Number.MAX_VALUE,
             expectedArrivalTime: Number.MAX_VALUE,
@@ -354,6 +405,7 @@ export class ProfileConnectionScanAlgorithmController {
             //     footpath: undefined,
             // }
         }
+        // default entry for each trip
         for(let i = 0; i < this.t.length; i++) {
             this.t[i] = {
                 expectedArrivalTime: Number.MAX_VALUE
@@ -371,6 +423,12 @@ export class ProfileConnectionScanAlgorithmController {
         
     }
 
+    /**
+     * Checks if q dominates p (domination means earlier expected arrival time or later departure time if the expected arrival times are the same).
+     * @param q 
+     * @param p 
+     * @returns 
+     */
     private static dominates(q: SEntry, p: SEntry): boolean {
         if(q.expectedArrivalTime < p.expectedArrivalTime) {
             return true;
@@ -381,9 +439,15 @@ export class ProfileConnectionScanAlgorithmController {
         return false;
     }
 
+    /**
+     * Extracts the decision graph.
+     * @returns 
+     */
     private static extractDecisionGraph() {
+        // the minimum expected arrival time
         let meatTime = this.s[this.sourceStops[0]][0].expectedArrivalTime;
         this.meatDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(meatTime));
+        // sets the common values of the journey
         let decisionGraph: DecisionGraph = {
             sourceStop: GoogleTransitData.STOPS[this.sourceStops[0]].name,
             targetStop: GoogleTransitData.STOPS[this.targetStops[0]].name,
@@ -398,17 +462,20 @@ export class ProfileConnectionScanAlgorithmController {
             clusters: [],
         };     
         let tempEdges: TempEdge[] = [];
+        // priority queue sorted by the departure times
         let priorityQueue = new FastPriorityQueue<SEntry>((a, b) => {
             return a.departureTime > b.departureTime
         });
         if(this.s[this.sourceStops[0]][0].departureTime === Number.MAX_VALUE){
             throw new Error("Couldn't find a connection.")
         }
+        // adds the source stop
         priorityQueue.add(this.s[this.sourceStops[0]][0]);
         // console.log(this.s[this.sourceStops[0]])
         while(!priorityQueue.isEmpty()){
             let p = priorityQueue.poll();
             let tripId = p.tripId;
+            // uses the information of the profile function to create an edge
             let edge: TempEdge = {
                 departureStop: GoogleTransitData.STOPS[p.enterStop].name,
                 departureTime: p.enterTime,
@@ -417,13 +484,16 @@ export class ProfileConnectionScanAlgorithmController {
                 type: 'Train',
             }
             tempEdges.push(edge);
+            // checks if the current profile reaches the target
             if(p.exitStop !== this.targetStops[0]){
+                // sets max delay
                 let maxDelay: number;
                 if(GoogleTransitData.TRIPS[tripId].isLongDistance){
                     maxDelay = MAX_D_C_LONG;
                 } else {
                     maxDelay = MAX_D_C_NORMAL;
                 }
+                // finds the next profile functions which can be added to the queue (every profile between departure and departure + max Delay and the first one after the max Delay).
                 let relevantPs: SEntry[] = [];
                 for(let i = 0; i < this.s[p.exitStop].length; i++) {
                     let nextP = this.s[p.exitStop][i];
@@ -445,10 +515,12 @@ export class ProfileConnectionScanAlgorithmController {
         let tempNodeArr: TempNode;
         let tempNodeDep: TempNode;
         let edge: Link;
+        // sorts the edges and eliminates duplicates
         tempEdges.sort((a: TempEdge, b: TempEdge) => {
             return this.sortByDepartureTime(a, b);
         })
         tempEdges = this.removeDuplicateEdges(tempEdges);
+        // uses the temp edges to create temp nodes and edges
         for(let tempEdge of tempEdges){
             tempNodeDep = {
                 id: 'id_' + idCounter.toString(),
@@ -475,12 +547,14 @@ export class ProfileConnectionScanAlgorithmController {
             decisionGraph.links.push(edge);
             idCounter++;
         }
+        // sorts nodes and eliminates duplicates
         tempNodes.sort((a: TempNode, b: TempNode) => {
             return this.sortByTime(a, b);
         })
         tempNodes = this.removeDuplicateNodes(tempNodes, decisionGraph.links);
         let node: Node;
         let cluster: Cluster;
+        // uses the temp nodes to create nodes and clusters
         for(let tempNode of tempNodes){
             node = {
                 id: tempNode.id,
@@ -517,6 +591,12 @@ export class ProfileConnectionScanAlgorithmController {
         return true;
     }
 
+    /**
+     * Sorts temp edges by departure time, arrival time, source stop, target stop and type.
+     * @param a 
+     * @param b 
+     * @returns 
+     */
     private static sortByDepartureTime(a: TempEdge, b: TempEdge){
         if(a.departureTime < b.departureTime){
             return -1;
@@ -553,6 +633,12 @@ export class ProfileConnectionScanAlgorithmController {
         }
     }
 
+    /**
+     * Sorts tempNodes by time, stop and type.
+     * @param a 
+     * @param b 
+     * @returns 
+     */
     private static sortByTime(a: TempNode, b: TempNode){
         if(a.time < b.time){
             return -1;
@@ -581,6 +667,11 @@ export class ProfileConnectionScanAlgorithmController {
         }
     }
 
+    /**
+     * Removes duplicate edges.
+     * @param edges 
+     * @returns 
+     */
     private static removeDuplicateEdges(edges: TempEdge[]){
         if(edges.length === 0){
             return;
@@ -598,6 +689,12 @@ export class ProfileConnectionScanAlgorithmController {
         return edges.filter(edge => edge !== undefined);
     }
 
+    /**
+     * Removes duplicate nodes and maps edge ids.
+     * @param nodes 
+     * @param edges 
+     * @returns 
+     */
     private static removeDuplicateNodes(nodes: TempNode[], edges: Link[]){
         if(nodes.length === 0){
             return;
