@@ -15,6 +15,7 @@ import { Link } from "../../models/Link";
 import { DecisionGraph } from "../../models/DecisionGraph";
 import {Node} from "../../models/Node";
 import { Cluster } from "../../models/Cluster";
+import { MeatResponse } from "../../models/MeatResponse";
 
 // profile function entry
 interface SEntry {
@@ -50,7 +51,8 @@ interface TempEdge {
     departureStop: string,
     arrivalStop: string,
     departureTime: number,
-    arrivalTime: number,
+    lastDepartureTime?: number
+    arrivalTime?: number,
     type: string,
 }
 
@@ -79,11 +81,9 @@ export class ProfileConnectionScanAlgorithmController {
     private static maxArrivalTime: number;
 
     // relevant dates for the journey
-    private static sourceDate: Date = new Date();
-    private static eatDate: Date = new Date();
-    private static esatDate: Date = new Date();
-    private static meatDate: Date = new Date();
-    private static currentDate: Date = new Date();
+    private static sourceDate: Date;
+    private static meatDate: Date;
+    private static currentDate: Date;
 
     private static dayOffset: number;
 
@@ -114,8 +114,8 @@ export class ProfileConnectionScanAlgorithmController {
             this.sourceDate = new Date(req.query.date);
 
             // gets the minimum times from the normal csa algorithm
-            this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.currentDate, this.minDepartureTime, false);
-            this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.currentDate, this.minDepartureTime, true);
+            this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, false);
+            this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, true);
             if(this.earliestSafeArrivalTimeCSA === null || this.earliestArrivalTimeCSA === null) {
                 throw new Error("Couldn't find a connection.")
             }
@@ -125,9 +125,8 @@ export class ProfileConnectionScanAlgorithmController {
             
             // sets the relevant dates
             this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
-            this.currentDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
-            this.esatDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(this.earliestSafeArrivalTimeCSA));
-            this.eatDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(this.earliestArrivalTimeCSA));
+            this.currentDate = new Date(this.sourceDate);
+            this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
             
             this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(req.query.sourceStop, this.currentDate, this.minDepartureTime, this.maxArrivalTime)
             // initializes the csa algorithm
@@ -138,8 +137,8 @@ export class ProfileConnectionScanAlgorithmController {
             console.timeEnd('connection scan profile algorithm')
             
             // generates the http response which includes all information of the graph
-            const decisionGraph = this.extractDecisionGraph();
-            res.send(decisionGraph);
+            const meatResponse = this.extractDecisionGraphs();
+            res.send(meatResponse);
         } catch(error) {
             console.log(error);
             console.timeEnd('connection scan algorithm')
@@ -443,12 +442,14 @@ export class ProfileConnectionScanAlgorithmController {
      * Extracts the decision graph.
      * @returns 
      */
-    private static extractDecisionGraph() {
+    private static extractDecisionGraphs() {
         // the minimum expected arrival time
         let meatTime = this.s[this.sourceStops[0]][0].expectedArrivalTime;
-        this.meatDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(meatTime));
+        this.meatDate = new Date(this.sourceDate);
+        this.meatDate.setDate(this.meatDate.getDate() + Converter.getDayDifference(meatTime));
+        
         // sets the common values of the journey
-        let decisionGraph: DecisionGraph = {
+        let meatResponse: MeatResponse = {
             sourceStop: GoogleTransitData.STOPS[this.sourceStops[0]].name,
             targetStop: GoogleTransitData.STOPS[this.targetStops[0]].name,
             departureTime: Converter.secondsToTime(this.s[this.sourceStops[0]][0].departureTime),
@@ -457,11 +458,28 @@ export class ProfileConnectionScanAlgorithmController {
             meatDate: this.meatDate.toLocaleDateString('de-DE'),
             eatTime: Converter.secondsToTime(this.earliestArrivalTimeCSA),
             esatTime: Converter.secondsToTime(this.earliestSafeArrivalTimeCSA),
+            expandedDecisionGraph: {
+                nodes: [],
+                links: [],
+                clusters: [],
+            },
+            compactDecisionGraph: {
+                nodes: [],
+                links: [],
+                clusters: [],
+            }
+        }
+        let expandedDecisionGraph: DecisionGraph = {
             nodes: [],
             links: [],
             clusters: [],
         };     
-        let tempEdges: TempEdge[] = [];
+        let compactDecisionGraph: DecisionGraph = {
+            nodes: [],
+            links: [],
+            clusters: [],
+        }
+        let expandedTempEdges: TempEdge[] = [];
         // priority queue sorted by the departure times
         let priorityQueue = new FastPriorityQueue<SEntry>((a, b) => {
             return a.departureTime > b.departureTime
@@ -471,7 +489,6 @@ export class ProfileConnectionScanAlgorithmController {
         }
         // adds the source stop
         priorityQueue.add(this.s[this.sourceStops[0]][0]);
-        // console.log(this.s[this.sourceStops[0]])
         while(!priorityQueue.isEmpty()){
             let p = priorityQueue.poll();
             let tripId = p.tripId;
@@ -483,7 +500,7 @@ export class ProfileConnectionScanAlgorithmController {
                 arrivalTime: p.exitTime,
                 type: 'Train',
             }
-            tempEdges.push(edge);
+            expandedTempEdges.push(edge);
             // checks if the current profile reaches the target
             if(p.exitStop !== this.targetStops[0]){
                 // sets max delay
@@ -516,12 +533,12 @@ export class ProfileConnectionScanAlgorithmController {
         let tempNodeDep: TempNode;
         let edge: Link;
         // sorts the edges and eliminates duplicates
-        tempEdges.sort((a: TempEdge, b: TempEdge) => {
+        expandedTempEdges.sort((a: TempEdge, b: TempEdge) => {
             return this.sortByDepartureTime(a, b);
         })
-        tempEdges = this.removeDuplicateEdges(tempEdges);
+        expandedTempEdges = this.removeDuplicateEdges(expandedTempEdges);
         // uses the temp edges to create temp nodes and edges
-        for(let tempEdge of tempEdges){
+        for(let tempEdge of expandedTempEdges){
             tempNodeDep = {
                 id: 'id_' + idCounter.toString(),
                 stop: tempEdge.departureStop,
@@ -544,14 +561,14 @@ export class ProfileConnectionScanAlgorithmController {
                 target: tempNodeArr.id,
                 label: tempEdge.type,
             }
-            decisionGraph.links.push(edge);
+            expandedDecisionGraph.links.push(edge);
             idCounter++;
         }
         // sorts nodes and eliminates duplicates
         tempNodes.sort((a: TempNode, b: TempNode) => {
             return this.sortByTime(a, b);
         })
-        tempNodes = this.removeDuplicateNodes(tempNodes, decisionGraph.links);
+        tempNodes = this.removeDuplicateNodes(tempNodes, expandedDecisionGraph.links);
         let node: Node;
         let cluster: Cluster;
         // uses the temp nodes to create nodes and clusters
@@ -560,9 +577,9 @@ export class ProfileConnectionScanAlgorithmController {
                 id: tempNode.id,
                 label: Converter.secondsToTime(tempNode.time)
             }
-            decisionGraph.nodes.push(node);
+            expandedDecisionGraph.nodes.push(node);
             let createCluster = true;
-            for(let cluster of decisionGraph.clusters){
+            for(let cluster of expandedDecisionGraph.clusters){
                 if(cluster.label === tempNode.stop){
                     createCluster = false;
                     cluster.childNodeIds.push(node.id);
@@ -575,11 +592,70 @@ export class ProfileConnectionScanAlgorithmController {
                     label: tempNode.stop,
                     childNodeIds: [node.id],
                 }
-                decisionGraph.clusters.push(cluster);
+                expandedDecisionGraph.clusters.push(cluster);
                 idCounter++;
             }
         }
-        return decisionGraph;
+        meatResponse.expandedDecisionGraph = expandedDecisionGraph;
+        let compactTempEdges: TempEdge[] = this.getCompactTempEdges(expandedTempEdges);
+        let arrivalTimeStringOfTarget = this.getArrivalTimeArrayOfTargetStop(expandedTempEdges);
+        let arrivalStops = new Map<string, string>();
+        let departureNode: Node;
+        for(let compactTempEdge of compactTempEdges){
+            if(compactTempEdge.departureStop === GoogleTransitData.STOPS[this.sourceStops[0]].name){
+                cluster = {
+                    id: 'id_' + idCounter.toString(),
+                    label: compactTempEdge.departureStop,
+                    childNodeIds: [],
+                }
+                compactDecisionGraph.clusters.push(cluster);
+                idCounter++;
+            }
+            departureNode = {
+                id: 'id_' + idCounter.toString(),
+                label: Converter.secondsToTime(compactTempEdge.departureTime), 
+            }
+            if(compactTempEdge.lastDepartureTime !== undefined){
+                departureNode.label = departureNode.label + ' - ' + Converter.secondsToTime(compactTempEdge.lastDepartureTime);
+            }
+            compactDecisionGraph.nodes.push(departureNode);
+            idCounter++;
+            for(let cluster of compactDecisionGraph.clusters){
+                if(cluster.label === compactTempEdge.departureStop){
+                    cluster.childNodeIds.push(departureNode.id);
+                    break;
+                }
+            }
+            if(arrivalStops.get(compactTempEdge.arrivalStop) === undefined){
+                node = {
+                    id: 'id_' + idCounter.toString(),
+                    label: ' ',
+                }
+                if(compactTempEdge.arrivalStop === GoogleTransitData.STOPS[this.targetStops[0]].name){
+                    node.label = arrivalTimeStringOfTarget;
+                }
+                compactDecisionGraph.nodes.push(node);
+                arrivalStops.set(compactTempEdge.arrivalStop, node.id);
+                idCounter++;
+                cluster = {
+                    id: 'id_' + idCounter.toString(),
+                    label: compactTempEdge.arrivalStop,
+                    childNodeIds: [node.id],
+                }
+                compactDecisionGraph.clusters.push(cluster);
+                idCounter++;
+            }
+            edge = {
+                id: 'id_' + idCounter.toString(),
+                source: departureNode.id,
+                target: arrivalStops.get(compactTempEdge.arrivalStop),
+                label: compactTempEdge.type,
+            }
+            compactDecisionGraph.links.push(edge);
+            idCounter++;
+        }
+        meatResponse.compactDecisionGraph = compactDecisionGraph;
+        return meatResponse;
     }
 
     private static notDominatedInProfile(p: SEntry, stopId: number): boolean{
@@ -629,6 +705,48 @@ export class ProfileConnectionScanAlgorithmController {
             }
         }
         if(a.departureTime > b.departureTime){
+            return 1
+        }
+    }
+
+    /**
+     * Sorts temp edges by source stop, target stop, type and departure time.
+     * @param a 
+     * @param b 
+     * @returns 
+     */
+     private static sortByDepartureStop(a: TempEdge, b: TempEdge){
+        if(a.departureStop < b.departureStop){
+            return -1;
+        }
+        if(a.departureStop === b.departureStop){
+            if(a.arrivalStop < b.arrivalStop){
+                return -1;
+            }
+            if(a.arrivalStop === b.arrivalStop){
+                if(a.type < b.type){
+                    return -1;
+                }
+                if(a.type === b.type){
+                    if(a.departureTime < b.departureTime){
+                        return -1;
+                    }
+                    if(a.departureTime === b.departureTime){
+                        return 0;
+                    }
+                    if(a.departureTime > b.departureTime){
+                        return 1;
+                    }
+                }
+                if(a.type > b.type){
+                    return 1;
+                }
+            }
+            if(a.arrivalStop > b.arrivalStop){
+                return 1;
+            }
+        }
+        if(a.departureStop > b.departureStop){
             return 1
         }
     }
@@ -687,6 +805,71 @@ export class ProfileConnectionScanAlgorithmController {
             }
         }
         return edges.filter(edge => edge !== undefined);
+    }
+
+    private static getCompactTempEdges(expandedTempEdges: TempEdge[]){
+        let compactTempEdges = [];
+        if(expandedTempEdges.length === 0){
+            return compactTempEdges;
+        }
+        let expandedTempEdgesCopy = expandedTempEdges;
+        expandedTempEdgesCopy.sort((a, b) => {
+            return this.sortByDepartureStop(a, b);
+        });
+        let firstDepartureTime = expandedTempEdges[0].departureTime;
+        let lastDepartureTime = undefined;
+        let currentDepartureStop = expandedTempEdges[0].departureStop;
+        let currentArrivalStop = expandedTempEdges[0].arrivalStop;
+        let currentType = expandedTempEdges[0].type;
+        for(let i = 1; i <= expandedTempEdgesCopy.length; i++){
+            let currentTempEdge = expandedTempEdgesCopy[i];
+            if(currentTempEdge && currentTempEdge.departureStop === currentDepartureStop && currentTempEdge.arrivalStop === currentArrivalStop && currentTempEdge.type === currentType) {
+                lastDepartureTime = currentTempEdge.departureTime;
+            } else {
+                let newTempEdge: TempEdge = {
+                    departureStop: currentDepartureStop,
+                    arrivalStop: currentArrivalStop,
+                    type: currentType,
+                    departureTime: firstDepartureTime,
+                    lastDepartureTime: lastDepartureTime,
+                }
+                compactTempEdges.push(newTempEdge);
+                if(currentTempEdge){
+                    firstDepartureTime = currentTempEdge.departureTime;
+                    lastDepartureTime = undefined;
+                    currentDepartureStop = currentTempEdge.departureStop;
+                    currentArrivalStop = currentTempEdge.arrivalStop;
+                    currentType = currentTempEdge.type;
+                }
+            }
+        }
+        compactTempEdges.sort((a, b) => {
+            return this.sortByDepartureTime(a, b);
+        })
+        return compactTempEdges;
+    }
+
+    private static getArrivalTimeArrayOfTargetStop(expandedTempEdges: TempEdge[]){
+        if(expandedTempEdges.length === 0){
+            return '';
+        }
+        let earliestArrivalTime = Number.MAX_VALUE;
+        let latestArrivalTime = 0;
+        for(let tempEdge of expandedTempEdges){
+            if(tempEdge.arrivalStop === GoogleTransitData.STOPS[this.targetStops[0]].name){
+                if(tempEdge.arrivalTime < earliestArrivalTime){
+                    earliestArrivalTime = tempEdge.arrivalTime;
+                }
+                if(tempEdge.arrivalTime > latestArrivalTime){
+                    latestArrivalTime = tempEdge.arrivalTime;
+                }
+            }
+        }
+        let arrivalTimeString = Converter.secondsToTime(earliestArrivalTime);
+        if(earliestArrivalTime < latestArrivalTime){
+            arrivalTimeString += ' - ' + Converter.secondsToTime(latestArrivalTime);
+        }
+        return arrivalTimeString;
     }
 
     /**
