@@ -79,7 +79,6 @@ export class ProfileConnectionScanAlgorithmController {
     private static minDepartureTime: number;
     // maximum arrival time of the journey
     private static maxArrivalTime: number;
-
     // relevant dates for the journey
     private static sourceDate: Date;
     private static meatDate: Date;
@@ -126,6 +125,7 @@ export class ProfileConnectionScanAlgorithmController {
             // sets the relevant dates
             this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
             this.currentDate = new Date(this.sourceDate);
+
             this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
             
             this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(req.query.sourceStop, this.currentDate, this.minDepartureTime, this.maxArrivalTime)
@@ -410,6 +410,7 @@ export class ProfileConnectionScanAlgorithmController {
                 expectedArrivalTime: Number.MAX_VALUE
             };
         }
+
         // for(let targetStop of this.targetStops){
         //     let finalFootpaths = GoogleTransitData.getAllFootpathsOfAArrivalStop(targetStop);
         //     for(let footpath of finalFootpaths){
