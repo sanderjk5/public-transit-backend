@@ -122,7 +122,7 @@ export class ProfileConnectionScanAlgorithmController {
             }
 
             // calculates the maximum arrival time of the alpha bounded version of the algorithm
-            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 5 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
             
             // sets the relevant dates
             this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
@@ -580,6 +580,7 @@ export class ProfileConnectionScanAlgorithmController {
         let tempNodeArr: TempNode;
         let tempNodeDep: TempNode;
         let edge: Link;
+        expandedTempEdges = this.getDepartureTimesOfFootpaths(arrivalTimesPerStop, expandedTempEdges);
         // sorts the edges and eliminates duplicates
         expandedTempEdges.sort((a: TempEdge, b: TempEdge) => {
             return this.sortByDepartureTime(a, b);
@@ -867,17 +868,31 @@ export class ProfileConnectionScanAlgorithmController {
         });
         let lastDepartureStop: string = expandedTempEdges[0].departureStop;
         let lastArrivalTimes = arrivalTimesPerStop.get(lastDepartureStop);
+        lastArrivalTimes.push(Number.MAX_VALUE);
+        lastArrivalTimes.sort((a, b) => a-b);
         let lastArrivalTimeIndex = 0;
         for(let tempEdge of expandedTempEdges){
             if(tempEdge.departureStop !== lastDepartureStop){
                 lastDepartureStop = tempEdge.departureStop;
                 lastArrivalTimes = arrivalTimesPerStop.get(lastDepartureStop);
+                if(lastArrivalTimes === undefined){
+                    continue;
+                }
+                lastArrivalTimes.push(Number.MAX_VALUE);
+                lastArrivalTimes.sort((a, b) => a-b);
+                lastArrivalTimeIndex = 1;
             }
-            if(lastArrivalTimes === undefined){
+            if(tempEdge.type !== 'Footpath'){
                 continue;
             }
-            
+            while(lastArrivalTimes[lastArrivalTimeIndex] <= tempEdge.departureTime){
+                lastArrivalTimeIndex++;
+            }
+            let duration = tempEdge.arrivalTime - tempEdge.departureTime;
+            tempEdge.departureTime = lastArrivalTimes[lastArrivalTimeIndex-1];
+            tempEdge.arrivalTime = tempEdge.departureTime + duration;
         }
+        return expandedTempEdges;
     }
 
     /**
