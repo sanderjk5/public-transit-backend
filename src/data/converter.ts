@@ -64,6 +64,7 @@ export class Converter {
         if(timeInSeconds === Number.MAX_VALUE) {
             return 0;
         }
+        timeInSeconds = Math.floor(timeInSeconds);
         let counter = 0;
         while(timeInSeconds >= SECONDS_OF_A_DAY){
             timeInSeconds = timeInSeconds - SECONDS_OF_A_DAY;
@@ -81,6 +82,7 @@ export class Converter {
         if(timeInSeconds === Number.MAX_VALUE) {
             return 0;
         }
+        timeInSeconds = Math.floor(timeInSeconds);
         let counter = 0;
         while(timeInSeconds >= SECONDS_OF_A_DAY){
             timeInSeconds = timeInSeconds - SECONDS_OF_A_DAY;

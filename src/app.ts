@@ -14,6 +14,7 @@ const app = express();
 // imports the gtfs files
 Importer.importGoogleTransitData();
 // generates routes which can be used by the raptor algorithm
+Generator.combineStops();
 Generator.generateValidRoutes();
 // genreates connections which can be used by the csa
 Generator.generateSortedConnections();
