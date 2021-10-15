@@ -38,6 +38,7 @@ interface TEntry {
     arrivalDate?: Date,
     connectionArrivalTime?: number,
     connectionArrivalStop?: number,
+    finalFootpath?: number,
 }
 
 // duration to the target stop
@@ -261,17 +262,18 @@ export class ProfileConnectionScanAlgorithmController {
             let time3: number;
             let timeC: number;
             let p: SEntry;
-            // if(this.d[currentConnection.arrivalStop].duration !== Number.MAX_VALUE) {
-            //     time1 = currentConnectionArrivalTime + currentExpectedDelay + this.d[currentConnection.arrivalStop].duration;
-            // } else {
-            //     time1 = Number.MAX_VALUE;
-            // }
-            // checks if the arrival stop of the connection is a target stop (expected arrival time when walking to the target)
-            if(currentConnection.arrivalStop === this.targetStops[0]) {
-                time1 = currentConnectionArrivalTime + currentExpectedDelay;
+            // expected arrival time when walking to the target
+            if(this.d[currentConnection.arrivalStop].duration !== Number.MAX_VALUE) {
+                time1 = currentConnectionArrivalTime + currentExpectedDelay + this.d[currentConnection.arrivalStop].duration;
             } else {
                 time1 = Number.MAX_VALUE;
             }
+            // checks if the arrival stop of the connection is a target stop (expected arrival time when walking to the target)
+            // if(currentConnection.arrivalStop === this.targetStops[0]) {
+            //     time1 = currentConnectionArrivalTime + currentExpectedDelay;
+            // } else {
+            //     time1 = Number.MAX_VALUE;
+            // }
             // expected arrival time when remaining seated
             time2 = this.t[currentConnection.trip].expectedArrivalTime;
             let expectedArrivalTime = Number.MAX_VALUE;
@@ -311,6 +313,9 @@ export class ProfileConnectionScanAlgorithmController {
                     connectionArrivalTime: currentConnectionArrivalTime,
                     connectionArrivalStop: currentConnection.arrivalStop,
                 };
+                if(time1 === timeC && currentConnection.arrivalStop !== this.targetStops[0]){
+                    this.t[currentConnection.trip].finalFootpath = this.d[currentConnection.arrivalStop].footpath;
+                }
             }
 
             // sets the new profile function of the departure stop of the connection
@@ -324,60 +329,62 @@ export class ProfileConnectionScanAlgorithmController {
                 exitTime: this.t[currentConnection.trip].connectionArrivalTime,
                 exitStop: this.t[currentConnection.trip].connectionArrivalStop,
                 tripId: currentConnection.trip,
+                finalFootpath: this.t[currentConnection.trip].finalFootpath,
             }
 
-            // if(time1 === timeC && time1 !== Number.MAX_VALUE && currentConnection.arrivalStop !== this.targetStops[0]){
-            //     p.finalFootpath = this.d[currentConnection.arrivalStop].footpath;
-            // }
+            
 
             // profile function with minimum expected arrival time of departure stop
-            let q = this.s[currentConnection.departureStop][0];
-            
+            // let q = this.s[currentConnection.departureStop][0];
+            if(GoogleTransitData.STOPS[currentConnection.arrivalStop].name === 'Karlsruhe-Knielingen' && currentConnection.departureStop === this.sourceStops[0] && time1 === timeC){
+                console.log('without footpath')
+                console.log(p)
+            }
             if(p.expectedArrivalTime !== Number.MAX_VALUE) {
                 // checks if q dominates p
-                if(!this.dominates(q, p)){
-                    // adds p to the s entry of the departure stop
-                    if(q.departureTime !== p.departureTime){
-                        this.s[currentConnection.departureStop].unshift(p)
-                    } else {
-                        this.s[currentConnection.departureStop][0] = p;
-                    }
-                }
-                // let footpaths = GoogleTransitData.getAllFootpathsOfAArrivalStop(currentConnection.departureStop);
-                // for(let footpath of footpaths) {
-                //     let pNew: SEntry= {
-                //         departureTime: currentConnectionDepartureTime - footpath.duration,
-                //         expectedArrivalTime: p.expectedArrivalTime,
-                //         departureDate: p.departureDate,
-                //         arrivalDate: p.arrivalDate,
-                //         connectionDepartureTime: p.connectionDepartureTime,
-                //         connectionDepartureStop: p.connectionDepartureStop,
-                //         connectionArrivalTime: p.connectionArrivalTime,
-                //         connectionArrivalStop: p.connectionArrivalStop,
-                //         connectionId: p.connectionId,
-                //         // transferFootpath: footpath.idArrival,
-                //         // finalFootpath: p.finalFootpath,
-                //     }
-                //     if(pNew.departureTime < this.minDepartureTime){
-                //         continue;
-                //     }
-                //     if(this.notDominatedInProfile(pNew, footpath.departureStop)){
-                //         let shiftedPairs = [];
-                //         let currentPair = this.s[footpath.departureStop][0];
-                //         while(pNew.departureTime >= currentPair.departureTime){
-                //             let removedPair = this.s[footpath.departureStop].shift()
-                //             shiftedPairs.push(removedPair);
-                //             currentPair = this.s[footpath.departureStop][0];
-                //         }
-                //         this.s[footpath.departureStop].unshift(pNew);
-                //         for(let j = 0; j < shiftedPairs.length; j++) {
-                //             let removedPair = shiftedPairs[j];
-                //             if(!this.dominates(pNew, removedPair)){
-                //                 this.s[footpath.departureStop].unshift(removedPair);
-                //             }
-                //         }
+                // if(!this.dominates(q, p)){
+                //     // adds p to the s entry of the departure stop
+                //     if(q.departureTime !== p.departureTime){
+                //         this.s[currentConnection.departureStop].unshift(p)
+                //     } else {
+                //         this.s[currentConnection.departureStop][0] = p;
                 //     }
                 // }
+                let footpaths = GoogleTransitData.getAllFootpathsOfAArrivalStop(currentConnection.departureStop);
+                for(let footpath of footpaths) {
+                    let pNew: SEntry= {
+                        departureTime: currentConnectionDepartureTime - footpath.duration,
+                        expectedArrivalTime: p.expectedArrivalTime,
+                        departureDate: p.departureDate,
+                        arrivalDate: p.arrivalDate,
+                        enterTime: p.enterTime,
+                        enterStop: p.enterStop,
+                        exitTime: p.exitTime,
+                        exitStop: p.exitStop,
+                        tripId: p.tripId,
+                        transferFootpath: footpath.idArrival,
+                        finalFootpath: p.finalFootpath,
+                    }
+                    if(pNew.departureTime < this.minDepartureTime){
+                        continue;
+                    }
+                    if(this.notDominatedInProfile(pNew, footpath.departureStop)){
+                        let shiftedPairs = [];
+                        let currentPair = this.s[footpath.departureStop][0];
+                        while(pNew.departureTime >= currentPair.departureTime){
+                            let removedPair = this.s[footpath.departureStop].shift()
+                            shiftedPairs.push(removedPair);
+                            currentPair = this.s[footpath.departureStop][0];
+                        }
+                        this.s[footpath.departureStop].unshift(pNew);
+                        for(let j = 0; j < shiftedPairs.length; j++) {
+                            let removedPair = shiftedPairs[j];
+                            if(!this.dominates(pNew, removedPair)){
+                                this.s[footpath.departureStop].unshift(removedPair);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -390,7 +397,7 @@ export class ProfileConnectionScanAlgorithmController {
         this.s = new Array(GoogleTransitData.STOPS.length);
         // sets the trip array
         this.t = new Array(GoogleTransitData.TRIPS.length);
-        // this.d = new Array(GoogleTransitData.STOPS.length);
+        this.d = new Array(GoogleTransitData.STOPS.length);
 
         // default entry for each stop
         const defaultSEntry: SEntry = {
@@ -399,10 +406,10 @@ export class ProfileConnectionScanAlgorithmController {
         }
         for(let i = 0; i < GoogleTransitData.STOPS.length; i++) {
             this.s[i] = [defaultSEntry];
-            // this.d[i] = {
-            //     duration: Number.MAX_VALUE,
-            //     footpath: undefined,
-            // }
+            this.d[i] = {
+                duration: Number.MAX_VALUE,
+                footpath: undefined,
+            }
         }
         // default entry for each trip
         for(let i = 0; i < this.t.length; i++) {
@@ -410,16 +417,15 @@ export class ProfileConnectionScanAlgorithmController {
                 expectedArrivalTime: Number.MAX_VALUE
             };
         }
-
-        // for(let targetStop of this.targetStops){
-        //     let finalFootpaths = GoogleTransitData.getAllFootpathsOfAArrivalStop(targetStop);
-        //     for(let footpath of finalFootpaths){
-        //         if(this.d[footpath.departureStop].duration > footpath.duration){
-        //             this.d[footpath.departureStop].duration = footpath.duration;
-        //             this.d[footpath.departureStop].footpath = footpath.idArrival;
-        //         }
-        //     }
-        // }
+        for(let targetStop of this.targetStops){
+            let finalFootpaths = GoogleTransitData.getAllFootpathsOfAArrivalStop(targetStop);
+            for(let footpath of finalFootpaths){
+                if(this.d[footpath.departureStop].duration > footpath.duration){
+                    this.d[footpath.departureStop].duration = footpath.duration;
+                    this.d[footpath.departureStop].footpath = footpath.idArrival;
+                }
+            }
+        }
         
     }
 
@@ -481,6 +487,7 @@ export class ProfileConnectionScanAlgorithmController {
             clusters: [],
         }
         let expandedTempEdges: TempEdge[] = [];
+        let arrivalTimesPerStop: Map<string, number[]> = new Map<string, number[]>();
         // priority queue sorted by the departure times
         let priorityQueue = new FastPriorityQueue<SEntry>((a, b) => {
             return a.departureTime > b.departureTime
@@ -493,6 +500,22 @@ export class ProfileConnectionScanAlgorithmController {
         while(!priorityQueue.isEmpty()){
             let p = priorityQueue.poll();
             let tripId = p.tripId;
+            let transfer = GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath];
+            if(transfer.departureStop !== transfer.arrivalStop){
+                let transferEdge: TempEdge = {
+                    departureStop: GoogleTransitData.STOPS[transfer.departureStop].name,
+                    departureTime: p.departureTime,
+                    arrivalStop: GoogleTransitData.STOPS[transfer.arrivalStop].name,
+                    arrivalTime: p.departureTime + transfer.duration,
+                    type: 'Footpath',
+                }
+                expandedTempEdges.push(transferEdge);
+                if(arrivalTimesPerStop.get(transferEdge.arrivalStop) === undefined) {
+                    arrivalTimesPerStop.set(transferEdge.arrivalStop, [transferEdge.arrivalTime]);
+                } else {
+                    arrivalTimesPerStop.get(transferEdge.arrivalStop).push(transferEdge.arrivalTime);
+                }
+            }
             // uses the information of the profile function to create an edge
             let edge: TempEdge = {
                 departureStop: GoogleTransitData.STOPS[p.enterStop].name,
@@ -502,6 +525,30 @@ export class ProfileConnectionScanAlgorithmController {
                 type: 'Train',
             }
             expandedTempEdges.push(edge);
+            if(arrivalTimesPerStop.get(edge.arrivalStop) === undefined) {
+                arrivalTimesPerStop.set(edge.arrivalStop, [edge.arrivalTime]);
+            } else {
+                arrivalTimesPerStop.get(edge.arrivalStop).push(edge.arrivalTime);
+            }
+            if(p.finalFootpath !== undefined){
+                let finalFootpath = GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.finalFootpath];
+                if(finalFootpath.departureStop !== finalFootpath.arrivalStop){
+                    let finalFootpathEdge: TempEdge = {
+                        departureStop: GoogleTransitData.STOPS[finalFootpath.departureStop].name,
+                        departureTime: p.exitTime,
+                        arrivalStop: GoogleTransitData.STOPS[finalFootpath.arrivalStop].name,
+                        arrivalTime: p.exitTime + finalFootpath.duration,
+                        type: 'Footpath',
+                    }
+                    expandedTempEdges.push(finalFootpathEdge);
+                    if(arrivalTimesPerStop.get(finalFootpathEdge.arrivalStop) === undefined) {
+                        arrivalTimesPerStop.set(finalFootpathEdge.arrivalStop, [finalFootpathEdge.arrivalTime]);
+                    } else {
+                        arrivalTimesPerStop.get(finalFootpathEdge.arrivalStop).push(finalFootpathEdge.arrivalTime);
+                    }
+                    continue;
+                }
+            }
             // checks if the current profile reaches the target
             if(p.exitStop !== this.targetStops[0]){
                 // sets max delay
@@ -533,6 +580,7 @@ export class ProfileConnectionScanAlgorithmController {
         let tempNodeArr: TempNode;
         let tempNodeDep: TempNode;
         let edge: Link;
+        expandedTempEdges = this.getDepartureTimesOfFootpaths(arrivalTimesPerStop, expandedTempEdges);
         // sorts the edges and eliminates duplicates
         expandedTempEdges.sort((a: TempEdge, b: TempEdge) => {
             return this.sortByDepartureTime(a, b);
@@ -691,7 +739,15 @@ export class ProfileConnectionScanAlgorithmController {
                         return -1;
                     }
                     if(a.arrivalStop === b.arrivalStop){
-                        return 0;
+                        if(a.type < b.type){
+                            return -1;
+                        }
+                        if(a.type === b.type){
+                            return 0;
+                        }
+                        if(a.type > b.type){
+                            return 1;
+                        }
                     }
                     if(a.arrivalStop > b.arrivalStop){
                         return 1;
@@ -752,6 +808,26 @@ export class ProfileConnectionScanAlgorithmController {
         }
     }
 
+    private static sortByDepartureStopAndDepartureTime(a: TempEdge, b: TempEdge){
+        if(a.departureStop < b.departureStop){
+            return -1;
+        }
+        if(a.departureStop === b.departureStop){
+            if(a.departureTime < b.departureTime){
+                return -1;
+            }
+            if(a.departureTime === b.departureTime){
+                return 0;
+            }
+            if(a.departureTime > b.departureTime){
+                return 1;
+            }
+        }
+        if(a.departureStop > b.departureStop){
+            return 1
+        }
+    }
+
     /**
      * Sorts tempNodes by time, stop and type.
      * @param a 
@@ -786,6 +862,39 @@ export class ProfileConnectionScanAlgorithmController {
         }
     }
 
+    private static getDepartureTimesOfFootpaths(arrivalTimesPerStop: Map<string, number[]>, expandedTempEdges: TempEdge[]){
+        expandedTempEdges.sort((a, b) => {
+            return this.sortByDepartureStopAndDepartureTime(a, b);
+        });
+        let lastDepartureStop: string = expandedTempEdges[0].departureStop;
+        let lastArrivalTimes = arrivalTimesPerStop.get(lastDepartureStop);
+        lastArrivalTimes.push(Number.MAX_VALUE);
+        lastArrivalTimes.sort((a, b) => a-b);
+        let lastArrivalTimeIndex = 0;
+        for(let tempEdge of expandedTempEdges){
+            if(tempEdge.departureStop !== lastDepartureStop){
+                lastDepartureStop = tempEdge.departureStop;
+                lastArrivalTimes = arrivalTimesPerStop.get(lastDepartureStop);
+                if(lastArrivalTimes === undefined){
+                    continue;
+                }
+                lastArrivalTimes.push(Number.MAX_VALUE);
+                lastArrivalTimes.sort((a, b) => a-b);
+                lastArrivalTimeIndex = 1;
+            }
+            if(tempEdge.type !== 'Footpath'){
+                continue;
+            }
+            while(lastArrivalTimes[lastArrivalTimeIndex] <= tempEdge.departureTime){
+                lastArrivalTimeIndex++;
+            }
+            let duration = tempEdge.arrivalTime - tempEdge.departureTime;
+            tempEdge.departureTime = lastArrivalTimes[lastArrivalTimeIndex-1];
+            tempEdge.arrivalTime = tempEdge.departureTime + duration;
+        }
+        return expandedTempEdges;
+    }
+
     /**
      * Removes duplicate edges.
      * @param edges 
@@ -799,7 +908,7 @@ export class ProfileConnectionScanAlgorithmController {
         for(let i = 1; i < edges.length; i++){
             let currentEdge = edges[i];
             if(currentEdge.departureStop === lastEdge.departureStop && currentEdge.arrivalStop === lastEdge.arrivalStop && currentEdge.departureTime === lastEdge.departureTime &&
-                currentEdge.arrivalTime === lastEdge.arrivalTime){
+                currentEdge.arrivalTime === lastEdge.arrivalTime && currentEdge.type === lastEdge.type){
                 edges[i] = undefined;
             } else {
                 lastEdge = edges[i];
