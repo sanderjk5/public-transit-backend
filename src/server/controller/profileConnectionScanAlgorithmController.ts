@@ -122,7 +122,7 @@ export class ProfileConnectionScanAlgorithmController {
             }
 
             // calculates the maximum arrival time of the alpha bounded version of the algorithm
-            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 0.5 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 5 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
             
             // sets the relevant dates
             this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
@@ -487,6 +487,7 @@ export class ProfileConnectionScanAlgorithmController {
             clusters: [],
         }
         let expandedTempEdges: TempEdge[] = [];
+        let arrivalTimesPerStop: Map<string, number[]> = new Map<string, number[]>();
         // priority queue sorted by the departure times
         let priorityQueue = new FastPriorityQueue<SEntry>((a, b) => {
             return a.departureTime > b.departureTime
@@ -509,6 +510,11 @@ export class ProfileConnectionScanAlgorithmController {
                     type: 'Footpath',
                 }
                 expandedTempEdges.push(transferEdge);
+                if(arrivalTimesPerStop.get(transferEdge.arrivalStop) === undefined) {
+                    arrivalTimesPerStop.set(transferEdge.arrivalStop, [transferEdge.arrivalTime]);
+                } else {
+                    arrivalTimesPerStop.get(transferEdge.arrivalStop).push(transferEdge.arrivalTime);
+                }
             }
             // uses the information of the profile function to create an edge
             let edge: TempEdge = {
@@ -519,6 +525,11 @@ export class ProfileConnectionScanAlgorithmController {
                 type: 'Train',
             }
             expandedTempEdges.push(edge);
+            if(arrivalTimesPerStop.get(edge.arrivalStop) === undefined) {
+                arrivalTimesPerStop.set(edge.arrivalStop, [edge.arrivalTime]);
+            } else {
+                arrivalTimesPerStop.get(edge.arrivalStop).push(edge.arrivalTime);
+            }
             if(p.finalFootpath !== undefined){
                 let finalFootpath = GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.finalFootpath];
                 if(finalFootpath.departureStop !== finalFootpath.arrivalStop){
@@ -530,7 +541,11 @@ export class ProfileConnectionScanAlgorithmController {
                         type: 'Footpath',
                     }
                     expandedTempEdges.push(finalFootpathEdge);
-                    // console.log(finalFootpathEdge)
+                    if(arrivalTimesPerStop.get(finalFootpathEdge.arrivalStop) === undefined) {
+                        arrivalTimesPerStop.set(finalFootpathEdge.arrivalStop, [finalFootpathEdge.arrivalTime]);
+                    } else {
+                        arrivalTimesPerStop.get(finalFootpathEdge.arrivalStop).push(finalFootpathEdge.arrivalTime);
+                    }
                     continue;
                 }
             }
@@ -792,6 +807,26 @@ export class ProfileConnectionScanAlgorithmController {
         }
     }
 
+    private static sortByDepartureStopAndDepartureTime(a: TempEdge, b: TempEdge){
+        if(a.departureStop < b.departureStop){
+            return -1;
+        }
+        if(a.departureStop === b.departureStop){
+            if(a.departureTime < b.departureTime){
+                return -1;
+            }
+            if(a.departureTime === b.departureTime){
+                return 0;
+            }
+            if(a.departureTime > b.departureTime){
+                return 1;
+            }
+        }
+        if(a.departureStop > b.departureStop){
+            return 1
+        }
+    }
+
     /**
      * Sorts tempNodes by time, stop and type.
      * @param a 
@@ -823,6 +858,25 @@ export class ProfileConnectionScanAlgorithmController {
         }
         if(a.time > b.time){
             return 1;
+        }
+    }
+
+    private static getDepartureTimesOfFootpaths(arrivalTimesPerStop: Map<string, number[]>, expandedTempEdges: TempEdge[]){
+        expandedTempEdges.sort((a, b) => {
+            return this.sortByDepartureStopAndDepartureTime(a, b);
+        });
+        let lastDepartureStop: string = expandedTempEdges[0].departureStop;
+        let lastArrivalTimes = arrivalTimesPerStop.get(lastDepartureStop);
+        let lastArrivalTimeIndex = 0;
+        for(let tempEdge of expandedTempEdges){
+            if(tempEdge.departureStop !== lastDepartureStop){
+                lastDepartureStop = tempEdge.departureStop;
+                lastArrivalTimes = arrivalTimesPerStop.get(lastDepartureStop);
+            }
+            if(lastArrivalTimes === undefined){
+                continue;
+            }
+            
         }
     }
 
