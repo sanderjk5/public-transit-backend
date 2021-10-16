@@ -101,6 +101,7 @@ export class RaptorMeatAlgorithmController {
             // generates the http response which includes all information of the journey
             // const journeyResponse = this.getJourneyResponse();
             // res.status(200).send(journeyResponse);
+            console.log(this.earliestArrivalTime[this.targetStops[0]])
             res.status(200).send();
         } catch (err) {
             res.status(500).send(err);
@@ -391,6 +392,9 @@ export class RaptorMeatAlgorithmController {
             let tripDeparture: number = Number.MAX_VALUE;
 
             let earliestArrival = this.earliestArrivalTimePerRound[k-1][pi][i];
+            if(earliestArrival.tripId !== undefined && GoogleTransitData.TRIPS[earliestArrival.tripId].routeId === r){
+                continue;
+            }
             let earliestArrivalTime = earliestArrival.arrivalTime;
             let earliestArrivalDayOffset = Converter.getDayOffset(earliestArrivalTime);
 
