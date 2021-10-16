@@ -868,8 +868,10 @@ export class ProfileConnectionScanAlgorithmController {
         });
         let lastDepartureStop: string = expandedTempEdges[0].departureStop;
         let lastArrivalTimes = arrivalTimesPerStop.get(lastDepartureStop);
-        lastArrivalTimes.push(Number.MAX_VALUE);
-        lastArrivalTimes.sort((a, b) => a-b);
+        if(lastArrivalTimes !== undefined){
+            lastArrivalTimes.push(Number.MAX_VALUE);
+            lastArrivalTimes.sort((a, b) => a-b);
+        }
         let lastArrivalTimeIndex = 0;
         for(let tempEdge of expandedTempEdges){
             if(tempEdge.departureStop !== lastDepartureStop){
