@@ -9,6 +9,7 @@ import { performance } from 'perf_hooks';
 import { Calculator } from "../../data/calculator";
 import { SECONDS_OF_A_DAY } from "../../constants";
 import { Reliability } from "../../data/reliability";
+import { JourneyPointerRaptor } from "../../models/JourneyPointerRaptor";
 
 // entries of the q array
 interface QEntry {
@@ -24,16 +25,6 @@ interface EarliestTripInfo {
     dayOffset: number,
 }
 
-// can be used to reconstruct the journey
-interface JourneyPointer {
-    enterTripAtStop: number,
-    exitTripAtStop?: number,
-    departureTime: number,
-    arrivalTime: number,
-    tripId: number,
-    footpath: number,
-}
-
 export class RaptorAlgorithmController {
     // stores for each round k and each stop the earliest arrival time
     private static earliestArrivalTimePerRound: number[][];
@@ -44,7 +35,7 @@ export class RaptorAlgorithmController {
     // stores the route-stop pairs of the marked stops
     private static Q: QEntry[];
     // stores the journey pointer for each stop
-    private static j: JourneyPointer[];
+    private static j: JourneyPointerRaptor[];
 
     private static sourceWeekday: number;
 
@@ -116,6 +107,22 @@ export class RaptorAlgorithmController {
             }
             return {arrivalTime: earliestTargetStopArrival, duration: duration};
         } catch (err) {
+            return null;
+        }
+    }
+
+    public static getJourneyPointersOfRaptorAlgorithm(sourceStop: string, targetStop: string, sourceDate: Date, sourceTimeInSeconds: number): JourneyPointerRaptor[] {
+        try {
+            // gets the source and target stops
+            const sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
+            const targetStops = GoogleTransitData.getStopIdsByName(targetStop);
+            // sets the source Weekday
+            this.sourceWeekday = Calculator.moduloSeven((sourceDate.getDay() - 1));
+            this.init(sourceStops, sourceTimeInSeconds);
+            this.performAlgorithm(targetStops);
+            const journeyPointers: JourneyPointerRaptor[] = this.getJourneyPointers(sourceStops, targetStops);
+            return journeyPointers;
+        } catch (err){
             return null;
         }
     }
@@ -459,14 +466,7 @@ export class RaptorAlgorithmController {
         return earliestTripInfo;
     }
 
-    /**
-     * Uses the journey pointers to generate the journey response of the http request.
-     * @param sourceStops 
-     * @param targetStops 
-     * @param initialDate 
-     * @returns 
-     */
-    private static getJourneyResponse(sourceStops: number[], targetStops: number[], initialDate: Date): JourneyResponse {
+    private static getJourneyPointers(sourceStops: number[], targetStops: number[]){
         // finds the earliest arrival at the target stops
         let earliestTargetStopArrival = this.earliestArrivalTime[targetStops[0]];
         let earliestTargetStopId = targetStops[0];
@@ -482,13 +482,25 @@ export class RaptorAlgorithmController {
         }
 
         // reconstructs the journey pointers from target to source stop
-        let journeyPointers: JourneyPointer[] = []
+        let journeyPointers: JourneyPointerRaptor[] = []
         let stopId = earliestTargetStopId;
         while(!sourceStops.includes(stopId)){
             this.j[stopId].exitTripAtStop = stopId;
-            journeyPointers.push(this.j[stopId]);
+            journeyPointers.unshift(this.j[stopId]);
             stopId = this.j[stopId].enterTripAtStop;
         }
+        return journeyPointers;
+    }
+
+    /**
+     * Uses the journey pointers to generate the journey response of the http request.
+     * @param sourceStops 
+     * @param targetStops 
+     * @param initialDate 
+     * @returns 
+     */
+    private static getJourneyResponse(sourceStops: number[], targetStops: number[], initialDate: Date): JourneyResponse {
+        const journeyPointers = this.getJourneyPointers(sourceStops, targetStops);
 
         let reliability = 1;
         let lastTripId = null;
@@ -497,7 +509,7 @@ export class RaptorAlgorithmController {
         // generates the sections
         const sections: Section[] = []
         let numberOfLegs = 0;
-        for(let i = (journeyPointers.length - 1); i >= 0; i--){
+        for(let i = 0; i < journeyPointers.length; i--){
             let departureTime = journeyPointers[i].departureTime;
             let arrivalTime = journeyPointers[i].arrivalTime;
             let arrivalStop = journeyPointers[i].exitTripAtStop;
