@@ -70,6 +70,7 @@ export class RaptorAlgorithmController {
             const journeyResponse = this.getJourneyResponse(sourceStops, targetStops, sourceDate);
             res.status(200).send(journeyResponse);
         } catch (err) {
+            console.log(err)
             res.status(500).send(err);
         }
     }
@@ -111,11 +112,8 @@ export class RaptorAlgorithmController {
         }
     }
 
-    public static getJourneyPointersOfRaptorAlgorithm(sourceStop: string, targetStop: string, sourceDate: Date, sourceTimeInSeconds: number): JourneyPointerRaptor[] {
+    public static getJourneyPointersOfRaptorAlgorithm(sourceStops: number[], targetStops: number[], sourceDate: Date, sourceTimeInSeconds: number): JourneyPointerRaptor[] {
         try {
-            // gets the source and target stops
-            const sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
-            const targetStops = GoogleTransitData.getStopIdsByName(targetStop);
             // sets the source Weekday
             this.sourceWeekday = Calculator.moduloSeven((sourceDate.getDay() - 1));
             this.init(sourceStops, sourceTimeInSeconds);
@@ -509,7 +507,7 @@ export class RaptorAlgorithmController {
         // generates the sections
         const sections: Section[] = []
         let numberOfLegs = 0;
-        for(let i = 0; i < journeyPointers.length; i--){
+        for(let i = 0; i < journeyPointers.length; i++){
             let departureTime = journeyPointers[i].departureTime;
             let arrivalTime = journeyPointers[i].arrivalTime;
             let arrivalStop = journeyPointers[i].exitTripAtStop;
@@ -534,15 +532,15 @@ export class RaptorAlgorithmController {
 
             lastArrivalTime = arrivalTime;
             
-            if(i === 0 && section.departureStop === section.arrivalStop){
+            if(i === journeyPointers.length-1 && section.departureStop === section.arrivalStop){
                 break;
             }
             sections.push(section);
 
-            if(i > 0){
-                let nextDepartureStop = journeyPointers[i-1].enterTripAtStop;
+            if(i < journeyPointers.length-1){
+                let nextDepartureStop = journeyPointers[i+1].enterTripAtStop;
                 // raptor doesn't saves changes at stops. create them as footpath with a duration of 0 seconds.
-                if(arrivalStop === nextDepartureStop && type === 'Train' && journeyPointers[i-1].footpath === null){
+                if(arrivalStop === nextDepartureStop && type === 'Train' && journeyPointers[i+1].footpath === null){
                     let stopName = GoogleTransitData.STOPS[nextDepartureStop].name;
                     let section: Section = {
                         departureTime: Converter.secondsToTime(arrivalTime),
@@ -562,8 +560,8 @@ export class RaptorAlgorithmController {
         // calculates departure and arrival date
         let departureDate = new Date(initialDate);
         let arrivalDate = new Date(initialDate);
-        departureDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyPointers[journeyPointers.length-1].departureTime))
-        arrivalDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyPointers[0].arrivalTime))
+        departureDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyPointers[0].departureTime))
+        arrivalDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyPointers[journeyPointers.length-1].arrivalTime))
         let departureDateAsString = departureDate.toLocaleDateString('de-DE');
         let arrivalDateAsString = arrivalDate.toLocaleDateString('de-DE');
 

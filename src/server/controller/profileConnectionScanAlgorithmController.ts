@@ -16,6 +16,8 @@ import { DecisionGraph } from "../../models/DecisionGraph";
 import {Node} from "../../models/Node";
 import { Cluster } from "../../models/Cluster";
 import { MeatResponse } from "../../models/MeatResponse";
+import { TempNode } from "../../models/TempNode";
+import { TempEdge } from "../../models/TempEdge";
 
 // profile function entry
 interface SEntry {
@@ -45,24 +47,6 @@ interface TEntry {
 interface DEntry {
     duration: number,
     footpath: number,
-}
-
-// temporary edge to create the graph
-interface TempEdge {
-    departureStop: string,
-    arrivalStop: string,
-    departureTime: number,
-    lastDepartureTime?: number
-    arrivalTime?: number,
-    type: string,
-}
-
-// temporary node to create the graph
-interface TempNode {
-    id: string,
-    stop: string,
-    time: number,
-    type: string,
 }
 
 export class ProfileConnectionScanAlgorithmController {
