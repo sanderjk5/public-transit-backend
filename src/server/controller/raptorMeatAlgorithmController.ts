@@ -14,11 +14,20 @@ import { MAX_D_C_LONG, MAX_D_C_NORMAL } from "../../constants";
 import { Link } from "../../models/Link";
 import {Node} from "../../models/Node";
 import { Cluster } from "../../models/Cluster";
+import { Reliability } from "../../data/reliability";
 
 interface BackupInfo {
     departureStops: number[],
+    arrivalTime: number,
     lastDepartureTime: number,
     safeTime: number,
+    probability: number,
+    isLongDistance: boolean,
+}
+
+interface TargetStopInfo {
+    arrivalTime: number,
+    probability: number,
 }
 export class RaptorMeatAlgorithmController {
     private static sourceStops: number[];
@@ -31,6 +40,8 @@ export class RaptorMeatAlgorithmController {
 
     private static sourceWeekday: number;
     private static sourceDate: Date;
+
+    private static targetStopInfos: TargetStopInfo[];
 
     public static raptorMeatAlgorithm(req: express.Request, res: express.Response) {
         try {
@@ -79,8 +90,11 @@ export class RaptorMeatAlgorithmController {
         });
         let journeyPointers = RaptorAlgorithmController.getJourneyPointersOfRaptorAlgorithm(this.sourceStops, this.targetStops, this.sourceDate, this.minDepartureTime);
 
+        let probability = 1;
+
         let lastArrivalTime = null;
         let lastArrivalStop = null;
+        let isLastTripLongDistance = null;
         let lastMaxDelay = null;
         for(let journeyPointer of journeyPointers){
             let departureTime = journeyPointer.departureTime;
@@ -102,33 +116,55 @@ export class RaptorMeatAlgorithmController {
                 if(lastArrivalTime + lastMaxDelay >= departureTime){
                     const backUpInfo: BackupInfo = {
                         departureStops: [lastArrivalStop],
+                        arrivalTime: lastArrivalTime,
                         lastDepartureTime: departureTime,
                         safeTime: lastArrivalTime + lastMaxDelay,
+                        probability: probability * (1 - Reliability.getReliability(-1, departureTime - lastArrivalTime, isLastTripLongDistance)),
+                        isLongDistance: isLastTripLongDistance,
                     }
                     priorityQueue.add(backUpInfo);
                 }
+                probability = probability * Reliability.getReliability(-1, departureTime - lastArrivalTime, isLastTripLongDistance);
             }
             lastArrivalStop = arrivalStop;
             lastArrivalTime = arrivalTime;
             lastMaxDelay = MAX_D_C_NORMAL;
+            isLastTripLongDistance = false;
             if(GoogleTransitData.TRIPS[tripId].isLongDistance){
                 lastMaxDelay = MAX_D_C_LONG;
+                isLastTripLongDistance = true;
+            }
+            if(this.targetStops.includes(arrivalStop)){
+                let expectedDelay = Reliability.normalDistanceExpectedValue;
+                if(isLastTripLongDistance){
+                    expectedDelay = Reliability.longDistanceExpectedValue;
+                }
+                const targetStopInfo: TargetStopInfo = {
+                    arrivalTime: arrivalTime + expectedDelay,
+                    probability: probability,
+                }
+                this.targetStopInfos.push(targetStopInfo);
             }
         }
         while(!priorityQueue.isEmpty()){
             let backUpInfo = priorityQueue.poll();
             let journeyPointers = RaptorAlgorithmController.getJourneyPointersOfRaptorAlgorithm(backUpInfo.departureStops, this.targetStops, this.sourceDate, backUpInfo.lastDepartureTime+0.1);
+            probability = backUpInfo.probability;
             if(journeyPointers[0].departureTime <= backUpInfo.safeTime){
                 let updatedBackupInfo: BackupInfo = {
                     departureStops: backUpInfo.departureStops,
+                    arrivalTime: backUpInfo.arrivalTime,
                     lastDepartureTime: journeyPointers[0].departureTime,
                     safeTime: backUpInfo.safeTime,
+                    probability: probability * (1 - Reliability.getReliability(-1, journeyPointers[0].departureTime - backUpInfo.arrivalTime, backUpInfo.isLongDistance)),
+                    isLongDistance: backUpInfo.isLongDistance,
                 }
                 priorityQueue.add(updatedBackupInfo);
             }
             let lastArrivalTime = null;
             let lastArrivalStop = null;
             let lastMaxDelay = null;
+            let isLastTripLongDistance = null;
             for(let journeyPointer of journeyPointers){
                 let departureTime = journeyPointer.departureTime;
                 let arrivalTime = journeyPointer.arrivalTime;
@@ -154,17 +190,34 @@ export class RaptorMeatAlgorithmController {
                     if(lastArrivalTime + lastMaxDelay >= departureTime){
                         const backUpInfo: BackupInfo = {
                             departureStops: [lastArrivalStop],
+                            arrivalTime: lastArrivalTime,
                             lastDepartureTime: departureTime,
                             safeTime: lastArrivalTime + lastMaxDelay,
+                            probability: probability * (1 - Reliability.getReliability(-1, departureTime - lastArrivalTime, isLastTripLongDistance)),
+                            isLongDistance: isLastTripLongDistance,
                         }
                         priorityQueue.add(backUpInfo);
                     }
+                    probability = probability * Reliability.getReliability(-1, departureTime - lastArrivalTime, isLastTripLongDistance);
                 }
                 lastArrivalStop = arrivalStop;
                 lastArrivalTime = arrivalTime;
                 lastMaxDelay = MAX_D_C_NORMAL;
+                isLastTripLongDistance = false;
                 if(GoogleTransitData.TRIPS[tripId].isLongDistance){
                     lastMaxDelay = MAX_D_C_LONG;
+                    isLastTripLongDistance = true;
+                }
+                if(this.targetStops.includes(arrivalStop)){
+                    let expectedDelay = Reliability.normalDistanceExpectedValue;
+                    if(isLastTripLongDistance){
+                        expectedDelay = Reliability.longDistanceExpectedValue;
+                    }
+                    const targetStopInfo: TargetStopInfo = {
+                        arrivalTime: arrivalTime + expectedDelay,
+                        probability: probability,
+                    }
+                    this.targetStopInfos.push(targetStopInfo);
                 }
             }
         }
@@ -176,6 +229,7 @@ export class RaptorMeatAlgorithmController {
         let meatResponse: MeatResponse = {
             sourceStop: GoogleTransitData.STOPS[this.sourceStops[0]].name,
             targetStop: GoogleTransitData.STOPS[this.targetStops[0]].name,
+            meatTime: Converter.secondsToTime(this.calculateMeat()),
             eatTime: Converter.secondsToTime(this.earliestArrivalTime),
             esatTime: Converter.secondsToTime(this.earliestSafeArrivalTime),
             expandedDecisionGraph: {
@@ -331,8 +385,20 @@ export class RaptorMeatAlgorithmController {
         return meatResponse;
     }
 
+    private static calculateMeat(){
+        let meat = 0;
+        let probabilitySum = 0;
+        for(let targetStopInfo of this.targetStopInfos){
+            meat += (targetStopInfo.arrivalTime * targetStopInfo.probability)
+            probabilitySum += targetStopInfo.probability;
+        }
+        console.log(probabilitySum);
+        console.log(meat);
+        return meat;
+    }
+
     private static init() {
-        
+        this.targetStopInfos = [];
     }
 
     /**
