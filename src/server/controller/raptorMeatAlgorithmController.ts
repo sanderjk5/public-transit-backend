@@ -86,7 +86,11 @@ export class RaptorMeatAlgorithmController {
         let tempEdges: TempEdge[] = [];
         let arrivalTimesPerStop: Map<string, number[]> = new Map<string, number[]>();
         let priorityQueue = new FastPriorityQueue<BackupInfo>((a, b) => {
-            return a.lastDepartureTime > b.lastDepartureTime
+            if(a.lastDepartureTime === b.lastDepartureTime){
+                return GoogleTransitData.STOPS[a.departureStops[0]].name < GoogleTransitData.STOPS[b.departureStops[0]].name
+            } else {
+                return a.lastDepartureTime < b.lastDepartureTime
+            }
         });
         let journeyPointers = RaptorAlgorithmController.getJourneyPointersOfRaptorAlgorithm(this.sourceStops, this.targetStops, this.sourceDate, this.minDepartureTime);
 
@@ -111,6 +115,12 @@ export class RaptorMeatAlgorithmController {
                 type: 'Train',
             }
             tempEdges.push(tempEdge);
+
+            if(arrivalTimesPerStop.get(tempEdge.arrivalStop) === undefined) {
+                arrivalTimesPerStop.set(tempEdge.arrivalStop, [tempEdge.arrivalTime]);
+            } else {
+                arrivalTimesPerStop.get(tempEdge.arrivalStop).push(tempEdge.arrivalTime);
+            }
 
             if(lastArrivalTime !== null && lastMaxDelay !== null){
                 if(lastArrivalTime + lastMaxDelay >= departureTime){
@@ -148,6 +158,12 @@ export class RaptorMeatAlgorithmController {
         }
         while(!priorityQueue.isEmpty()){
             let backUpInfo = priorityQueue.poll();
+            let nextBackInfo = priorityQueue.peek();
+            while(nextBackInfo && backUpInfo.lastDepartureTime === nextBackInfo.lastDepartureTime && GoogleTransitData.STOPS[backUpInfo.departureStops[0]].name === GoogleTransitData.STOPS[nextBackInfo.departureStops[0]].name){
+                priorityQueue.poll();
+                backUpInfo.probability += nextBackInfo.probability;
+                nextBackInfo = priorityQueue.peek();
+            }
             let journeyPointers = RaptorAlgorithmController.getJourneyPointersOfRaptorAlgorithm(backUpInfo.departureStops, this.targetStops, this.sourceDate, backUpInfo.lastDepartureTime+0.1);
             probability = backUpInfo.probability;
             if(journeyPointers[0].departureTime <= backUpInfo.safeTime){
@@ -161,6 +177,7 @@ export class RaptorMeatAlgorithmController {
                 }
                 priorityQueue.add(updatedBackupInfo);
             }
+            probability = probability * Reliability.getReliability(-1, journeyPointers[0].departureTime - backUpInfo.arrivalTime, backUpInfo.isLongDistance);
             let lastArrivalTime = null;
             let lastArrivalStop = null;
             let lastMaxDelay = null;
@@ -392,8 +409,8 @@ export class RaptorMeatAlgorithmController {
             meat += (targetStopInfo.arrivalTime * targetStopInfo.probability)
             probabilitySum += targetStopInfo.probability;
         }
-        console.log(probabilitySum);
-        console.log(meat);
+        // console.log(probabilitySum);
+        // console.log(meat);
         return meat;
     }
 

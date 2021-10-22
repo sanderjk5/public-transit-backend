@@ -474,7 +474,7 @@ export class ProfileConnectionScanAlgorithmController {
         let arrivalTimesPerStop: Map<string, number[]> = new Map<string, number[]>();
         // priority queue sorted by the departure times
         let priorityQueue = new FastPriorityQueue<SEntry>((a, b) => {
-            return a.departureTime > b.departureTime
+            return a.departureTime < b.departureTime
         });
         if(this.s[this.sourceStops[0]][0].departureTime === Number.MAX_VALUE){
             throw new Error("Couldn't find a connection.")
