@@ -15,6 +15,7 @@ import { Link } from "../../models/Link";
 import {Node} from "../../models/Node";
 import { Cluster } from "../../models/Cluster";
 import { Reliability } from "../../data/reliability";
+import { McRaptorAlgorithmController } from "./mcRaptorAlgorithmController";
 
 interface BackupInfo {
     departureStops: number[],
@@ -66,7 +67,7 @@ export class RaptorMeatAlgorithmController {
             }
 
             // calculates the maximum arrival time of the alpha bounded version of the algorithm
-            this.maxArrivalTime = this.earliestSafeArrivalTime + 1 * (this.earliestSafeArrivalTime - this.minDepartureTime);
+            this.maxArrivalTime = this.earliestSafeArrivalTime + 0.5 * (this.earliestSafeArrivalTime - this.minDepartureTime);
 
             // initializes the raptor algorithm
             this.init();
@@ -74,6 +75,7 @@ export class RaptorMeatAlgorithmController {
             // calls the raptor
             let meatResponse = this.performAlgorithm();
             console.timeEnd('raptor meat algorithm')
+            //McRaptorAlgorithmController.getJourneyPointersOfRaptorAlgorithm(this.sourceStops, this.targetStops, this.sourceDate, this.minDepartureTime, this.maxArrivalTime);
             // generates the http response which includes all information of the journey
             res.status(200).send(meatResponse);
         } catch (err) {
@@ -409,8 +411,8 @@ export class RaptorMeatAlgorithmController {
             meat += (targetStopInfo.arrivalTime * targetStopInfo.probability)
             probabilitySum += targetStopInfo.probability;
         }
-        // console.log(probabilitySum);
-        // console.log(meat);
+        console.log(probabilitySum);
+        console.log(meat);
         return meat;
     }
 

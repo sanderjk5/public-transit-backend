@@ -5,6 +5,7 @@ import { GoogleTransitData } from "./google-transit-data";
 import { Sorter } from "./sorter";
 import { Stop } from "../models/Stop";
 import { Calculator } from "./calculator";
+import { CHANGE_TIME } from "../constants";
 
 interface newStopMapEntry {
     stopId: number,
@@ -66,7 +67,7 @@ export class Generator {
                 id: GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.length,
                 departureStop: stop1.id,
                 arrivalStop: stop1.id,
-                duration: 0
+                duration: CHANGE_TIME,
             }
             GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.push(footpath);
             GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP.push(footpath);
@@ -79,7 +80,7 @@ export class Generator {
             //     // adds only foothpaths with a distance smaller than 1km
             //     if(distance < 1){
             //         // assume a speed of 4km/h
-            //         duration = Math.floor(15 * distance) * 60 + 60;
+            //         duration = Math.floor(15 * distance) * 60 + CHANGE_TIME;
             //         // creates reflexive footpaths
             //         let footpath: Footpath = {
             //             id: GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP.length,

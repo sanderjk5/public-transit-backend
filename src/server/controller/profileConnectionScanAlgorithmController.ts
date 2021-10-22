@@ -316,14 +316,8 @@ export class ProfileConnectionScanAlgorithmController {
                 finalFootpath: this.t[currentConnection.trip].finalFootpath,
             }
 
-            
-
             // profile function with minimum expected arrival time of departure stop
             // let q = this.s[currentConnection.departureStop][0];
-            if(GoogleTransitData.STOPS[currentConnection.arrivalStop].name === 'Karlsruhe-Knielingen' && currentConnection.departureStop === this.sourceStops[0] && time1 === timeC){
-                console.log('without footpath')
-                console.log(p)
-            }
             if(p.expectedArrivalTime !== Number.MAX_VALUE) {
                 // checks if q dominates p
                 // if(!this.dominates(q, p)){

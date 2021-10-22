@@ -7,9 +7,10 @@ import { Section } from "../../models/Section";
 import express from "express";
 import { performance } from 'perf_hooks';
 import { Calculator } from "../../data/calculator";
-import { SECONDS_OF_A_DAY } from "../../constants";
+import { CHANGE_TIME, SECONDS_OF_A_DAY } from "../../constants";
 import { Reliability } from "../../data/reliability";
 import { JourneyPointerRaptor } from "../../models/JourneyPointerRaptor";
+import { McRaptorAlgorithmController } from "./mcRaptorAlgorithmController";
 
 // entries of the q array
 interface QEntry {
@@ -141,7 +142,7 @@ export class RaptorAlgorithmController {
             // traverses each route and updates earliest arrival times
             this.traverseRoutes(k, targetStops);
             // updates earliest arrival times with footpaths of marked stops
-            this.handleFootpaths(k);
+            // this.handleFootpaths(k);
             // termination condition
             if(this.markedStops.length === 0){
                 break;
@@ -322,7 +323,7 @@ export class RaptorAlgorithmController {
                 }
                 
                 // checks if it is possible to catch an earlier trip at pi in round k
-                if(stopTime && this.earliestArrivalTimePerRound[k-1][pi] < departureTime){
+                if(stopTime && this.earliestArrivalTimePerRound[k-1][pi] + CHANGE_TIME < departureTime){
                     let newT = this.getEarliestTrip(r, pi, k);
                     if(t !== newT.tripId || dayOffset !== newT.dayOffset){
                         tripInfo = newT;
@@ -403,6 +404,9 @@ export class RaptorAlgorithmController {
         }
 
         let earliestArrival = this.earliestArrivalTimePerRound[k-1][pi];
+        if(k > 1){
+            earliestArrival += CHANGE_TIME;
+        }
         let earliestArrivalDayOffset = Converter.getDayOffset(earliestArrival);
         let previousDay = false;
         let currentWeekday = Calculator.moduloSeven(this.sourceWeekday + Converter.getDayDifference(earliestArrival));
@@ -547,7 +551,7 @@ export class RaptorAlgorithmController {
                         arrivalTime: Converter.secondsToTime(arrivalTime),
                         departureStop: stopName,
                         arrivalStop: stopName,
-                        duration: Converter.secondsToTime(0),
+                        duration: Converter.secondsToTime(CHANGE_TIME),
                         type: 'Footpath'
                     }
                     sections.push(section);
