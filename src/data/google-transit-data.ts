@@ -8,6 +8,7 @@ import { Trip } from "../models/Trip";
 import { Agency } from "../models/Agency";
 import { Connection } from "../models/Connection";
 import { RouteStopMapping } from "../models/RouteStopMapping";
+import { SECONDS_OF_A_DAY } from "../constants";
 
 
 export class GoogleTransitData {
@@ -155,5 +156,21 @@ export class GoogleTransitData {
             }
         }
         return stopTimes;
+    }
+
+    public static getAllArrivalTimesOfAStopInATimeRange(stopId: number, earliestArrival: number, latestArrival: number): number[] {
+        let arrivalTimes: number[] = [];
+        for(let stopTime of this.STOPTIMES){
+            if(stopTime.stopId === stopId && stopTime.arrivalTime >= earliestArrival && stopTime.arrivalTime <= latestArrival && !arrivalTimes.includes(stopTime.arrivalTime)){
+                arrivalTimes.push(stopTime.arrivalTime);
+            }
+            if(stopTime.stopId === stopId && stopTime.arrivalTime + SECONDS_OF_A_DAY >= earliestArrival && stopTime.arrivalTime + SECONDS_OF_A_DAY <= latestArrival && !arrivalTimes.includes(stopTime.arrivalTime + SECONDS_OF_A_DAY)){
+                arrivalTimes.push(stopTime.arrivalTime + SECONDS_OF_A_DAY);
+            }
+        }
+        arrivalTimes.sort((a, b) => {
+            return a - b;
+        })
+        return arrivalTimes;
     }
 }

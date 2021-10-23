@@ -10,39 +10,62 @@ import { MeatResponse } from "../../models/MeatResponse";
 import { DecisionGraph } from "../../models/DecisionGraph";
 import { TempNode } from "../../models/TempNode";
 import { TempEdge } from "../../models/TempEdge";
-import { MAX_D_C_LONG, MAX_D_C_NORMAL } from "../../constants";
+import { CHANGE_TIME, MAX_D_C_LONG, MAX_D_C_NORMAL, SECONDS_OF_A_DAY } from "../../constants";
 import { Link } from "../../models/Link";
 import {Node} from "../../models/Node";
 import { Cluster } from "../../models/Cluster";
 import { Reliability } from "../../data/reliability";
 import { McRaptorAlgorithmController } from "./mcRaptorAlgorithmController";
+import { RouteStopMapping } from "../../models/RouteStopMapping";
+import { StopTime } from "../../models/StopTime";
+import { JourneyPointerRaptor } from "../../models/JourneyPointerRaptor";
 
-interface BackupInfo {
-    departureStops: number[],
-    arrivalTime: number,
-    lastDepartureTime: number,
-    safeTime: number,
-    probability: number,
-    isLongDistance: boolean,
+// entries of the q array
+interface QEntry {
+    r: number,
+    p: number,
+    stopSequence: number
 }
 
-interface TargetStopInfo {
-    arrivalTime: number,
-    probability: number,
+// stores the information about the earliest trip
+interface EarliestTripInfo {
+    tripId: number,
+    tripArrival: number,
+    dayOffset: number,
 }
+
+interface Label {
+    arrivalTime: number,
+    departureTime?: number,
+    associatedTrip?: EarliestTripInfo,
+    exitTripAtStop?: number,
+    round: number,
+}
+
 export class RaptorMeatAlgorithmController {
     private static sourceStops: number[];
     private static targetStops: number[];
 
     private static minDepartureTime: number;
-    private static earliestArrivalTime: number;
-    private static earliestSafeArrivalTime: number;
+    private static earliestArrivalTimeCSA: number;
+    private static earliestSafeArrivalTimeCSA: number;
     private static maxArrivalTime: number;
+    private static earliestArrivalTimes: number[];
 
     private static sourceWeekday: number;
     private static sourceDate: Date;
 
-    private static targetStopInfos: TargetStopInfo[];
+    // stores for each round k and each stop the earliest arrival time
+    private static earliestArrivalTimePerRound: Label[][][];
+    // stores the marked stops of the current round
+    private static markedStops: number[];
+    // stores the route-stop pairs of the marked stops
+    private static Q: QEntry[];
+    // stores the journey pointer for each stop
+    private static j: JourneyPointerRaptor[];
+
+    private static arrivalTimesOfTarget: number[];
+
 
     public static raptorMeatAlgorithm(req: express.Request, res: express.Response) {
         try {
@@ -60,664 +83,448 @@ export class RaptorMeatAlgorithmController {
             this.sourceDate = new Date(req.query.date);
             this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
 
-            this.earliestArrivalTime = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, false);
-            this.earliestSafeArrivalTime = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, true);
-            if(this.earliestArrivalTime === null || this.earliestSafeArrivalTime === null) {
+            console.time('csa algorithms')
+            // gets the minimum times from the normal csa algorithm
+            this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, false);
+            this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, true);
+            if(this.earliestSafeArrivalTimeCSA === null || this.earliestArrivalTimeCSA === null) {
                 throw new Error("Couldn't find a connection.")
             }
-
+            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+            this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(req.query.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
+            console.timeEnd('csa algorithms')
             // calculates the maximum arrival time of the alpha bounded version of the algorithm
-            this.maxArrivalTime = this.earliestSafeArrivalTime + 0.5 * (this.earliestSafeArrivalTime - this.minDepartureTime);
+            
 
             // initializes the raptor algorithm
             this.init();
             console.time('raptor meat algorithm')
             // calls the raptor
-            let meatResponse = this.performAlgorithm();
+            this.performAlgorithm();
             console.timeEnd('raptor meat algorithm')
+            console.log(this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][this.sourceStops[0]])
+            console.log(Converter.secondsToTime(this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][this.sourceStops[0]][0].arrivalTime))
+            console.log(Converter.secondsToTime(this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][this.sourceStops[0]][0].departureTime))
             //McRaptorAlgorithmController.getJourneyPointersOfRaptorAlgorithm(this.sourceStops, this.targetStops, this.sourceDate, this.minDepartureTime, this.maxArrivalTime);
             // generates the http response which includes all information of the journey
-            res.status(200).send(meatResponse);
+            res.status(200).send();
         } catch (err) {
             console.log(err);
             res.status(500).send(err);
         }
     }
 
-    private static performAlgorithm(){
-        let tempEdges: TempEdge[] = [];
-        let arrivalTimesPerStop: Map<string, number[]> = new Map<string, number[]>();
-        let priorityQueue = new FastPriorityQueue<BackupInfo>((a, b) => {
-            if(a.lastDepartureTime === b.lastDepartureTime){
-                return GoogleTransitData.STOPS[a.departureStops[0]].name < GoogleTransitData.STOPS[b.departureStops[0]].name
-            } else {
-                return a.lastDepartureTime < b.lastDepartureTime
-            }
-        });
-        let journeyPointers = RaptorAlgorithmController.getJourneyPointersOfRaptorAlgorithm(this.sourceStops, this.targetStops, this.sourceDate, this.minDepartureTime);
-
-        let probability = 1;
-
-        let lastArrivalTime = null;
-        let lastArrivalStop = null;
-        let isLastTripLongDistance = null;
-        let lastMaxDelay = null;
-        for(let journeyPointer of journeyPointers){
-            let departureTime = journeyPointer.departureTime;
-            let arrivalTime = journeyPointer.arrivalTime;
-            let departureStop = journeyPointer.enterTripAtStop;
-            let arrivalStop = journeyPointer.exitTripAtStop;
-            let tripId = journeyPointer.tripId;
-
-            let tempEdge: TempEdge = {
-                departureStop: GoogleTransitData.STOPS[departureStop].name,
-                arrivalStop: GoogleTransitData.STOPS[arrivalStop].name,
-                departureTime: departureTime,
-                arrivalTime: arrivalTime,
-                type: 'Train',
-            }
-            tempEdges.push(tempEdge);
-
-            if(arrivalTimesPerStop.get(tempEdge.arrivalStop) === undefined) {
-                arrivalTimesPerStop.set(tempEdge.arrivalStop, [tempEdge.arrivalTime]);
-            } else {
-                arrivalTimesPerStop.get(tempEdge.arrivalStop).push(tempEdge.arrivalTime);
-            }
-
-            if(lastArrivalTime !== null && lastMaxDelay !== null){
-                if(lastArrivalTime + lastMaxDelay >= departureTime){
-                    const backUpInfo: BackupInfo = {
-                        departureStops: [lastArrivalStop],
-                        arrivalTime: lastArrivalTime,
-                        lastDepartureTime: departureTime,
-                        safeTime: lastArrivalTime + lastMaxDelay,
-                        probability: probability * (1 - Reliability.getReliability(-1, departureTime - lastArrivalTime, isLastTripLongDistance)),
-                        isLongDistance: isLastTripLongDistance,
-                    }
-                    priorityQueue.add(backUpInfo);
+    /**
+     * Performs the raptor algorithm.
+     * @param targetStops 
+     */
+     private static performAlgorithm(){
+        for(let l = this.arrivalTimesOfTarget.length-1; l >= 0; l--){
+            for(let i = 0; i < this.targetStops.length; i++) {
+                let targetStop = this.targetStops[i];
+                let label: Label = {
+                    arrivalTime: this.arrivalTimesOfTarget[l],
+                    departureTime: this.arrivalTimesOfTarget[l],
+                    round: 0,
                 }
-                probability = probability * Reliability.getReliability(-1, departureTime - lastArrivalTime, isLastTripLongDistance);
+                this.earliestArrivalTimePerRound[0][targetStop].unshift(label);
+                this.markedStops.push(targetStop);
             }
-            lastArrivalStop = arrivalStop;
-            lastArrivalTime = arrivalTime;
-            lastMaxDelay = MAX_D_C_NORMAL;
-            isLastTripLongDistance = false;
-            if(GoogleTransitData.TRIPS[tripId].isLongDistance){
-                lastMaxDelay = MAX_D_C_LONG;
-                isLastTripLongDistance = true;
-            }
-            if(this.targetStops.includes(arrivalStop)){
-                let expectedDelay = Reliability.normalDistanceExpectedValue;
-                if(isLastTripLongDistance){
-                    expectedDelay = Reliability.longDistanceExpectedValue;
-                }
-                const targetStopInfo: TargetStopInfo = {
-                    arrivalTime: arrivalTime + expectedDelay,
-                    probability: probability,
-                }
-                this.targetStopInfos.push(targetStopInfo);
-            }
-        }
-        while(!priorityQueue.isEmpty()){
-            let backUpInfo = priorityQueue.poll();
-            let nextBackInfo = priorityQueue.peek();
-            while(nextBackInfo && backUpInfo.lastDepartureTime === nextBackInfo.lastDepartureTime && GoogleTransitData.STOPS[backUpInfo.departureStops[0]].name === GoogleTransitData.STOPS[nextBackInfo.departureStops[0]].name){
-                priorityQueue.poll();
-                backUpInfo.probability += nextBackInfo.probability;
-                nextBackInfo = priorityQueue.peek();
-            }
-            let journeyPointers = RaptorAlgorithmController.getJourneyPointersOfRaptorAlgorithm(backUpInfo.departureStops, this.targetStops, this.sourceDate, backUpInfo.lastDepartureTime+0.1);
-            probability = backUpInfo.probability;
-            if(journeyPointers[0].departureTime <= backUpInfo.safeTime){
-                let updatedBackupInfo: BackupInfo = {
-                    departureStops: backUpInfo.departureStops,
-                    arrivalTime: backUpInfo.arrivalTime,
-                    lastDepartureTime: journeyPointers[0].departureTime,
-                    safeTime: backUpInfo.safeTime,
-                    probability: probability * (1 - Reliability.getReliability(-1, journeyPointers[0].departureTime - backUpInfo.arrivalTime, backUpInfo.isLongDistance)),
-                    isLongDistance: backUpInfo.isLongDistance,
-                }
-                priorityQueue.add(updatedBackupInfo);
-            }
-            probability = probability * Reliability.getReliability(-1, journeyPointers[0].departureTime - backUpInfo.arrivalTime, backUpInfo.isLongDistance);
-            let lastArrivalTime = null;
-            let lastArrivalStop = null;
-            let lastMaxDelay = null;
-            let isLastTripLongDistance = null;
-            for(let journeyPointer of journeyPointers){
-                let departureTime = journeyPointer.departureTime;
-                let arrivalTime = journeyPointer.arrivalTime;
-                let departureStop = journeyPointer.enterTripAtStop;
-                let arrivalStop = journeyPointer.exitTripAtStop;
-                let tripId = journeyPointer.tripId;
-    
-                let tempEdge: TempEdge = {
-                    departureStop: GoogleTransitData.STOPS[departureStop].name,
-                    arrivalStop: GoogleTransitData.STOPS[arrivalStop].name,
-                    departureTime: departureTime,
-                    arrivalTime: arrivalTime,
-                    type: 'Train',
-                }
-                tempEdges.push(tempEdge);
-                if(arrivalTimesPerStop.get(tempEdge.arrivalStop) === undefined) {
-                    arrivalTimesPerStop.set(tempEdge.arrivalStop, [tempEdge.arrivalTime]);
-                } else {
-                    arrivalTimesPerStop.get(tempEdge.arrivalStop).push(tempEdge.arrivalTime);
-                }
-    
-                if(lastArrivalTime !== null && lastMaxDelay !== null){
-                    if(lastArrivalTime + lastMaxDelay >= departureTime){
-                        const backUpInfo: BackupInfo = {
-                            departureStops: [lastArrivalStop],
-                            arrivalTime: lastArrivalTime,
-                            lastDepartureTime: departureTime,
-                            safeTime: lastArrivalTime + lastMaxDelay,
-                            probability: probability * (1 - Reliability.getReliability(-1, departureTime - lastArrivalTime, isLastTripLongDistance)),
-                            isLongDistance: isLastTripLongDistance,
-                        }
-                        priorityQueue.add(backUpInfo);
-                    }
-                    probability = probability * Reliability.getReliability(-1, departureTime - lastArrivalTime, isLastTripLongDistance);
-                }
-                lastArrivalStop = arrivalStop;
-                lastArrivalTime = arrivalTime;
-                lastMaxDelay = MAX_D_C_NORMAL;
-                isLastTripLongDistance = false;
-                if(GoogleTransitData.TRIPS[tripId].isLongDistance){
-                    lastMaxDelay = MAX_D_C_LONG;
-                    isLastTripLongDistance = true;
-                }
-                if(this.targetStops.includes(arrivalStop)){
-                    let expectedDelay = Reliability.normalDistanceExpectedValue;
-                    if(isLastTripLongDistance){
-                        expectedDelay = Reliability.longDistanceExpectedValue;
-                    }
-                    const targetStopInfo: TargetStopInfo = {
-                        arrivalTime: arrivalTime + expectedDelay,
-                        probability: probability,
-                    }
-                    this.targetStopInfos.push(targetStopInfo);
-                }
-            }
-        }
-        return this.getMeatResponse(tempEdges, arrivalTimesPerStop);
-    }
-
-    private static getMeatResponse(expandedTempEdges: TempEdge[], arrivalTimesPerStop: Map<string, number[]>) {
-        // sets the common values of the journey
-        let meatResponse: MeatResponse = {
-            sourceStop: GoogleTransitData.STOPS[this.sourceStops[0]].name,
-            targetStop: GoogleTransitData.STOPS[this.targetStops[0]].name,
-            meatTime: Converter.secondsToTime(this.calculateMeat()),
-            eatTime: Converter.secondsToTime(this.earliestArrivalTime),
-            esatTime: Converter.secondsToTime(this.earliestSafeArrivalTime),
-            expandedDecisionGraph: {
-                nodes: [],
-                links: [],
-                clusters: [],
-            },
-            compactDecisionGraph: {
-                nodes: [],
-                links: [],
-                clusters: [],
-            }
-        }
-        let expandedDecisionGraph: DecisionGraph = {
-            nodes: [],
-            links: [],
-            clusters: [],
-        };     
-        let compactDecisionGraph: DecisionGraph = {
-            nodes: [],
-            links: [],
-            clusters: [],
-        }
-        let idCounter = 0;
-        let tempNodes: TempNode[] = [];
-        let tempNodeArr: TempNode;
-        let tempNodeDep: TempNode;
-        let edge: Link;
-        //expandedTempEdges = this.getDepartureTimesOfFootpaths(arrivalTimesPerStop, expandedTempEdges);
-        // sorts the edges and eliminates duplicates
-        expandedTempEdges.sort((a: TempEdge, b: TempEdge) => {
-            return this.sortByDepartureTime(a, b);
-        })
-        expandedTempEdges = this.removeDuplicateEdges(expandedTempEdges);
-        // uses the temp edges to create temp nodes and edges
-        for(let tempEdge of expandedTempEdges){
-            tempNodeDep = {
-                id: 'id_' + idCounter.toString(),
-                stop: tempEdge.departureStop,
-                time: tempEdge.departureTime,
-                type: 'departure',
-            }
-            tempNodes.push(tempNodeDep);
-            idCounter++;
-            tempNodeArr = {
-                id: 'id_' + idCounter.toString(),
-                stop: tempEdge.arrivalStop,
-                time: tempEdge.arrivalTime,
-                type: 'arrival',
-            }
-            tempNodes.push(tempNodeArr);
-            idCounter++;
-            edge = {
-                id: 'id_' + idCounter.toString(),
-                source: tempNodeDep.id,
-                target: tempNodeArr.id,
-                label: tempEdge.type,
-            }
-            expandedDecisionGraph.links.push(edge);
-            idCounter++;
-        }
-        // sorts nodes and eliminates duplicates
-        tempNodes.sort((a: TempNode, b: TempNode) => {
-            return this.sortByTime(a, b);
-        })
-        tempNodes = this.removeDuplicateNodes(tempNodes, expandedDecisionGraph.links);
-        let node: Node;
-        let cluster: Cluster;
-        // uses the temp nodes to create nodes and clusters
-        for(let tempNode of tempNodes){
-            node = {
-                id: tempNode.id,
-                label: Converter.secondsToTime(tempNode.time)
-            }
-            expandedDecisionGraph.nodes.push(node);
-            let createCluster = true;
-            for(let cluster of expandedDecisionGraph.clusters){
-                if(cluster.label === tempNode.stop){
-                    createCluster = false;
-                    cluster.childNodeIds.push(node.id);
+            let k = 0;
+            while(true){
+                // increases round counter
+                // console.log(this.earliestArrivalTimePerRound[k][this.sourceStops[0]]);
+                k++;
+                // adds an empty array to the earliest arrival times
+                this.addNextArrivalTimeRound(k);
+                // fills the array of route-stop pairs
+                this.fillQ();
+                // traverses each route and updates earliest arrival times
+                this.traverseRoutes(k);
+                // updates earliest arrival times with footpaths of marked stops
+                //this.handleFootpaths(k);
+                // termination condition
+                if(this.markedStops.length === 0){
                     break;
                 }
             }
-            if(createCluster){
-                cluster = {
-                    id: 'id_' + idCounter.toString(),
-                    label: tempNode.stop,
-                    childNodeIds: [node.id],
-                }
-                expandedDecisionGraph.clusters.push(cluster);
-                idCounter++;
-            }
-        }
-        meatResponse.expandedDecisionGraph = expandedDecisionGraph;
-        let compactTempEdges: TempEdge[] = this.getCompactTempEdges(expandedTempEdges);
-        let arrivalTimeStringOfTarget = this.getArrivalTimeArrayOfTargetStop(expandedTempEdges);
-        let arrivalStops = new Map<string, string>();
-        let departureNode: Node;
-        for(let compactTempEdge of compactTempEdges){
-            if(compactTempEdge.departureStop === GoogleTransitData.STOPS[this.sourceStops[0]].name){
-                cluster = {
-                    id: 'id_' + idCounter.toString(),
-                    label: compactTempEdge.departureStop,
-                    childNodeIds: [],
-                }
-                compactDecisionGraph.clusters.push(cluster);
-                idCounter++;
-            }
-            departureNode = {
-                id: 'id_' + idCounter.toString(),
-                label: Converter.secondsToTime(compactTempEdge.departureTime), 
-            }
-            if(compactTempEdge.lastDepartureTime !== undefined){
-                departureNode.label = departureNode.label + ' - ' + Converter.secondsToTime(compactTempEdge.lastDepartureTime);
-            }
-            compactDecisionGraph.nodes.push(departureNode);
-            idCounter++;
-            for(let cluster of compactDecisionGraph.clusters){
-                if(cluster.label === compactTempEdge.departureStop){
-                    cluster.childNodeIds.push(departureNode.id);
-                    break;
-                }
-            }
-            if(arrivalStops.get(compactTempEdge.arrivalStop) === undefined){
-                node = {
-                    id: 'id_' + idCounter.toString(),
-                    label: ' ',
-                }
-                if(compactTempEdge.arrivalStop === GoogleTransitData.STOPS[this.targetStops[0]].name){
-                    node.label = arrivalTimeStringOfTarget;
-                }
-                compactDecisionGraph.nodes.push(node);
-                arrivalStops.set(compactTempEdge.arrivalStop, node.id);
-                idCounter++;
-                cluster = {
-                    id: 'id_' + idCounter.toString(),
-                    label: compactTempEdge.arrivalStop,
-                    childNodeIds: [node.id],
-                }
-                compactDecisionGraph.clusters.push(cluster);
-                idCounter++;
-            }
-            edge = {
-                id: 'id_' + idCounter.toString(),
-                source: departureNode.id,
-                target: arrivalStops.get(compactTempEdge.arrivalStop),
-                label: compactTempEdge.type,
-            }
-            compactDecisionGraph.links.push(edge);
-            idCounter++;
-        }
-        meatResponse.compactDecisionGraph = compactDecisionGraph;
-        return meatResponse;
-    }
-
-    private static calculateMeat(){
-        let meat = 0;
-        let probabilitySum = 0;
-        for(let targetStopInfo of this.targetStopInfos){
-            meat += (targetStopInfo.arrivalTime * targetStopInfo.probability)
-            probabilitySum += targetStopInfo.probability;
-        }
-        console.log(probabilitySum);
-        console.log(meat);
-        return meat;
-    }
-
-    private static init() {
-        this.targetStopInfos = [];
-    }
-
-    /**
-     * Sorts temp edges by departure time, arrival time, source stop, target stop and type.
-     * @param a 
-     * @param b 
-     * @returns 
-     */
-     private static sortByDepartureTime(a: TempEdge, b: TempEdge){
-        if(a.departureTime < b.departureTime){
-            return -1;
-        }
-        if(a.departureTime === b.departureTime){
-            if(a.arrivalTime < b.arrivalTime){
-                return -1;
-            }
-            if(a.arrivalTime === b.arrivalTime){
-                if(a.departureStop < b.departureStop){
-                    return -1;
-                }
-                if(a.departureStop === b.departureStop){
-                    if(a.arrivalStop < b.arrivalStop){
-                        return -1;
-                    }
-                    if(a.arrivalStop === b.arrivalStop){
-                        if(a.type < b.type){
-                            return -1;
-                        }
-                        if(a.type === b.type){
-                            return 0;
-                        }
-                        if(a.type > b.type){
-                            return 1;
-                        }
-                    }
-                    if(a.arrivalStop > b.arrivalStop){
-                        return 1;
-                    }
-                }
-                if(a.departureStop > b.departureStop){
-                    return 1;
-                }
-            }
-            if(a.arrivalTime > b.arrivalTime){
-                return 1;
-            }
-        }
-        if(a.departureTime > b.departureTime){
-            return 1
         }
     }
 
     /**
-     * Sorts temp edges by source stop, target stop, type and departure time.
-     * @param a 
-     * @param b 
-     * @returns 
+     * Initializes the required arrays.
+     * @param sourceStops 
+     * @param sourceTime 
      */
-     private static sortByDepartureStop(a: TempEdge, b: TempEdge){
-        if(a.departureStop < b.departureStop){
-            return -1;
+    private static init(){
+        const numberOfStops = GoogleTransitData.STOPS.length;
+        const firstRoundLabels: Label[][] = new Array(numberOfStops);
+        this.earliestArrivalTimePerRound = [];
+        this.markedStops = [];
+        this.j = new Array(numberOfStops);
+
+        const defaultLabel: Label = {
+            arrivalTime: Number.MAX_VALUE,
+            departureTime: Number.MAX_VALUE,
+            round: 0,
         }
-        if(a.departureStop === b.departureStop){
-            if(a.arrivalStop < b.arrivalStop){
-                return -1;
-            }
-            if(a.arrivalStop === b.arrivalStop){
-                if(a.type < b.type){
-                    return -1;
-                }
-                if(a.type === b.type){
-                    if(a.departureTime < b.departureTime){
-                        return -1;
-                    }
-                    if(a.departureTime === b.departureTime){
-                        return 0;
-                    }
-                    if(a.departureTime > b.departureTime){
-                        return 1;
-                    }
-                }
-                if(a.type > b.type){
-                    return 1;
-                }
-            }
-            if(a.arrivalStop > b.arrivalStop){
-                return 1;
-            }
+        for(let i = 0; i < numberOfStops; i++) {
+            firstRoundLabels[i] = [defaultLabel];
         }
-        if(a.departureStop > b.departureStop){
-            return 1
-        }
+
+        this.arrivalTimesOfTarget = GoogleTransitData.getAllArrivalTimesOfAStopInATimeRange(this.targetStops[0], this.earliestArrivalTimeCSA, this.maxArrivalTime);
+        console.log(this.arrivalTimesOfTarget.length)
+        
+        this.earliestArrivalTimePerRound.push(firstRoundLabels);
+
+        // updates the footpaths of the source stops
+        // for(let i = 0; i < sourceStops.length; i++) {
+        //     let sourceStop = sourceStops[i];
+        //     let sourceFootpaths = GoogleTransitData.getAllFootpathsOfADepartureStop(sourceStop);
+        //     for(let j = 0; j < sourceFootpaths.length; j++){
+        //         let p = sourceFootpaths[j].departureStop;
+        //         let pN = sourceFootpaths[j].arrivalStop;
+        //         if(p !== pN && this.earliestArrivalTimePerRound[0][pN] > (this.earliestArrivalTimePerRound[0][p] + sourceFootpaths[j].duration)){
+        //             this.earliestArrivalTimePerRound[0][pN] = this.earliestArrivalTimePerRound[0][p] + sourceFootpaths[j].duration;
+        //             if(!this.markedStops.includes(pN)){
+        //                 this.markedStops.push(pN);
+        //             }
+        //             if(this.earliestArrivalTimePerRound[0][pN] < this.earliestArrivalTime[pN]){
+        //                 this.earliestArrivalTime[pN] = this.earliestArrivalTimePerRound[0][pN];
+        //                 this.j[pN] = {
+        //                     enterTripAtStop: p,
+        //                     departureTime: this.earliestArrivalTimePerRound[0][p],
+        //                     arrivalTime: this.earliestArrivalTime[pN],
+        //                     tripId: null,
+        //                     footpath: sourceFootpaths[j].id
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
     }
 
-    private static sortByDepartureStopAndDepartureTime(a: TempEdge, b: TempEdge){
-        if(a.departureStop < b.departureStop){
-            return -1;
-        }
-        if(a.departureStop === b.departureStop){
-            if(a.departureTime < b.departureTime){
-                return -1;
+    /**
+     * Adds an empty array to the earliestArrivalTimePerRound array which can be used in the next round.
+     */
+    private static addNextArrivalTimeRound(k: number) {
+        if(this.earliestArrivalTimePerRound.length <= k){
+            const nextRoundLabels: Label[][] = this.earliestArrivalTimePerRound[k-1];
+            this.earliestArrivalTimePerRound.push(nextRoundLabels);
+        } else {
+            for(let pi of GoogleTransitData.STOPS){
+                this.mergeBagInRoundBag(this.earliestArrivalTimePerRound[k-1][pi.id], pi.id, k)
             }
-            if(a.departureTime === b.departureTime){
-                return 0;
-            }
-            if(a.departureTime > b.departureTime){
-                return 1;
-            }
-        }
-        if(a.departureStop > b.departureStop){
-            return 1
         }
     }
 
     /**
-     * Sorts tempNodes by time, stop and type.
-     * @param a 
-     * @param b 
-     * @returns 
+     * Fills the Q-Array with route-stop pairs.
      */
-    private static sortByTime(a: TempNode, b: TempNode){
-        if(a.time < b.time){
-            return -1;
-        }
-        if(a.time === b.time){
-            if(a.stop < b.stop){
-                return -1;
-            }
-            if(a.stop === b.stop){
-                if(a.type < b.type){
-                    return -1;
+    private static fillQ() {
+        this.Q = [];
+        let qTemp: QEntry[] = [];
+        // stores the last stop of each route
+        let routeSequenceMaxima = new Array(GoogleTransitData.ROUTES.length);
+        // loop over all marked stops
+        while(this.markedStops.length > 0){
+            let markedStop = this.markedStops.pop();
+            // gets all routes which serves the current stop
+            let routesServingStop: RouteStopMapping[] = GoogleTransitData.ROUTES_SERVING_STOPS[markedStop];
+            // adds all route-stop pairs with the related sequence number to qTemp
+            for(let i = 0; i < routesServingStop.length; i++) {
+                let routeId = routesServingStop[i].routeId;
+                let stopSequence = routesServingStop[i].stopSequence;
+                // sets the minimal sequence number for each route
+                if(routeSequenceMaxima[routeId] === undefined || stopSequence > routeSequenceMaxima[routeId]){
+                    routeSequenceMaxima[routeId] = stopSequence;
                 }
-                if(a.type === b.type){
-                    return 0;
-                }
-                if(a.type > b.type){
-                    return 1;
-                }
-            }
-            if(a.stop > b.stop){
-                return 1;
+                qTemp.push({r: routeId, p: markedStop, stopSequence: stopSequence});
             }
         }
-        if(a.time > b.time){
-            return 1;
+        // uses qTemp and routeSequenceMaxima to add the last route-stop pair of each route to Q
+        for(let i = 0; i < qTemp.length; i++){
+            let qEntry = qTemp[i];
+            if(routeSequenceMaxima[qEntry.r] === qEntry.stopSequence){
+                this.Q.push(qEntry);
+                routeSequenceMaxima[qEntry.r] = -1;
+            }
         }
     }
 
-    private static getDepartureTimesOfFootpaths(arrivalTimesPerStop: Map<string, number[]>, expandedTempEdges: TempEdge[]){
-        expandedTempEdges.sort((a, b) => {
-            return this.sortByDepartureStopAndDepartureTime(a, b);
-        });
-        let lastDepartureStop: string = expandedTempEdges[0].departureStop;
-        let lastArrivalTimes = arrivalTimesPerStop.get(lastDepartureStop);
-        if(lastArrivalTimes !== undefined){
-            lastArrivalTimes.push(Number.MAX_VALUE);
-            lastArrivalTimes.sort((a, b) => a-b);
-        }
-        let lastArrivalTimeIndex = 0;
-        for(let tempEdge of expandedTempEdges){
-            if(tempEdge.departureStop !== lastDepartureStop){
-                lastDepartureStop = tempEdge.departureStop;
-                lastArrivalTimes = arrivalTimesPerStop.get(lastDepartureStop);
-                if(lastArrivalTimes === undefined){
+    /**
+     * Traverses each route and updates the earliest arrival times after k changes.
+     * @param k 
+     * @param targetStops 
+     */
+    private static traverseRoutes(k: number) {
+        // loop over all elements of q
+        console.log(k)
+        for(let i= 0; i < this.Q.length; i++){
+            let r = this.Q[i].r;
+            let p = this.Q[i].p;
+            let routeBag: Label[] = [];
+            let reachedP = false;
+            // loop over all stops of r beggining with p
+            for(let j = GoogleTransitData.STOPS_OF_A_ROUTE[r].length-1; j >= 0; j--){     
+                let pi = GoogleTransitData.STOPS_OF_A_ROUTE[r][j];
+                if(pi === p){
+                    reachedP = true;
+                    routeBag = this.mergeLastRoundLabelsInRouteBag(k, r, pi, routeBag);
                     continue;
                 }
-                lastArrivalTimes.push(Number.MAX_VALUE);
-                lastArrivalTimes.sort((a, b) => a-b);
-                lastArrivalTimeIndex = 1;
+                if(!reachedP){
+                    continue;
+                }
+
+                routeBag = this.updateRouteBag(routeBag, pi);
+
+                let addedLabel = this.mergeBagInRoundBag(routeBag, pi, k);
+                routeBag = this.mergeLastRoundLabelsInRouteBag(k, r, pi, routeBag);
+                // adds pi to the marked stops
+                if(addedLabel && !this.markedStops.includes(pi)){
+                    this.markedStops.push(pi);
+                }
+            
             }
-            if(tempEdge.type !== 'Footpath'){
+        }
+    }
+
+    private static mergeLastRoundLabelsInRouteBag(k: number, r: number, pi: number, routeBag: Label[]){
+        let lastRoundLabels = this.earliestArrivalTimePerRound[k-1][pi];
+        if(lastRoundLabels.length === 0){
+            return routeBag;
+        }
+        // first version:
+        let returnedTripInfos = new Map<number, number[]>();
+        for(let lastRoundLabel of lastRoundLabels){
+            if(lastRoundLabel.round !== k-1 || lastRoundLabel.arrivalTime === Number.MAX_VALUE){
                 continue;
             }
-            while(lastArrivalTimes[lastArrivalTimeIndex] <= tempEdge.departureTime){
-                lastArrivalTimeIndex++;
+            let newTripInfo: EarliestTripInfo = this.getLatestTrip(r, pi, k, lastRoundLabel.departureTime);
+            if(newTripInfo === null || (lastRoundLabel.associatedTrip && lastRoundLabel.associatedTrip.tripId === newTripInfo.tripId)){
+                continue;
             }
-            let duration = tempEdge.arrivalTime - tempEdge.departureTime;
-            tempEdge.departureTime = lastArrivalTimes[lastArrivalTimeIndex-1];
-            tempEdge.arrivalTime = tempEdge.departureTime + duration;
-        }
-        return expandedTempEdges;
-    }
-
-    /**
-     * Removes duplicate edges.
-     * @param edges 
-     * @returns 
-     */
-    private static removeDuplicateEdges(edges: TempEdge[]){
-        if(edges.length === 0){
-            return;
-        }
-        let lastEdge = edges[0];
-        for(let i = 1; i < edges.length; i++){
-            let currentEdge = edges[i];
-            if(currentEdge.departureStop === lastEdge.departureStop && currentEdge.arrivalStop === lastEdge.arrivalStop && currentEdge.departureTime === lastEdge.departureTime &&
-                currentEdge.arrivalTime === lastEdge.arrivalTime && currentEdge.type === lastEdge.type){
-                edges[i] = undefined;
+            let returnedDepartureTimesOfTrip = returnedTripInfos.get(newTripInfo.tripId);
+            if(returnedDepartureTimesOfTrip === undefined){
+                returnedTripInfos.set(newTripInfo.tripId, [newTripInfo.tripArrival]);
             } else {
-                lastEdge = edges[i];
-            }
-        }
-        return edges.filter(edge => edge !== undefined);
-    }
-
-    private static getCompactTempEdges(expandedTempEdges: TempEdge[]){
-        let compactTempEdges = [];
-        if(expandedTempEdges.length === 0){
-            return compactTempEdges;
-        }
-        let expandedTempEdgesCopy = expandedTempEdges;
-        expandedTempEdgesCopy.sort((a, b) => {
-            return this.sortByDepartureStop(a, b);
-        });
-        let firstDepartureTime = expandedTempEdges[0].departureTime;
-        let lastDepartureTime = undefined;
-        let currentDepartureStop = expandedTempEdges[0].departureStop;
-        let currentArrivalStop = expandedTempEdges[0].arrivalStop;
-        let currentType = expandedTempEdges[0].type;
-        for(let i = 1; i <= expandedTempEdgesCopy.length; i++){
-            let currentTempEdge = expandedTempEdgesCopy[i];
-            if(currentTempEdge && currentTempEdge.departureStop === currentDepartureStop && currentTempEdge.arrivalStop === currentArrivalStop && currentTempEdge.type === currentType) {
-                lastDepartureTime = currentTempEdge.departureTime;
-            } else {
-                let newTempEdge: TempEdge = {
-                    departureStop: currentDepartureStop,
-                    arrivalStop: currentArrivalStop,
-                    type: currentType,
-                    departureTime: firstDepartureTime,
-                    lastDepartureTime: lastDepartureTime,
-                }
-                compactTempEdges.push(newTempEdge);
-                if(currentTempEdge){
-                    firstDepartureTime = currentTempEdge.departureTime;
-                    lastDepartureTime = undefined;
-                    currentDepartureStop = currentTempEdge.departureStop;
-                    currentArrivalStop = currentTempEdge.arrivalStop;
-                    currentType = currentTempEdge.type;
+                if(returnedDepartureTimesOfTrip.includes(newTripInfo.tripArrival)){
+                    continue;
+                } else {
+                    returnedDepartureTimesOfTrip.push(newTripInfo.tripArrival);
+                    returnedTripInfos.set(newTripInfo.tripId, returnedDepartureTimesOfTrip)
                 }
             }
+            let newLabel: Label = {
+                arrivalTime: lastRoundLabel.arrivalTime,
+                associatedTrip: newTripInfo,
+                exitTripAtStop: pi,
+                round: k,
+            }
+            routeBag.push(newLabel);
         }
-        compactTempEdges.sort((a, b) => {
-            return this.sortByDepartureTime(a, b);
+        return routeBag;
+    }
+
+    private static updateRouteBag(routeBag: Label[], pi: number){
+        let newRouteBag: Label[] = [];
+        for(let label of routeBag){
+            let stopTime = GoogleTransitData.getStopTimeByTripAndStop(label.associatedTrip.tripId, pi);
+            let departureTime = stopTime.departureTime + label.associatedTrip.dayOffset;
+            if(departureTime > label.associatedTrip.tripArrival){
+                departureTime -= SECONDS_OF_A_DAY;
+            }
+            if(departureTime < this.earliestArrivalTimes[pi]){
+                continue;
+            }
+            let newLabel: Label = {
+                arrivalTime: label.arrivalTime,
+                departureTime: departureTime,
+                associatedTrip: label.associatedTrip,
+                exitTripAtStop: label.exitTripAtStop,
+                round: label.round,
+            }
+            newRouteBag.push(newLabel)
+        }
+        return newRouteBag;
+    }
+
+    private static mergeBagInRoundBag(bag: Label[], pi: number, k: number){
+        let addedLabel = false;
+        if(bag.length === 0){
+            return addedLabel;
+        }
+        bag.sort((a, b) => {
+            return b.departureTime - a.departureTime;
         })
-        return compactTempEdges;
-    }
 
-    private static getArrivalTimeArrayOfTargetStop(expandedTempEdges: TempEdge[]){
-        if(expandedTempEdges.length === 0){
-            return '';
-        }
-        let earliestArrivalTime = Number.MAX_VALUE;
-        let latestArrivalTime = 0;
-        for(let tempEdge of expandedTempEdges){
-            if(tempEdge.arrivalStop === GoogleTransitData.STOPS[this.targetStops[0]].name){
-                if(tempEdge.arrivalTime < earliestArrivalTime){
-                    earliestArrivalTime = tempEdge.arrivalTime;
+        for(let i = 0; i < bag.length; i++){
+            if(this.notDominatedInProfile(bag[i], pi, k)){
+                let shiftedLabels = [];
+                let currentLabel = this.earliestArrivalTimePerRound[k][pi][0];
+                while(bag[i].departureTime >= currentLabel.departureTime){
+                    let removedLabel = this.earliestArrivalTimePerRound[k][pi].shift()
+                    shiftedLabels.push(removedLabel);
+                    currentLabel = this.earliestArrivalTimePerRound[k][pi][0];
                 }
-                if(tempEdge.arrivalTime > latestArrivalTime){
-                    latestArrivalTime = tempEdge.arrivalTime;
+                this.earliestArrivalTimePerRound[k][pi].unshift(bag[i]);
+                for(let j = 0; j < shiftedLabels.length; j++) {
+                    let removedLabel = shiftedLabels[j];
+                    if(!this.dominates(bag[i], removedLabel)){
+                        this.earliestArrivalTimePerRound[k][pi].unshift(removedLabel);
+                    }
                 }
+                addedLabel = true;
             }
         }
-        let arrivalTimeString = Converter.secondsToTime(earliestArrivalTime);
-        if(earliestArrivalTime < latestArrivalTime){
-            arrivalTimeString += ' - ' + Converter.secondsToTime(latestArrivalTime);
+        return addedLabel;
+    }
+
+    private static dominates(q: Label, p: Label): boolean {
+        if(q.arrivalTime < p.arrivalTime) {
+            return true;
         }
-        return arrivalTimeString;
+        if(q.arrivalTime === p.arrivalTime && q.departureTime > p.departureTime) {
+            return true;
+        }
+        if(q.arrivalTime === p.arrivalTime && q.departureTime === p.departureTime && q.round <= p.round) {
+            return true;
+        }
+        return false;
+    }
+
+    private static notDominatedInProfile(p: Label, pi: number, k: number): boolean{
+        for(let q of this.earliestArrivalTimePerRound[k][pi]){
+            if(this.dominates(q, p)){
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
-     * Removes duplicate nodes and maps edge ids.
-     * @param nodes 
-     * @param edges 
+     * Uses the footpaths to update the earliest arrival times.
+     * @param k 
+     */
+    // private static handleFootpaths(k: number) {
+    //     // uses the arrival times before they are updated by footpaths
+    //     let numberOfMarkedStops = this.markedStops.length;
+    //     let arrivalTimesInRoundK = [];
+    //     for(let i = 0; i < numberOfMarkedStops; i++){
+    //         let markedStop = this.markedStops[i];
+    //         arrivalTimesInRoundK.push(this.earliestArrivalTimePerRound[k][markedStop])
+    //     }
+
+    //     // loop over all marked stops
+    //     for(let i = 0; i < numberOfMarkedStops; i++){
+    //         let markedStop = this.markedStops[i];
+    //         let arrivalTimeOfMarkedStop = arrivalTimesInRoundK[i];
+    //         let footPaths = GoogleTransitData.getAllFootpathsOfADepartureStop(markedStop);
+    //         for(let j = 0; j < footPaths.length; j++){
+    //             let p = footPaths[j].departureStop;
+    //             let pN = footPaths[j].arrivalStop;
+    //             // checks if the footpath minimizes the arrival time in round k
+    //             if(p !== pN && this.earliestArrivalTimePerRound[k][pN] > (arrivalTimeOfMarkedStop + footPaths[j].duration)){
+    //                 this.earliestArrivalTimePerRound[k][pN] = arrivalTimeOfMarkedStop + footPaths[j].duration;
+    //                 if(!this.markedStops.includes(pN)){
+    //                     this.markedStops.push(pN);
+    //                 }
+    //                 // checks if the new arrival time is smaller than the overall earliest arrival time
+    //                 if(this.earliestArrivalTimePerRound[k][pN] < this.earliestArrivalTime[pN]){
+    //                     this.earliestArrivalTime[pN] = this.earliestArrivalTimePerRound[k][pN];
+    //                     // updates the journey pointer
+    //                     this.j[pN] = {
+    //                         enterTripAtStop: p,
+    //                         departureTime: arrivalTimeOfMarkedStop,
+    //                         arrivalTime: this.earliestArrivalTime[pN],
+    //                         tripId: null,
+    //                         footpath: footPaths[j].id
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
+    /**
+     * Gets the earliest trip of route r which can be catched at stop pi in round k.
+     * @param r 
+     * @param pi 
+     * @param k 
      * @returns 
      */
-    private static removeDuplicateNodes(nodes: TempNode[], edges: Link[]){
-        if(nodes.length === 0){
-            return;
+    private static getLatestTrip(r: number, pi: number, k: number, earliestDeparture: number): EarliestTripInfo {
+        let tripId: number; 
+        let tripArrival: number = -1;
+        let earliestTripInfo: EarliestTripInfo;
+        
+        let stopTimes: StopTime[] = GoogleTransitData.getStopTimesByStopAndRoute(pi, r);
+
+        if(stopTimes.length === 0) {
+            earliestTripInfo = null;
+            return earliestTripInfo;
         }
-        let idMap = new Map<string, string>();
-        let lastNode = nodes[0];
-        for(let i = 1; i < nodes.length; i++){
-            let currentNode = nodes[i];
-            if(currentNode.stop === lastNode.stop && currentNode.time === lastNode.time && currentNode.type === lastNode.type){
-                idMap.set(currentNode.id, lastNode.id);
-                nodes[i] = undefined;
+
+        if(k > 1){
+            earliestDeparture -= CHANGE_TIME;
+        }
+
+        let earliestDepartureDayOffset = Converter.getDayOffset(earliestDeparture);
+        let previousDay = false;
+        let currentWeekday = Calculator.moduloSeven(this.sourceWeekday + Converter.getDayDifference(earliestDeparture));
+        let previousWeekday = Calculator.moduloSeven(currentWeekday - 1);
+        // loops over all stop times until it finds the first departure after the earliestArrival
+        for(let i = 7; i >= 0; i--) {
+            for(let j = stopTimes.length-1; j >= 0; j--) {
+                let stopTime = stopTimes[j];
+                let arrivalTime = stopTime.arrivalTime;
+                let serviceId = GoogleTransitData.TRIPS[stopTime.tripId].serviceId;
+                // checks if the trip is available and if it is a candidat for the earliest trip
+                if(GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday] && (arrivalTime + earliestDepartureDayOffset) <= earliestDeparture 
+                    && (arrivalTime + earliestDepartureDayOffset) > tripArrival) {
+                    tripId = stopTime.tripId;
+                    tripArrival = arrivalTime + earliestDepartureDayOffset;
+                    previousDay = false;
+                }
+                // checks if the trip corresponds to the previous day but could be catched at the current day
+                let arrivalTimeOfPreviousDay = arrivalTime - SECONDS_OF_A_DAY;
+                if(GoogleTransitData.CALENDAR[serviceId].isAvailable[previousWeekday] && arrivalTimeOfPreviousDay >= 0 
+                    && (arrivalTimeOfPreviousDay + earliestDepartureDayOffset) <= earliestDeparture && (arrivalTimeOfPreviousDay + earliestDepartureDayOffset) > tripArrival){
+                    tripId = stopTime.tripId;
+                    tripArrival = arrivalTimeOfPreviousDay + earliestDepartureDayOffset;
+                    previousDay = true;
+                }
+            }
+            if(tripId !== undefined){
+                break;
+            }
+            currentWeekday = previousWeekday;
+            previousWeekday = Calculator.moduloSeven(currentWeekday - 1);
+            earliestDepartureDayOffset -= SECONDS_OF_A_DAY;
+        }
+        
+        
+        if(tripId !== undefined){
+            // checks if it found a trip at the same day
+            let dayOffset: number;
+            if(previousDay) {
+                dayOffset = earliestDepartureDayOffset-SECONDS_OF_A_DAY;
             } else {
-                lastNode = nodes[i];
+                dayOffset = earliestDepartureDayOffset;
             }
+            // updates the earliest trip information
+            earliestTripInfo = {
+                tripId: tripId,
+                tripArrival: tripArrival,
+                dayOffset: dayOffset,
+            }
+        } else {
+            // return null if there are no stop times at this stop
+            earliestTripInfo = null
         }
-        for(let edge of edges){
-            if(idMap.get(edge.source) !== undefined){
-                edge.source = idMap.get(edge.source);
-            }
-            if(idMap.get(edge.target) !== undefined){
-                edge.target = idMap.get(edge.target);
-            }
-        }
-        return nodes.filter(node => node !== undefined);
+        
+        return earliestTripInfo;
     }
 
 }
