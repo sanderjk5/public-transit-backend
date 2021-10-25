@@ -169,7 +169,7 @@ export class GoogleTransitData {
             }
         }
         arrivalTimes.sort((a, b) => {
-            return a - b;
+            return b - a;
         })
         return arrivalTimes;
     }
