@@ -9,6 +9,7 @@ import { Agency } from "../models/Agency";
 import { Connection } from "../models/Connection";
 import { RouteStopMapping } from "../models/RouteStopMapping";
 import { SECONDS_OF_A_DAY } from "../constants";
+import { Converter } from "./converter";
 
 
 export class GoogleTransitData {
@@ -160,12 +161,22 @@ export class GoogleTransitData {
 
     public static getAllArrivalTimesOfAStopInATimeRange(stopId: number, earliestArrival: number, latestArrival: number): number[] {
         let arrivalTimes: number[] = [];
+        let earliestArrivalDayOffset = Converter.getDayOffset(earliestArrival);
+        let latestArrivalDayOffset = Converter.getDayOffset(latestArrival);
+        earliestArrival = earliestArrival - earliestArrivalDayOffset;
+        latestArrival = latestArrival - latestArrivalDayOffset;
+        if(latestArrival < earliestArrival){
+            latestArrival += SECONDS_OF_A_DAY;
+        }
         for(let stopTime of this.STOPTIMES){
-            if(stopTime.stopId === stopId && stopTime.arrivalTime >= earliestArrival && stopTime.arrivalTime <= latestArrival && !arrivalTimes.includes(stopTime.arrivalTime)){
-                arrivalTimes.push(stopTime.arrivalTime);
+            if(stopTime.stopId === stopId && stopTime.arrivalTime >= earliestArrival && stopTime.arrivalTime <= latestArrival && !arrivalTimes.includes(stopTime.arrivalTime + earliestArrivalDayOffset)){
+                arrivalTimes.push(stopTime.arrivalTime + earliestArrivalDayOffset);
             }
-            if(stopTime.stopId === stopId && stopTime.arrivalTime + SECONDS_OF_A_DAY >= earliestArrival && stopTime.arrivalTime + SECONDS_OF_A_DAY <= latestArrival && !arrivalTimes.includes(stopTime.arrivalTime + SECONDS_OF_A_DAY)){
-                arrivalTimes.push(stopTime.arrivalTime + SECONDS_OF_A_DAY);
+            if(stopTime.stopId === stopId && stopTime.arrivalTime + SECONDS_OF_A_DAY >= earliestArrival && stopTime.arrivalTime + SECONDS_OF_A_DAY <= latestArrival && !arrivalTimes.includes(stopTime.arrivalTime+ earliestArrivalDayOffset + SECONDS_OF_A_DAY)){
+                arrivalTimes.push(stopTime.arrivalTime+ earliestArrivalDayOffset + SECONDS_OF_A_DAY);
+            }
+            if(stopTime.stopId === stopId && stopTime.arrivalTime - SECONDS_OF_A_DAY >= earliestArrival && stopTime.arrivalTime - SECONDS_OF_A_DAY <= latestArrival && !arrivalTimes.includes(stopTime.arrivalTime+ earliestArrivalDayOffset - SECONDS_OF_A_DAY)){
+                arrivalTimes.push(stopTime.arrivalTime+ earliestArrivalDayOffset - SECONDS_OF_A_DAY);
             }
         }
         arrivalTimes.sort((a, b) => {
