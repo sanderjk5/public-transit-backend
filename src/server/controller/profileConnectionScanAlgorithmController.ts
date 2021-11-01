@@ -18,6 +18,7 @@ import { Cluster } from "../../models/Cluster";
 import { MeatResponse } from "../../models/MeatResponse";
 import { TempNode } from "../../models/TempNode";
 import { TempEdge } from "../../models/TempEdge";
+import {cloneDeep} from 'lodash';
 
 // profile function entry
 interface SEntry {
@@ -32,6 +33,7 @@ interface SEntry {
     tripId?: number,
     transferFootpath?: number,
     finalFootpath?: number,
+    calcReliability?: number,
 }
 
 // information for each trip
@@ -120,6 +122,13 @@ export class ProfileConnectionScanAlgorithmController {
             console.time('connection scan profile algorithm')
             this.performAlgorithm();
             console.timeEnd('connection scan profile algorithm')
+
+            // console.log(this.s[this.sourceStops[0]])
+            // console.log(this.s[6340])
+            console.log(this.s[this.sourceStops[0]][0].expectedArrivalTime)
+            console.log(Converter.secondsToTime(this.s[this.sourceStops[0]][0].expectedArrivalTime))
+            
+            // console.log(Converter.secondsToTime(this.s[6340][0].departureTime))
             
             // generates the http response which includes all information of the graph
             const meatResponse = this.extractDecisionGraphs();
@@ -470,10 +479,12 @@ export class ProfileConnectionScanAlgorithmController {
         let priorityQueue = new FastPriorityQueue<SEntry>((a, b) => {
             return a.departureTime < b.departureTime
         });
+        let targetStopPairs: SEntry[] = [];
         if(this.s[this.sourceStops[0]][0].departureTime === Number.MAX_VALUE){
             throw new Error("Couldn't find a connection.")
         }
         // adds the source stop
+        this.s[this.sourceStops[0]][0].calcReliability = 1;
         priorityQueue.add(this.s[this.sourceStops[0]][0]);
         while(!priorityQueue.isEmpty()){
             let p = priorityQueue.poll();
@@ -528,13 +539,16 @@ export class ProfileConnectionScanAlgorithmController {
                 }
             }
             // checks if the current profile reaches the target
-            if(p.exitStop !== this.targetStops[0]){
+            if(!this.targetStops.includes(p.exitStop)){
                 // sets max delay
                 let maxDelay: number;
+                let isLongDistanceTrip: boolean;
                 if(GoogleTransitData.TRIPS[tripId].isLongDistance){
                     maxDelay = MAX_D_C_LONG;
+                    isLongDistanceTrip = true;
                 } else {
                     maxDelay = MAX_D_C_NORMAL;
+                    isLongDistanceTrip = false;
                 }
                 // finds the next profile functions which can be added to the queue (every profile between departure and departure + max Delay and the first one after the max Delay).
                 let relevantPs: SEntry[] = [];
@@ -548,11 +562,35 @@ export class ProfileConnectionScanAlgorithmController {
                         break;
                     }
                 }
-                for (let nextP of relevantPs) {
-                    priorityQueue.add(nextP);
+                let pLastDepartureTime = -1;
+                let probabilityToTakeJourney: number;
+                let nextP: SEntry;
+                for (let i = 0; i < relevantPs.length; i++) {
+                    nextP = relevantPs[i];
+                    probabilityToTakeJourney = Reliability.getReliability(pLastDepartureTime - p.exitTime, nextP.departureTime - p.exitTime, isLongDistanceTrip);
+                    let newP: SEntry = {
+                        departureTime: nextP.departureTime,
+                        expectedArrivalTime: nextP.expectedArrivalTime,
+                        departureDate: nextP.departureDate,
+                        arrivalDate: nextP.arrivalDate,
+                        enterTime: nextP.enterTime,
+                        enterStop: nextP.enterStop,
+                        exitTime: nextP.exitTime,
+                        exitStop: nextP.exitStop,
+                        tripId: nextP.tripId,
+                        transferFootpath: nextP.transferFootpath,
+                        calcReliability:  p.calcReliability * probabilityToTakeJourney,
+                    }
+                    pLastDepartureTime = newP.departureTime;
+                    priorityQueue.add(newP);
                 }
+            } else {
+                targetStopPairs.push(p)
             }
         }
+        let meat = this.calculateMEAT(targetStopPairs);
+        console.log(meat);
+        console.log(Converter.secondsToTime(meat));
         let idCounter = 0;
         let tempNodes: TempNode[] = [];
         let tempNodeArr: TempNode;
@@ -683,6 +721,24 @@ export class ProfileConnectionScanAlgorithmController {
         }
         meatResponse.compactDecisionGraph = compactDecisionGraph;
         return meatResponse;
+    }
+
+    private static calculateMEAT(targetStopPairs: SEntry[]){
+        let meat: number = 0;
+        let probabilitySum = 0;
+        for(let targetStopPair of targetStopPairs){
+            let expectedDelay: number;
+            if(GoogleTransitData.TRIPS[targetStopPair.tripId].isLongDistance){
+                expectedDelay = Reliability.longDistanceExpectedValue;
+            } else {
+                expectedDelay = Reliability.normalDistanceExpectedValue;
+            }
+            probabilitySum += targetStopPair.calcReliability;
+            let arrivalTime = targetStopPair.exitTime + expectedDelay;
+            meat += (arrivalTime * targetStopPair.calcReliability);
+        }
+        console.log(probabilitySum)
+        return meat;
     }
 
     private static notDominatedInProfile(p: SEntry, stopId: number): boolean{
