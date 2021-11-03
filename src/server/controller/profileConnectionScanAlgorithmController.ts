@@ -140,40 +140,40 @@ export class ProfileConnectionScanAlgorithmController {
         }
     }
 
-    // public static testProfileConnectionScanAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
-    //     this.sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
-    //     this.targetStops = GoogleTransitData.getStopIdsByName(targetStop);
-    //     // converts the source time
-    //     this.minDepartureTime = Converter.timeToSeconds(sourceTime);
-    //     this.currentDate = sourceDate;
+    public static testProfileConnectionScanAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
+        this.sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
+        this.targetStops = GoogleTransitData.getStopIdsByName(targetStop);
+        // converts the source time
+        this.minDepartureTime = Converter.timeToSeconds(sourceTime);
+        this.currentDate = sourceDate;
 
-    //     try {
-    //         this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.currentDate, this.minDepartureTime, false);
-    //         if(this.earliestArrivalTimeCSA === null) {
-    //             return {sameResult: true}
-    //         }
-    //     } catch (err) {
-    //         return {sameResult: true}
-    //     }
+        this.minDepartureTime = Converter.timeToSeconds(sourceTime);
+        this.sourceDate = sourceDate;
+
+        // gets the minimum times from the normal csa algorithm
+        this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.sourceDate, this.minDepartureTime, false);
+        this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.sourceDate, this.minDepartureTime, true);
+        if(this.earliestSafeArrivalTimeCSA === null || this.earliestArrivalTimeCSA === null) {
+            return null;
+        }
+
+        // calculates the maximum arrival time of the alpha bounded version of the algorithm
+        this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
         
-    //     this.maxArrivalTime = this.earliestArrivalTimeCSA + 1 * (this.earliestArrivalTimeCSA - this.minDepartureTime);
+        // sets the relevant dates
+        this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
+        this.currentDate = new Date(this.sourceDate);
+
+        this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
         
-    //     this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
-    //     this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
-    //     // initializes the csa algorithm
-    //     this.init();
-    //     // calls the csa
-    //     const startTime = performance.now();
-    //     this.performAlgorithm();
-    //     const duration = performance.now() - startTime;
-    //     // generates the http response which includes all information of the journey
-    //     const earliestArrivalTimeProfile = this.getEarliestArrivalTime();
-    //     if(this.earliestSafeArrivalTimeCSA === earliestArrivalTimeProfile){
-    //         return {sameResult: true, duration: duration}
-    //     } else {
-    //         return {sameResult: false}
-    //     }
-    // }
+        this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
+    
+        this.init();
+        const startTime = performance.now();
+        this.performAlgorithm();
+        const duration = performance.now() - startTime;
+        return {expectedArrivalTime: this.s[this.sourceStops[0]][0].expectedArrivalTime, duration: duration};
+    }
 
     /**
      * Performs the modified version of the profile algorithm to solve the minimum expected arrival time problem.

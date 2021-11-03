@@ -4,6 +4,7 @@ import { GoogleTransitData } from "../../data/google-transit-data";
 import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmController";
 import { ProfileConnectionScanAlgorithmController } from "./profileConnectionScanAlgorithmController";
 import { RaptorAlgorithmController } from "./raptorAlgorithmController";
+import { RaptorMeatAlgorithmController } from "./raptorMeatAlgorithmController";
 
 export class TestController {
 
@@ -52,36 +53,54 @@ export class TestController {
         console.log('average csa: ' + csaTimes/numberOfSuccessfulRequestsCSA)
     }
 
-    // public static testProfileScanAlgorithm() {
-    //     let csaProfileTimes = 0;
-    //     let numberOfSuccessfulRequestsCSAProfile = 0;
-    //     const numberOfStops = GoogleTransitData.STOPS.length;
-    //     const numberOfSeconds = SECONDS_OF_A_DAY;
-    //     const numberOfDates = 7;
-    //     const dates = [];
-    //     const initialDate = new Date(Date.now());
-    //     for(let i = 0; i < numberOfDates; i++){
-    //         let newDate = new Date(initialDate);
-    //         newDate.setDate(initialDate.getDate() + i);
-    //         dates.push(newDate);
-    //     }
-    //     for(let i = 0; i < 1000; i++){
-    //         const randomSourceStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
-    //         const randomTargetStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
-    //         const randomSourceTime = Converter.secondsToTime(this.getRandomInt(numberOfSeconds));
-    //         const randomSourceDate = dates[this.getRandomInt(numberOfDates)];
-    //         const csaProfileResponse = ProfileConnectionScanAlgorithmController.testProfileConnectionScanAlgorithm(randomSourceStop, randomTargetStop, randomSourceTime, randomSourceDate);
-    //         if(csaProfileResponse.sameResult){
-    //             if(csaProfileResponse.duration !== undefined){
-    //                 csaProfileTimes += csaProfileResponse.duration;
-    //                 numberOfSuccessfulRequestsCSAProfile++;
-    //             }
-    //         } else {
-    //             console.log(randomSourceStop + ', ' + randomTargetStop + ', ' + randomSourceDate + ', ' + randomSourceTime);
-    //         }
-    //     }
-    //     console.log('average csa profile: ' + csaProfileTimes/numberOfSuccessfulRequestsCSAProfile)
-    // }
+    /**
+     * Creates random requests and compares the results of Raptor and CSA. Calculates the average time of both algorithms.
+     */
+     public static testMeatAlgorithms() {
+        let raptorMeatTimes = 0;
+        let numberOfSuccessfulRequestsRaptor = 0;
+        let csaMeatTimes = 0;
+        let numberOfSuccessfulRequestsCSA = 0;
+        const numberOfStops = GoogleTransitData.STOPS.length;
+        const numberOfSeconds = SECONDS_OF_A_DAY;
+        const numberOfDates = 7;
+        const dates = [];
+        const initialDate = new Date(Date.now());
+        for(let i = 0; i < numberOfDates; i++){
+            let newDate = new Date(initialDate);
+            newDate.setDate(initialDate.getDate() + i);
+            dates.push(newDate);
+        }
+        for(let i = 0; i < 10; i++){
+            const randomSourceStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
+            const randomTargetStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
+            const randomSourceTime = this.getRandomInt(numberOfSeconds);
+            const randomSourceDate = dates[this.getRandomInt(numberOfDates)];
+            const raptorResponse = RaptorMeatAlgorithmController.testRaptorMeatAlgorithm(randomSourceStop, randomTargetStop, Converter.secondsToTime(randomSourceTime), randomSourceDate);
+            const csaResponse = ProfileConnectionScanAlgorithmController.testProfileConnectionScanAlgorithm(randomSourceStop, randomTargetStop, Converter.secondsToTime(randomSourceTime), randomSourceDate);
+            if(raptorResponse){
+                raptorMeatTimes += raptorResponse.duration;
+                numberOfSuccessfulRequestsRaptor++;
+            }
+            if(csaResponse){
+                csaMeatTimes += csaResponse.duration;
+                numberOfSuccessfulRequestsCSA++;
+            }
+            if(raptorResponse && csaResponse){
+                if(raptorResponse.expectedArrivalTime !== csaResponse.expectedArrivalTime){
+                    console.log('failed for: ' + randomSourceStop + ', ' + randomTargetStop + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime));
+                } else {
+                    console.log('successful for: ' + randomSourceStop + ', ' + randomTargetStop + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime));
+                }
+            } else if (!(!raptorResponse && !csaResponse)){
+                console.log('failed for: ' + randomSourceStop + ', ' + randomTargetStop + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime));
+            } else {
+                console.log('found no solution for: ' + randomSourceStop + ', ' + randomTargetStop + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime));
+            }
+        }
+        console.log('average raptor: ' + raptorMeatTimes/numberOfSuccessfulRequestsRaptor)
+        console.log('average csa: ' + csaMeatTimes/numberOfSuccessfulRequestsCSA)
+    }
 
     /**
      * Returns a random integer of the interval [0, max).
