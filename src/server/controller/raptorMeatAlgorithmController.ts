@@ -65,16 +65,15 @@ export class RaptorMeatAlgorithmController {
     private static arrivalTimeRound: number;
 
     // stores for each round k and each stop the earliest arrival time
-    private static earliestArrivalTimePerRound: Label[][][];
+    private static earliestArrivalTimesLastRound: Label[][];
+    private static earliestArrivalTimesCurrentRound: Label[][];
+    private static earliestExpectedArrivalTimes: Label[][];
     // stores the marked stops of the current round
-    private static markedStops: number[];
+    private static markedStops: number[][];
     // stores the route-stop pairs of the marked stops
     private static Q: QEntry[];
 
     private static arrivalTimesOfTarget: number[];
-    private static currentArrivalTime: number;
-
-    private static newLabelPerRound: Label[][][];
 
     public static raptorMeatAlgorithm(req: express.Request, res: express.Response) {
         try {
@@ -100,6 +99,7 @@ export class RaptorMeatAlgorithmController {
                 throw new Error("Couldn't find a connection.")
             }
             this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+            console.log(Converter.secondsToTime(this.maxArrivalTime))
             this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(req.query.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
             console.timeEnd('csa algorithms')
             // calculates the maximum arrival time of the alpha bounded version of the algorithm
@@ -112,10 +112,11 @@ export class RaptorMeatAlgorithmController {
             this.performAlgorithm();
             console.timeEnd('raptor meat algorithm')
             // console.log(this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][this.sourceStops[0]])
-            for(let i = 0; i < this.earliestArrivalTimePerRound.length; i++){
-                console.log(i);
-                console.log(this.earliestArrivalTimePerRound[i][this.sourceStops[0]]);
-            }
+            // for(let i = 0; i < this.earliestArrivalTimePerRound.length; i++){
+            //     console.log(i);
+            //     console.log(this.earliestArrivalTimePerRound[i][6352]);
+            // }
+            // console.log(this.earliestExpectedArrivalTimes[6340])
             // console.log(this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][6340])
             // console.log(Converter.secondsToTime(this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][6340][0].expectedArrivalTime))
             // console.log(this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][this.sourceStops[0]][0].expectedArrivalTime)
@@ -130,56 +131,58 @@ export class RaptorMeatAlgorithmController {
         }
     }
 
+    // public static testRaptorMeatAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
+    //     this.sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
+    //     this.targetStops = GoogleTransitData.getStopIdsByName(targetStop);
+    //     // converts the source time
+    //     this.minDepartureTime = Converter.timeToSeconds(sourceTime);
+    //     this.sourceDate = sourceDate;
+    //     this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
+    //     this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, false);
+    //     this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, true);
+    //     if(this.earliestSafeArrivalTimeCSA === null || this.earliestArrivalTimeCSA === null) {
+    //         throw new Error("Couldn't find a connection.")
+    //     }
+    //     this.init();
+    // }
+
     /**
      * Performs the raptor algorithm.
      * @param targetStops 
      */
      private static performAlgorithm(){
-        this.arrivalTimeRound = 0;
-        while(this.arrivalTimeRound < this.arrivalTimesOfTarget.length){
-            this.newLabelPerRound = [];
-            const numberOfStops = GoogleTransitData.STOPS.length;
-            const firstRoundNewLabels: Label[][] = new Array(numberOfStops);
-            for(let i = 0; i < numberOfStops; i++) {
-                firstRoundNewLabels[i] = [];
-            }
-            this.newLabelPerRound.push(firstRoundNewLabels);
-            this.k = 0;
-            this.currentArrivalTime = this.arrivalTimesOfTarget[this.arrivalTimeRound];
-            for(let i = 0; i < this.targetStops.length; i++) {
-                let targetStop = this.targetStops[i];
-                let label: Label = {
-                    expectedArrivalTime: this.currentArrivalTime,
-                    departureTime: this.currentArrivalTime,
-                    transferRound: this.k,
-                    arrivalTimeRound: this.arrivalTimeRound,
-                }
-                this.earliestArrivalTimePerRound[this.k][targetStop].unshift(label);
-                this.markedStops.push(targetStop);
-            }
-            while(true){
-                // increases round counter
-                // console.log(this.earliestArrivalTimePerRound[k][this.sourceStops[0]]);
-                this.k++;
-                // adds an empty array to the earliest arrival times
-                this.addNextArrivalTimeRound();
+        this.k = 0;
+        while(true){
+            // increases round counter
+            // console.log(this.earliestArrivalTimePerRound[k][this.sourceStops[0]]);
+            this.k++;
+            // console.log('k: ' + this.k)
+            // adds an empty array to the earliest arrival times
+            this.addNextArrivalTimeRound();
+            this.arrivalTimeRound = 0;
+            for(let i = 0; i < this.arrivalTimesOfTarget.length; i++){
                 // fills the array of route-stop pairs
                 this.fillQ();
                 // traverses each route and updates earliest arrival times
                 this.traverseRoutes();
-                // updates earliest arrival times with footpaths of marked stops
-                //this.handleFootpaths(k);
-                // termination condition
-                if(this.markedStops.length === 0){
+                this.arrivalTimeRound++;
+            }
+            // updates earliest arrival times with footpaths of marked stops
+            //this.handleFootpaths(k);
+
+            this.updateExpectedArrivalTimes();
+
+            // termination condition
+            let markedStopsAreEmpty = true;
+            for(let i = 0; i < this.arrivalTimesOfTarget.length; i++){
+                if(this.markedStops[i].length > 0){
+                    markedStopsAreEmpty = false;
                     break;
                 }
             }
-            let numberOfRounds = this.earliestArrivalTimePerRound.length;
-            while(this.k + 1 < numberOfRounds){
-                this.k++;
-                this.addNextArrivalTimeRound();
+            if(markedStopsAreEmpty){
+                break;
             }
-            this.arrivalTimeRound++;
         }
     }
 
@@ -190,10 +193,8 @@ export class RaptorMeatAlgorithmController {
      */
     private static init(){
         const numberOfStops = GoogleTransitData.STOPS.length;
-        const firstRoundLabels: Label[][] = new Array(numberOfStops);
-        this.earliestArrivalTimePerRound = [];
-        this.markedStops = [];
-        this.newLabelPerRound = [];
+        this.earliestArrivalTimesLastRound = new Array(numberOfStops);
+        this.earliestExpectedArrivalTimes = new Array(numberOfStops);
 
         const defaultLabel: Label = {
             expectedArrivalTime: Number.MAX_VALUE,
@@ -202,14 +203,26 @@ export class RaptorMeatAlgorithmController {
             arrivalTimeRound: 0,
         }
         for(let i = 0; i < numberOfStops; i++) {
-            firstRoundLabels[i] = [defaultLabel];
+            this.earliestArrivalTimesLastRound[i] = [];
+            this.earliestExpectedArrivalTimes[i] = [defaultLabel];
         }
 
         this.arrivalTimesOfTarget = GoogleTransitData.getAllArrivalTimesOfAStopInATimeRange(this.targetStops[0], this.earliestArrivalTimeCSA, this.maxArrivalTime);
         // console.log(this.arrivalTimesOfTarget)
-        console.log(this.arrivalTimesOfTarget.length)
-        
-        this.earliestArrivalTimePerRound.push(firstRoundLabels);
+        console.log(this.arrivalTimesOfTarget.length);
+
+        this.markedStops = new Array(this.arrivalTimesOfTarget.length);
+
+        for(let i = 0; i < this.arrivalTimesOfTarget.length; i++){
+            let label: Label = {
+                expectedArrivalTime: this.arrivalTimesOfTarget[i],
+                departureTime: this.arrivalTimesOfTarget[i],
+                transferRound: 0,
+                arrivalTimeRound: i,
+            }
+            this.earliestArrivalTimesLastRound[this.targetStops[0]].unshift(label);
+            this.markedStops[i] = [this.targetStops[0]];
+        }
 
         // updates the footpaths of the source stops
         // for(let i = 0; i < sourceStops.length; i++) {
@@ -242,21 +255,10 @@ export class RaptorMeatAlgorithmController {
      * Adds an empty array to the earliestArrivalTimePerRound array which can be used in the next round.
      */
     private static addNextArrivalTimeRound() {
-        let numberOfStops = GoogleTransitData.STOPS.length;
-        let newRoundArray = new Array(numberOfStops);
-        for(let i = 0; i < numberOfStops; i++) {
-            newRoundArray[i] = [];
-        }
-        this.newLabelPerRound.push(newRoundArray);
-        if(this.earliestArrivalTimePerRound.length <= this.k){
-            const lastRoundLabels: Label[][] = cloneDeep(this.earliestArrivalTimePerRound[this.k-1]);
-            this.earliestArrivalTimePerRound.push(lastRoundLabels);
-        } else {
-            for(let stop of GoogleTransitData.STOPS){
-                if(this.newLabelPerRound[this.k-1][stop.id].length > 0){
-                    this.mergeBagInRoundBag(this.newLabelPerRound[this.k-1][stop.id], stop.id);
-                }
-            }
+        const numberOfStops = GoogleTransitData.STOPS.length;
+        this.earliestArrivalTimesCurrentRound = new Array(numberOfStops);
+        for(let i = 0; i < numberOfStops; i++){
+            this.earliestArrivalTimesCurrentRound[i] = [];
         }
     }
 
@@ -269,8 +271,8 @@ export class RaptorMeatAlgorithmController {
         // stores the last stop of each route
         let routeSequenceMaxima = new Array(GoogleTransitData.ROUTES.length);
         // loop over all marked stops
-        while(this.markedStops.length > 0){
-            let markedStop = this.markedStops.pop();
+        while(this.markedStops[this.arrivalTimeRound].length > 0){
+            let markedStop = this.markedStops[this.arrivalTimeRound].pop();
             // gets all routes which serves the current stop
             let routesServingStop: RouteStopMapping[] = GoogleTransitData.ROUTES_SERVING_STOPS[markedStop];
             // adds all route-stop pairs with the related sequence number to qTemp
@@ -321,19 +323,14 @@ export class RaptorMeatAlgorithmController {
 
                 routeBag = this.updateRouteBag(routeBag, pi);
 
-                let addedLabel = this.mergeBagInRoundBag(routeBag, pi);
+                this.mergeBagInRoundBag(routeBag, pi);
                 routeBag = this.mergeLastRoundLabelsInRouteBag(r, pi, routeBag);
-                // adds pi to the marked stops
-                if(addedLabel && !this.markedStops.includes(pi)){
-                    this.markedStops.push(pi);
-                }
-            
             }
         }
     }
 
     private static mergeLastRoundLabelsInRouteBag(r: number, pi: number, routeBag: Label[]){
-        let lastRoundLabels = cloneDeep(this.earliestArrivalTimePerRound[this.k-1][pi]);
+        let lastRoundLabels = cloneDeep(this.earliestArrivalTimesLastRound[pi]);
         if(lastRoundLabels.length === 0){
             return routeBag;
         }
@@ -349,7 +346,7 @@ export class RaptorMeatAlgorithmController {
             if(newTripInfo === null || (lastRoundLabel.associatedTrip && lastRoundLabel.associatedTrip.tripId === newTripInfo.tripId)){
                 continue;
             }
-            if(this.targetStops.includes(pi) && newTripInfo.tripArrival !== this.currentArrivalTime){
+            if(this.targetStops.includes(pi) && newTripInfo.tripArrival !== this.arrivalTimesOfTarget[this.arrivalTimeRound]){
                 continue;
             }
             let newArrivalTime: number = 0;
@@ -364,14 +361,14 @@ export class RaptorMeatAlgorithmController {
                 if(isLongDistanceTrip){
                     expectedDelay = Reliability.longDistanceExpectedValue;
                 }
-                newArrivalTime = this.currentArrivalTime + expectedDelay;
+                newArrivalTime = currentTripArrivalTime + expectedDelay;
             } else {
                 let labelLastDepartureTime: number = -1;
                 let relevantLabels: Label[] = [];
                 let label: Label;
                 // finds all outgoing trips which have a departure time between c_arr and c_arr + maxD_c (and the departure after max delay)
-                for(let j = 0; j < this.earliestArrivalTimePerRound[this.k-1][pi].length; j++) {
-                    label = this.earliestArrivalTimePerRound[this.k-1][pi][j];
+                for(let j = 0; j < this.earliestExpectedArrivalTimes[pi].length; j++) {
+                    label = this.earliestExpectedArrivalTimes[pi][j];
                     if(label.departureTime >= currentTripArrivalTime && label.departureTime <= currentTripArrivalTime + currentMaxDelay){
                         relevantLabels.push(label);
                     } else if(label.departureTime > currentTripArrivalTime + currentMaxDelay) {
@@ -393,6 +390,9 @@ export class RaptorMeatAlgorithmController {
                 transferRound: this.k,
                 arrivalTimeRound: this.arrivalTimeRound,
             }
+            // if(pi === 6340 && newTripInfo.tripId === 252){
+            //     console.log(newLabel)
+            // }
             routeBag.push(newLabel);
         }
         return routeBag;
@@ -423,61 +423,56 @@ export class RaptorMeatAlgorithmController {
         return newRouteBag;
     }
 
-    private static mergeBagInRoundBag(bag: Label[], pi: number){
-        let addedLabel = false;
-        if(bag.length === 0){
-            return addedLabel;
+    private static mergeBagInRoundBag(bag: Label[], pi: number){        
+        for(let label of bag){
+            this.earliestArrivalTimesCurrentRound[pi].push(label);
         }
-        // bag.sort((a, b) => {
-        //     return a.expectedArrivalTime - b.expectedArrivalTime;
-        // })
-        bag.sort((a, b) => {
-            return b.departureTime - a.departureTime;
-        })
+    }
 
-        for(let i = 0; i < bag.length; i++){
-            if(this.notDominatedInProfile(bag[i], pi)){
-                let shiftedLabels = [];
-                let currentLabel = this.earliestArrivalTimePerRound[this.k][pi][0];
-                while(bag[i].departureTime >= currentLabel.departureTime){
-                    let removedLabel = this.earliestArrivalTimePerRound[this.k][pi].shift()
-                    shiftedLabels.push(removedLabel);
-                    currentLabel = this.earliestArrivalTimePerRound[this.k][pi][0];
-                }
-                this.earliestArrivalTimePerRound[this.k][pi].unshift(bag[i]);
-                this.newLabelPerRound[this.k][pi].push(bag[i]);
-                for(let j = 0; j < shiftedLabels.length; j++) {
-                    let removedLabel = shiftedLabels[j];
-                    if(!this.dominates(bag[i], removedLabel)){
-                        this.earliestArrivalTimePerRound[this.k][pi].unshift(removedLabel);
+    private static updateExpectedArrivalTimes(){
+        for(let i = 0; i < GoogleTransitData.STOPS.length; i++){
+            this.earliestArrivalTimesLastRound[i] = [];
+            if(this.earliestArrivalTimesCurrentRound[i].length === 0){
+                continue;
+            }
+            let expectedArrivalTimesDeepClone = cloneDeep(this.earliestExpectedArrivalTimes[i]);
+            for(let label of this.earliestArrivalTimesCurrentRound[i]){
+                expectedArrivalTimesDeepClone.push(cloneDeep(label));
+            }
+            expectedArrivalTimesDeepClone.sort((a, b) => {
+                if(a.departureTime === b.departureTime){
+                    if(a.expectedArrivalTime === b.expectedArrivalTime){
+                        return b.transferRound - a.transferRound;
                     }
+                    return b.expectedArrivalTime - a.expectedArrivalTime;
                 }
-                addedLabel = true;
+                return a.departureTime - b.departureTime;
+            })
+            let lastLabel = expectedArrivalTimesDeepClone[expectedArrivalTimesDeepClone.length-1];
+            for(let j = expectedArrivalTimesDeepClone.length-2; j >= 0; j--){
+                let currentLabel = expectedArrivalTimesDeepClone[j];
+                if(lastLabel.departureTime === currentLabel.departureTime || lastLabel.expectedArrivalTime <= currentLabel.expectedArrivalTime){
+                    expectedArrivalTimesDeepClone[j] = undefined;
+                } else {
+                    if(currentLabel.transferRound === this.k && !this.markedStops[currentLabel.arrivalTimeRound].includes(i)){
+                        this.markedStops[currentLabel.arrivalTimeRound].push(i);
+                    }
+                    if(currentLabel.transferRound === this.k){
+                        this.earliestArrivalTimesLastRound[i].push(currentLabel);
+                    }
+                    lastLabel = currentLabel;
+                }
             }
-        }
-        return addedLabel;
-    }
-
-    private static dominates(q: Label, p: Label): boolean {
-        if(q.expectedArrivalTime < p.expectedArrivalTime) {
-            return true;
-        }
-        if(q.expectedArrivalTime === p.expectedArrivalTime && q.departureTime > p.departureTime) {
-            return true;
-        }
-        if(q.expectedArrivalTime === p.expectedArrivalTime && q.departureTime === p.departureTime && q.transferRound <= p.transferRound) {
-            return true;
-        }
-        return false;
-    }
-
-    private static notDominatedInProfile(p: Label, pi: number): boolean{
-        for(let q of this.earliestArrivalTimePerRound[this.k][pi]){
-            if(this.dominates(q, p)){
-                return false;
+            this.earliestExpectedArrivalTimes[i] = [];
+            for(let j = 0; j < expectedArrivalTimesDeepClone.length; j++){
+                if(expectedArrivalTimesDeepClone[j] !== undefined){
+                    this.earliestExpectedArrivalTimes[i].push(expectedArrivalTimesDeepClone[j]);
+                }
             }
+            // if(i === this.sourceStops[0]){
+            //     console.log(this.earliestExpectedArrivalTimes[i])
+            // }
         }
-        return true;
     }
 
     /**
@@ -610,10 +605,10 @@ export class RaptorMeatAlgorithmController {
      */
       private static extractDecisionGraphs() {
         // the minimum expected arrival time
-        let meatTime = this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][this.sourceStops[0]][0].expectedArrivalTime;
+        let meatTime = this.earliestExpectedArrivalTimes[this.sourceStops[0]][0].expectedArrivalTime;
         this.meatDate = new Date(this.sourceDate);
         this.meatDate.setDate(this.meatDate.getDate() + Converter.getDayDifference(meatTime));
-        let departureTime = this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][this.sourceStops[0]][0].departureTime;
+        let departureTime = this.earliestExpectedArrivalTimes[this.sourceStops[0]][0].departureTime;
         let departureDate = new Date(this.sourceDate);
         departureDate.setDate(departureDate.getDate() + Converter.getDayDifference(departureTime))
         
@@ -621,7 +616,7 @@ export class RaptorMeatAlgorithmController {
         let meatResponse: MeatResponse = {
             sourceStop: GoogleTransitData.STOPS[this.sourceStops[0]].name,
             targetStop: GoogleTransitData.STOPS[this.targetStops[0]].name,
-            departureTime: Converter.secondsToTime(this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][this.sourceStops[0]][0].departureTime),
+            departureTime: Converter.secondsToTime(this.earliestExpectedArrivalTimes[this.sourceStops[0]][0].departureTime),
             departureDate: departureDate.toLocaleDateString('de-DE'),
             meatTime: Converter.secondsToTime(meatTime),
             meatDate: this.meatDate.toLocaleDateString('de-DE'),
@@ -655,12 +650,12 @@ export class RaptorMeatAlgorithmController {
         let priorityQueue = new FastPriorityQueue<Label>((a, b) => {
             return a.departureTime < b.departureTime
         });
-        if(this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][this.sourceStops[0]][0].departureTime === Number.MAX_VALUE){
+        if(this.earliestExpectedArrivalTimes[this.sourceStops[0]][0].departureTime === Number.MAX_VALUE){
             throw new Error("Couldn't find a connection.")
         }
         // adds the source stop
-        this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][this.sourceStops[0]][0].calcReliability = 1;
-        priorityQueue.add(this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][this.sourceStops[0]][0]);
+        this.earliestExpectedArrivalTimes[this.sourceStops[0]][0].calcReliability = 1;
+        priorityQueue.add(this.earliestExpectedArrivalTimes[this.sourceStops[0]][0]);
         while(!priorityQueue.isEmpty()){
             let p = priorityQueue.poll();
             let tripId = p.associatedTrip.tripId;
@@ -727,8 +722,8 @@ export class RaptorMeatAlgorithmController {
                 }
                 // finds the next profile functions which can be added to the queue (every profile between departure and departure + max Delay and the first one after the max Delay).
                 let relevantPs: Label[] = [];
-                for(let i = 0; i < this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][p.exitTripAtStop].length; i++) {
-                    let nextP = this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][p.exitTripAtStop][i];
+                for(let i = 0; i < this.earliestExpectedArrivalTimes[p.exitTripAtStop].length; i++) {
+                    let nextP = this.earliestExpectedArrivalTimes[p.exitTripAtStop][i];
                     if(nextP.departureTime >= p.associatedTrip.tripArrival && nextP.departureTime <= (p.associatedTrip.tripArrival + maxDelay)){
                         relevantPs.push(nextP);
                     }
