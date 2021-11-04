@@ -122,7 +122,6 @@ export class RaptorMeatAlgorithmController {
             // calls the raptor meat algorithm
             this.performAlgorithm();
             console.timeEnd('raptor meat algorithm')
-            console.log(this.expectedArrivalTimes[this.sourceStop][0])
             // generates the http response which includes all information of the journey incl. its decision graphs
             const meatResponse = this.extractDecisionGraphs();
             res.status(200).send(meatResponse);
