@@ -7,8 +7,9 @@ import { Section } from "../../models/Section";
 import express from "express";
 import { performance } from 'perf_hooks';
 import { Calculator } from "../../data/calculator";
-import { SECONDS_OF_A_DAY } from "../../constants";
+import { CHANGE_TIME, SECONDS_OF_A_DAY } from "../../constants";
 import { Reliability } from "../../data/reliability";
+import { JourneyPointerRaptor } from "../../models/JourneyPointerRaptor";
 
 // entries of the q array
 interface QEntry {
@@ -24,17 +25,18 @@ interface EarliestTripInfo {
     dayOffset: number,
 }
 
-// can be used to reconstruct the journey
-interface JourneyPointer {
-    enterTripAtStop: number,
-    exitTripAtStop?: number,
-    departureTime: number,
-    arrivalTime: number,
-    tripId: number,
-    footpath: number,
-}
-
 export class RaptorAlgorithmController {
+    // source and target stop
+    private static sourceStop: number;
+    private static targetStop: number;
+
+    // round counter
+    private static k: number;
+
+    // source time and date
+    private static sourceTime: number;
+    private static sourceDate: Date;
+
     // stores for each round k and each stop the earliest arrival time
     private static earliestArrivalTimePerRound: number[][];
     // stores for each stop the earliest arrival time independent from the round
@@ -44,7 +46,7 @@ export class RaptorAlgorithmController {
     // stores the route-stop pairs of the marked stops
     private static Q: QEntry[];
     // stores the journey pointer for each stop
-    private static j: JourneyPointer[];
+    private static j: JourneyPointerRaptor[];
 
     private static sourceWeekday: number;
 
@@ -63,22 +65,23 @@ export class RaptorAlgorithmController {
                 return;
             }
             // gets the source and target stops
-            const sourceStops = GoogleTransitData.getStopIdsByName(req.query.sourceStop);
-            const targetStops = GoogleTransitData.getStopIdsByName(req.query.targetStop);
+            this.sourceStop = GoogleTransitData.getStopIdByName(req.query.sourceStop);
+            this.targetStop = GoogleTransitData.getStopIdByName(req.query.targetStop);
             // converts the source time
-            const sourceTimeInSeconds = Converter.timeToSeconds(req.query.sourceTime)
-            const sourceDate = new Date(req.query.date);
-            this.sourceWeekday = Calculator.moduloSeven((sourceDate.getDay() - 1));
+            this.sourceTime = Converter.timeToSeconds(req.query.sourceTime)
+            this.sourceDate = new Date(req.query.date);
+            this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
             // initializes the csa algorithm
-            this.init(sourceStops, sourceTimeInSeconds);
+            this.init();
             console.time('raptor algorithm')
             // calls the csa
-            this.performAlgorithm(targetStops);
+            this.performAlgorithm();
             console.timeEnd('raptor algorithm')
             // generates the http response which includes all information of the journey
-            const journeyResponse = this.getJourneyResponse(sourceStops, targetStops, sourceDate);
+            const journeyResponse = this.getJourneyResponse();
             res.status(200).send(journeyResponse);
         } catch (err) {
+            console.log(err)
             res.status(500).send(err);
         }
     }
@@ -93,24 +96,21 @@ export class RaptorAlgorithmController {
      */
     public static testAlgorithm(sourceStop: string, targetStop: string, sourceDate: Date, sourceTimeInSeconds: number){
         // gets the source and target stops
-        const sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
-        const targetStops = GoogleTransitData.getStopIdsByName(targetStop);
+        this.sourceStop = GoogleTransitData.getStopIdByName(sourceStop);
+        this.targetStop = GoogleTransitData.getStopIdByName(targetStop);
+        this.sourceTime = sourceTimeInSeconds;
+        this.sourceDate = sourceDate;
         // sets the source Weekday
-        this.sourceWeekday = Calculator.moduloSeven((sourceDate.getDay() - 1));
+        this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
         try {
             // initializes the csa algorithm
-            this.init(sourceStops, sourceTimeInSeconds);
+            this.init();
             const startTime = performance.now();
             // calls the csa
-            this.performAlgorithm(targetStops);
+            this.performAlgorithm();
             const duration = performance.now() - startTime;
             // gets the earliest arrival time at the target stops
-            let earliestTargetStopArrival = this.earliestArrivalTime[targetStops[0]];
-            for(let l = 1; l < targetStops.length; l++){
-                if(this.earliestArrivalTime[targetStops[l]] < earliestTargetStopArrival){
-                    earliestTargetStopArrival = this.earliestArrivalTime[targetStops[l]];
-                }
-            }
+            let earliestTargetStopArrival = this.earliestArrivalTime[this.targetStop];
             if(earliestTargetStopArrival === Number.MAX_VALUE){
                 throw new Error('invalid time');
             }
@@ -122,21 +122,20 @@ export class RaptorAlgorithmController {
 
     /**
      * Performs the raptor algorithm.
-     * @param targetStops 
      */
-    private static performAlgorithm(targetStops: number[]){
-        let k = 0;
+    private static performAlgorithm(){
+        this.k = 0;
         while(true){
             // increases round counter
-            k++;
+            this.k++;
             // adds an empty array to the earliest arrival times
             this.addNextArrivalTimeRound();
             // fills the array of route-stop pairs
             this.fillQ();
             // traverses each route and updates earliest arrival times
-            this.traverseRoutes(k, targetStops);
+            this.traverseRoutes();
             // updates earliest arrival times with footpaths of marked stops
-            this.handleFootpaths(k);
+            // this.handleFootpaths();
             // termination condition
             if(this.markedStops.length === 0){
                 break;
@@ -146,10 +145,10 @@ export class RaptorAlgorithmController {
 
     /**
      * Initializes the required arrays.
-     * @param sourceStops 
+     * @param sourceStop 
      * @param sourceTime 
      */
-    private static init(sourceStops: number[], sourceTime: number){
+    private static init(){
         const numberOfStops = GoogleTransitData.STOPS.length;
         const firstRoundTimes = new Array(numberOfStops);
         this.earliestArrivalTimePerRound = [];
@@ -162,37 +161,31 @@ export class RaptorAlgorithmController {
             this.earliestArrivalTime[i] = Number.MAX_VALUE;
         }
 
-        // sets the source time of the source stops
-        for(let i = 0; i < sourceStops.length; i++) {
-            let sourceStop = sourceStops[i];
-            firstRoundTimes[sourceStop] = sourceTime;
-            this.earliestArrivalTime[sourceStop] = sourceTime;
-            this.markedStops.push(sourceStop);
-        }
+        // sets the source time of the source stop
+        firstRoundTimes[this.sourceStop] = this.sourceTime;
+        this.earliestArrivalTime[this.sourceStop] = this.sourceTime;
+        this.markedStops.push(this.sourceStop);
         
         this.earliestArrivalTimePerRound.push(firstRoundTimes);
 
         // updates the footpaths of the source stops
-        for(let i = 0; i < sourceStops.length; i++) {
-            let sourceStop = sourceStops[i];
-            let sourceFootpaths = GoogleTransitData.getAllFootpathsOfADepartureStop(sourceStop);
-            for(let j = 0; j < sourceFootpaths.length; j++){
-                let p = sourceFootpaths[j].departureStop;
-                let pN = sourceFootpaths[j].arrivalStop;
-                if(p !== pN && this.earliestArrivalTimePerRound[0][pN] > (this.earliestArrivalTimePerRound[0][p] + sourceFootpaths[j].duration)){
-                    this.earliestArrivalTimePerRound[0][pN] = this.earliestArrivalTimePerRound[0][p] + sourceFootpaths[j].duration;
-                    if(!this.markedStops.includes(pN)){
-                        this.markedStops.push(pN);
-                    }
-                    if(this.earliestArrivalTimePerRound[0][pN] < this.earliestArrivalTime[pN]){
-                        this.earliestArrivalTime[pN] = this.earliestArrivalTimePerRound[0][pN];
-                        this.j[pN] = {
-                            enterTripAtStop: p,
-                            departureTime: this.earliestArrivalTimePerRound[0][p],
-                            arrivalTime: this.earliestArrivalTime[pN],
-                            tripId: null,
-                            footpath: sourceFootpaths[j].id
-                        }
+        let sourceFootpaths = GoogleTransitData.getAllFootpathsOfADepartureStop(this.sourceStop);
+        for(let j = 0; j < sourceFootpaths.length; j++){
+            let p = sourceFootpaths[j].departureStop;
+            let pN = sourceFootpaths[j].arrivalStop;
+            if(p !== pN && this.earliestArrivalTimePerRound[0][pN] > (this.earliestArrivalTimePerRound[0][p] + sourceFootpaths[j].duration)){
+                this.earliestArrivalTimePerRound[0][pN] = this.earliestArrivalTimePerRound[0][p] + sourceFootpaths[j].duration;
+                if(!this.markedStops.includes(pN)){
+                    this.markedStops.push(pN);
+                }
+                if(this.earliestArrivalTimePerRound[0][pN] < this.earliestArrivalTime[pN]){
+                    this.earliestArrivalTime[pN] = this.earliestArrivalTimePerRound[0][pN];
+                    this.j[pN] = {
+                        enterTripAtStop: p,
+                        departureTime: this.earliestArrivalTimePerRound[0][p],
+                        arrivalTime: this.earliestArrivalTime[pN],
+                        tripId: null,
+                        footpath: sourceFootpaths[j].id
                     }
                 }
             }
@@ -248,15 +241,15 @@ export class RaptorAlgorithmController {
     /**
      * Traverses each route and updates the earliest arrival times after k changes.
      * @param k 
-     * @param targetStops 
+     * @param targetStop 
      */
-    private static traverseRoutes(k: number, targetStops: number[]) {
+    private static traverseRoutes() {
         // loop over all elements of q
         for(let i= 0; i < this.Q.length; i++){
             let r = this.Q[i].r;
             let p = this.Q[i].p;
             // get the earliest trip or r which can be catched at p in round k
-            let tripInfo = this.getEarliestTrip(r, p, k);
+            let tripInfo = this.getEarliestTrip(r, p);
             let t = tripInfo.tripId;
             let dayOffset = tripInfo.dayOffset;
             let enterTripAtStop = p;
@@ -293,15 +286,10 @@ export class RaptorAlgorithmController {
                 }
 
                 // gets the earliest arrival time at the target stops
-                let earliestTargetStopArrival = this.earliestArrivalTime[targetStops[0]];
-                for(let l = 1; l < targetStops.length; l++){
-                    if(this.earliestArrivalTime[targetStops[l]] < earliestTargetStopArrival){
-                        earliestTargetStopArrival = this.earliestArrivalTime[targetStops[l]];
-                    }
-                }
+                let earliestTargetStopArrival = this.earliestArrivalTime[this.targetStop];
                 // sets the arrival time + journey pointer
                 if(stopTime && arrivalTime < Math.min(this.earliestArrivalTime[pi], earliestTargetStopArrival)){
-                    this.earliestArrivalTimePerRound[k][pi] = arrivalTime;
+                    this.earliestArrivalTimePerRound[this.k][pi] = arrivalTime;
                     this.earliestArrivalTime[pi] = arrivalTime;
                     this.j[pi] = {
                         enterTripAtStop: enterTripAtStop,
@@ -317,8 +305,8 @@ export class RaptorAlgorithmController {
                 }
                 
                 // checks if it is possible to catch an earlier trip at pi in round k
-                if(stopTime && this.earliestArrivalTimePerRound[k-1][pi] < departureTime){
-                    let newT = this.getEarliestTrip(r, pi, k);
+                if(stopTime && this.earliestArrivalTimePerRound[this.k-1][pi] + CHANGE_TIME < departureTime){
+                    let newT = this.getEarliestTrip(r, pi);
                     if(t !== newT.tripId || dayOffset !== newT.dayOffset){
                         tripInfo = newT;
                         t = tripInfo.tripId;
@@ -334,13 +322,13 @@ export class RaptorAlgorithmController {
      * Uses the footpaths to update the earliest arrival times.
      * @param k 
      */
-    private static handleFootpaths(k: number) {
+    private static handleFootpaths() {
         // uses the arrival times before they are updated by footpaths
         let numberOfMarkedStops = this.markedStops.length;
         let arrivalTimesInRoundK = [];
         for(let i = 0; i < numberOfMarkedStops; i++){
             let markedStop = this.markedStops[i];
-            arrivalTimesInRoundK.push(this.earliestArrivalTimePerRound[k][markedStop])
+            arrivalTimesInRoundK.push(this.earliestArrivalTimePerRound[this.k][markedStop])
         }
 
         // loop over all marked stops
@@ -352,14 +340,14 @@ export class RaptorAlgorithmController {
                 let p = footPaths[j].departureStop;
                 let pN = footPaths[j].arrivalStop;
                 // checks if the footpath minimizes the arrival time in round k
-                if(p !== pN && this.earliestArrivalTimePerRound[k][pN] > (arrivalTimeOfMarkedStop + footPaths[j].duration)){
-                    this.earliestArrivalTimePerRound[k][pN] = arrivalTimeOfMarkedStop + footPaths[j].duration;
+                if(p !== pN && this.earliestArrivalTimePerRound[this.k][pN] > (arrivalTimeOfMarkedStop + footPaths[j].duration)){
+                    this.earliestArrivalTimePerRound[this.k][pN] = arrivalTimeOfMarkedStop + footPaths[j].duration;
                     if(!this.markedStops.includes(pN)){
                         this.markedStops.push(pN);
                     }
                     // checks if the new arrival time is smaller than the overall earliest arrival time
-                    if(this.earliestArrivalTimePerRound[k][pN] < this.earliestArrivalTime[pN]){
-                        this.earliestArrivalTime[pN] = this.earliestArrivalTimePerRound[k][pN];
+                    if(this.earliestArrivalTimePerRound[this.k][pN] < this.earliestArrivalTime[pN]){
+                        this.earliestArrivalTime[pN] = this.earliestArrivalTimePerRound[this.k][pN];
                         // updates the journey pointer
                         this.j[pN] = {
                             enterTripAtStop: p,
@@ -381,7 +369,7 @@ export class RaptorAlgorithmController {
      * @param k 
      * @returns 
      */
-    private static getEarliestTrip(r: number, pi: number, k: number): EarliestTripInfo {
+    private static getEarliestTrip(r: number, pi: number): EarliestTripInfo {
         let tripId: number; 
         let tripDeparture: number = Number.MAX_VALUE;
         let earliestTripInfo: EarliestTripInfo;
@@ -397,7 +385,10 @@ export class RaptorAlgorithmController {
             return earliestTripInfo;
         }
 
-        let earliestArrival = this.earliestArrivalTimePerRound[k-1][pi];
+        let earliestArrival = this.earliestArrivalTimePerRound[this.k-1][pi];
+        if(this.k > 1){
+            earliestArrival += CHANGE_TIME;
+        }
         let earliestArrivalDayOffset = Converter.getDayOffset(earliestArrival);
         let previousDay = false;
         let currentWeekday = Calculator.moduloSeven(this.sourceWeekday + Converter.getDayDifference(earliestArrival));
@@ -459,36 +450,34 @@ export class RaptorAlgorithmController {
         return earliestTripInfo;
     }
 
-    /**
-     * Uses the journey pointers to generate the journey response of the http request.
-     * @param sourceStops 
-     * @param targetStops 
-     * @param initialDate 
-     * @returns 
-     */
-    private static getJourneyResponse(sourceStops: number[], targetStops: number[], initialDate: Date): JourneyResponse {
+    private static getJourneyPointers(){
         // finds the earliest arrival at the target stops
-        let earliestTargetStopArrival = this.earliestArrivalTime[targetStops[0]];
-        let earliestTargetStopId = targetStops[0];
-        for(let i = 1; i < targetStops.length; i++){
-            if(this.earliestArrivalTime[targetStops[i]] < earliestTargetStopArrival){
-                earliestTargetStopArrival = this.earliestArrivalTime[targetStops[i]];
-                earliestTargetStopId = targetStops[i];
-            }
-        }
+        let earliestTargetStopArrival = this.earliestArrivalTime[this.targetStop];
 
         if(earliestTargetStopArrival === Number.MAX_VALUE){
             throw new Error("Couldn't find a connection.");
         }
 
         // reconstructs the journey pointers from target to source stop
-        let journeyPointers: JourneyPointer[] = []
-        let stopId = earliestTargetStopId;
-        while(!sourceStops.includes(stopId)){
+        let journeyPointers: JourneyPointerRaptor[] = []
+        let stopId = this.targetStop;
+        while(this.sourceStop !== stopId){
             this.j[stopId].exitTripAtStop = stopId;
-            journeyPointers.push(this.j[stopId]);
+            journeyPointers.unshift(this.j[stopId]);
             stopId = this.j[stopId].enterTripAtStop;
         }
+        return journeyPointers;
+    }
+
+    /**
+     * Uses the journey pointers to generate the journey response of the http request.
+     * @param sourceStop 
+     * @param targetStop 
+     * @param initialDate 
+     * @returns 
+     */
+    private static getJourneyResponse(): JourneyResponse {
+        const journeyPointers = this.getJourneyPointers();
 
         let reliability = 1;
         let lastTripId = null;
@@ -497,7 +486,7 @@ export class RaptorAlgorithmController {
         // generates the sections
         const sections: Section[] = []
         let numberOfLegs = 0;
-        for(let i = (journeyPointers.length - 1); i >= 0; i--){
+        for(let i = 0; i < journeyPointers.length; i++){
             let departureTime = journeyPointers[i].departureTime;
             let arrivalTime = journeyPointers[i].arrivalTime;
             let arrivalStop = journeyPointers[i].exitTripAtStop;
@@ -522,22 +511,22 @@ export class RaptorAlgorithmController {
 
             lastArrivalTime = arrivalTime;
             
-            if(i === 0 && section.departureStop === section.arrivalStop){
+            if(i === journeyPointers.length-1 && section.departureStop === section.arrivalStop){
                 break;
             }
             sections.push(section);
 
-            if(i > 0){
-                let nextDepartureStop = journeyPointers[i-1].enterTripAtStop;
+            if(i < journeyPointers.length-1){
+                let nextDepartureStop = journeyPointers[i+1].enterTripAtStop;
                 // raptor doesn't saves changes at stops. create them as footpath with a duration of 0 seconds.
-                if(arrivalStop === nextDepartureStop && type === 'Train' && journeyPointers[i-1].footpath === null){
+                if(arrivalStop === nextDepartureStop && type === 'Train' && journeyPointers[i+1].footpath === null){
                     let stopName = GoogleTransitData.STOPS[nextDepartureStop].name;
                     let section: Section = {
                         departureTime: Converter.secondsToTime(arrivalTime),
                         arrivalTime: Converter.secondsToTime(arrivalTime),
                         departureStop: stopName,
                         arrivalStop: stopName,
-                        duration: Converter.secondsToTime(0),
+                        duration: Converter.secondsToTime(CHANGE_TIME),
                         type: 'Footpath'
                     }
                     sections.push(section);
@@ -548,10 +537,10 @@ export class RaptorAlgorithmController {
         reliability = Math.floor(reliability * 100);
 
         // calculates departure and arrival date
-        let departureDate = new Date(initialDate);
-        let arrivalDate = new Date(initialDate);
-        departureDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyPointers[journeyPointers.length-1].departureTime))
-        arrivalDate.setDate(initialDate.getDate() + Converter.getDayDifference(journeyPointers[0].arrivalTime))
+        let departureDate = new Date(this.sourceDate);
+        let arrivalDate = new Date(this.sourceDate);
+        departureDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(journeyPointers[0].departureTime))
+        arrivalDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(journeyPointers[journeyPointers.length-1].arrivalTime))
         let departureDateAsString = departureDate.toLocaleDateString('de-DE');
         let arrivalDateAsString = arrivalDate.toLocaleDateString('de-DE');
 

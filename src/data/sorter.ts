@@ -1,6 +1,8 @@
 import { Connection } from "../models/Connection";
 import { Footpath } from "../models/Footpath";
 import { StopTime } from "../models/StopTime";
+import { TempEdge } from "../models/TempEdge";
+import { TempNode } from "../models/TempNode";
 
 export class Sorter {
     /**
@@ -97,6 +99,152 @@ export class Sorter {
             return 0;
         }
         if(a.arrivalStop > b.arrivalStop) {
+            return 1;
+        }
+    }
+
+    /**
+     * Sorts temp edges by departure time, arrival time, source stop, target stop and type.
+     * @param a 
+     * @param b 
+     * @returns 
+     */
+    public static sortEdgesByDepartureTime(a: TempEdge, b: TempEdge){
+        if(a.departureTime < b.departureTime){
+            return -1;
+        }
+        if(a.departureTime === b.departureTime){
+            if(a.arrivalTime < b.arrivalTime){
+                return -1;
+            }
+            if(a.arrivalTime === b.arrivalTime){
+                if(a.departureStop < b.departureStop){
+                    return -1;
+                }
+                if(a.departureStop === b.departureStop){
+                    if(a.arrivalStop < b.arrivalStop){
+                        return -1;
+                    }
+                    if(a.arrivalStop === b.arrivalStop){
+                        if(a.type < b.type){
+                            return -1;
+                        }
+                        if(a.type === b.type){
+                            return 0;
+                        }
+                        if(a.type > b.type){
+                            return 1;
+                        }
+                    }
+                    if(a.arrivalStop > b.arrivalStop){
+                        return 1;
+                    }
+                }
+                if(a.departureStop > b.departureStop){
+                    return 1;
+                }
+            }
+            if(a.arrivalTime > b.arrivalTime){
+                return 1;
+            }
+        }
+        if(a.departureTime > b.departureTime){
+            return 1
+        }
+    }
+
+    /**
+     * Sorts temp edges by source stop, target stop, type and departure time.
+     * @param a 
+     * @param b 
+     * @returns 
+     */
+     public static sortEdgesByDepartureStop(a: TempEdge, b: TempEdge){
+        if(a.departureStop < b.departureStop){
+            return -1;
+        }
+        if(a.departureStop === b.departureStop){
+            if(a.arrivalStop < b.arrivalStop){
+                return -1;
+            }
+            if(a.arrivalStop === b.arrivalStop){
+                if(a.type < b.type){
+                    return -1;
+                }
+                if(a.type === b.type){
+                    if(a.departureTime < b.departureTime){
+                        return -1;
+                    }
+                    if(a.departureTime === b.departureTime){
+                        return 0;
+                    }
+                    if(a.departureTime > b.departureTime){
+                        return 1;
+                    }
+                }
+                if(a.type > b.type){
+                    return 1;
+                }
+            }
+            if(a.arrivalStop > b.arrivalStop){
+                return 1;
+            }
+        }
+        if(a.departureStop > b.departureStop){
+            return 1
+        }
+    }
+
+    public static sortEdgesByDepartureStopAndDepartureTime(a: TempEdge, b: TempEdge){
+        if(a.departureStop < b.departureStop){
+            return -1;
+        }
+        if(a.departureStop === b.departureStop){
+            if(a.departureTime < b.departureTime){
+                return -1;
+            }
+            if(a.departureTime === b.departureTime){
+                return 0;
+            }
+            if(a.departureTime > b.departureTime){
+                return 1;
+            }
+        }
+        if(a.departureStop > b.departureStop){
+            return 1
+        }
+    }
+
+    /**
+     * Sorts tempNodes by time, stop and type.
+     * @param a 
+     * @param b 
+     * @returns 
+     */
+    public static sortNodesByTime(a: TempNode, b: TempNode){
+        if(a.time < b.time){
+            return -1;
+        }
+        if(a.time === b.time){
+            if(a.stop < b.stop){
+                return -1;
+            }
+            if(a.stop === b.stop){
+                if(a.type < b.type){
+                    return -1;
+                }
+                if(a.type === b.type){
+                    return 0;
+                }
+                if(a.type > b.type){
+                    return 1;
+                }
+            }
+            if(a.stop > b.stop){
+                return 1;
+            }
+        }
+        if(a.time > b.time){
             return 1;
         }
     }

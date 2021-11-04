@@ -5,9 +5,6 @@ import { Importer } from './data/importer';
 import { Generator } from './data/generator';
 import { TestController } from './server/controller/testController';
 import { Reliability } from './data/reliability';
-import { GoogleTransitData } from './data/google-transit-data';
-import { ProfileConnectionScanAlgorithmController } from './server/controller/profileConnectionScanAlgorithmController';
-import { Converter } from './data/converter';
 
 const app = express();
 
@@ -21,7 +18,8 @@ Generator.generateSortedConnections();
 // generates footpaths which can be used by raptor and csa
 Generator.generateFootpaths();
 Reliability.initReliability();
-//TestController.testProfileScanAlgorithm();
+// TestController.testAlgorithms();
+// TestController.testMeatAlgorithms();
 
 const port = 1337;
 const corsOptions = {

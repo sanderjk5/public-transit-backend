@@ -8,6 +8,8 @@ import { Trip } from "../models/Trip";
 import { Agency } from "../models/Agency";
 import { Connection } from "../models/Connection";
 import { RouteStopMapping } from "../models/RouteStopMapping";
+import { SECONDS_OF_A_DAY } from "../constants";
+import { Converter } from "./converter";
 
 
 export class GoogleTransitData {
