@@ -7,10 +7,17 @@ import {Node} from "../../models/Node";
 import { Cluster } from "../../models/Cluster";
 import { TempEdge } from "../../models/TempEdge";
 import { TempNode } from "../../models/TempNode";
-import { cloneDeep } from "lodash";
 
 export class DecisionGraphController {
 
+    /**
+     * Uses the information of the expanded temp edges to create an expanded and compact decision graph.
+     * @param expandedTempEdges 
+     * @param arrivalTimesPerStop 
+     * @param sourceStops 
+     * @param targetStops 
+     * @returns 
+     */
     public static getDecisionGraphs(expandedTempEdges: TempEdge[], arrivalTimesPerStop: Map<string, number[]>, sourceStops: number[], targetStops: number[]){
         let expandedDecisionGraph: DecisionGraph = {
             nodes: [],
@@ -156,6 +163,12 @@ export class DecisionGraphController {
         return decisionGraphs;
     }
 
+    /**
+     * Gets all departure times of the footpaths.
+     * @param arrivalTimesPerStop 
+     * @param expandedTempEdges 
+     * @returns 
+     */
     private static getDepartureTimesOfFootpaths(arrivalTimesPerStop: Map<string, number[]>, expandedTempEdges: TempEdge[]){
         expandedTempEdges.sort((a, b) => {
             return Sorter.sortEdgesByDepartureStopAndDepartureTime(a, b);
@@ -213,6 +226,11 @@ export class DecisionGraphController {
         return edges.filter(edge => edge !== undefined);
     }
 
+    /**
+     * Get the edges of the compact graph.
+     * @param expandedTempEdges 
+     * @returns 
+     */
     private static getCompactTempEdges(expandedTempEdges: TempEdge[]){
         let compactTempEdges = [];
         if(expandedTempEdges.length === 0){
@@ -255,6 +273,12 @@ export class DecisionGraphController {
         return compactTempEdges;
     }
 
+    /**
+     * Gets all arrival times of the target stop.
+     * @param expandedTempEdges 
+     * @param targetStops 
+     * @returns 
+     */
     private static getArrivalTimeArrayOfTargetStop(expandedTempEdges: TempEdge[], targetStops: number[]){
         if(expandedTempEdges.length === 0){
             return '';
@@ -309,5 +333,4 @@ export class DecisionGraphController {
         }
         return nodes.filter(node => node !== undefined);
     }
-
 }

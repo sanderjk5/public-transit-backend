@@ -97,10 +97,13 @@ export class ConnectionScanMeatAlgorithmController {
             this.minDepartureTime = Converter.timeToSeconds(req.query.sourceTime);
             this.sourceDate = new Date(req.query.date);
 
-            // gets the minimum times from the normal csa algorithm
+            // gets the minimum arrival times from the normal csa algorithm
             this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, false, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
+            if(this.earliestArrivalTimeCSA === null) {
+                throw new Error("Couldn't find a connection.")
+            }
             this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
-            if(this.earliestSafeArrivalTimeCSA === null || this.earliestArrivalTimeCSA === null) {
+            if(this.earliestSafeArrivalTimeCSA === null) {
                 throw new Error("Couldn't find a connection.")
             }
 
@@ -115,21 +118,14 @@ export class ConnectionScanMeatAlgorithmController {
             this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
             
             this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(req.query.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
-            // initializes the csa algorithm
+            // initializes the csa meat algorithm
             this.init();
-            // calls the csa
+            // calls the csa meat algorithm
             console.time('connection scan profile algorithm')
             this.performAlgorithm();
             console.timeEnd('connection scan profile algorithm')
-
-            // console.log(this.s[this.sourceStops[0]])
-            // console.log(this.s[6340])
-            // console.log(this.s[this.sourceStops[0]][0].expectedArrivalTime)
-            // console.log(Converter.secondsToTime(this.s[this.sourceStops[0]][0].expectedArrivalTime))
             
-            // console.log(Converter.secondsToTime(this.s[6340][0].departureTime))
-            
-            // generates the http response which includes all information of the graph
+            // generates the http response which includes all information of the journey incl. the graphs
             const meatResponse = this.extractDecisionGraphs();
             res.send(meatResponse);
         } catch(error) {
@@ -139,8 +135,17 @@ export class ConnectionScanMeatAlgorithmController {
         }
     }
 
+    /**
+     * Tests the connection scan meat algorithm.
+     * @param sourceStop 
+     * @param targetStop 
+     * @param sourceTime 
+     * @param sourceDate 
+     * @returns 
+     */
     public static testConnectionScanMeatAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
         try {
+            // gets the source and target stops
             this.sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
             this.targetStops = GoogleTransitData.getStopIdsByName(targetStop);
             // converts the source time
@@ -152,8 +157,11 @@ export class ConnectionScanMeatAlgorithmController {
     
             // gets the minimum times from the normal csa algorithm
             this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.sourceDate, this.minDepartureTime, false, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
+            if(this.earliestArrivalTimeCSA === null) {
+                return null;
+            }
             this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
-            if(this.earliestSafeArrivalTimeCSA === null || this.earliestArrivalTimeCSA === null) {
+            if(this.earliestSafeArrivalTimeCSA === null) {
                 return null;
             }
     
@@ -164,13 +172,14 @@ export class ConnectionScanMeatAlgorithmController {
             // sets the relevant dates
             this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
             this.currentDate = new Date(this.sourceDate);
-    
             this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
             
             this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
         
+            // initializes the csa meat algorithm
             this.init();
             const startTime = performance.now();
+            // calls the csa meat algorithm
             this.performAlgorithm();
             const duration = performance.now() - startTime;
             return {expectedArrivalTime: this.s[this.sourceStops[0]][0].expectedArrivalTime, duration: duration};
