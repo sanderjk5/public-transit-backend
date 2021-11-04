@@ -14,11 +14,11 @@ export class DecisionGraphController {
      * Uses the information of the expanded temp edges to create an expanded and compact decision graph.
      * @param expandedTempEdges 
      * @param arrivalTimesPerStop 
-     * @param sourceStops 
-     * @param targetStops 
+     * @param sourceStop 
+     * @param targetStop 
      * @returns 
      */
-    public static getDecisionGraphs(expandedTempEdges: TempEdge[], arrivalTimesPerStop: Map<string, number[]>, sourceStops: number[], targetStops: number[]){
+    public static getDecisionGraphs(expandedTempEdges: TempEdge[], arrivalTimesPerStop: Map<string, number[]>, sourceStop: number, targetStop: number){
         let expandedDecisionGraph: DecisionGraph = {
             nodes: [],
             links: [],
@@ -100,11 +100,11 @@ export class DecisionGraphController {
             }
         }
         let compactTempEdges: TempEdge[] = this.getCompactTempEdges(expandedTempEdges);
-        let arrivalTimeStringOfTarget = this.getArrivalTimeArrayOfTargetStop(expandedTempEdges, targetStops);
+        let arrivalTimeStringOfTarget = this.getArrivalTimeArrayOfTargetStop(expandedTempEdges, targetStop);
         let arrivalStops = new Map<string, string>();
         let departureNode: Node;
         for(let compactTempEdge of compactTempEdges){
-            if(compactTempEdge.departureStop === GoogleTransitData.STOPS[sourceStops[0]].name){
+            if(compactTempEdge.departureStop === GoogleTransitData.STOPS[sourceStop].name){
                 cluster = {
                     id: 'id_' + idCounter.toString(),
                     label: compactTempEdge.departureStop,
@@ -133,7 +133,7 @@ export class DecisionGraphController {
                     id: 'id_' + idCounter.toString(),
                     label: ' ',
                 }
-                if(compactTempEdge.arrivalStop === GoogleTransitData.STOPS[targetStops[0]].name){
+                if(compactTempEdge.arrivalStop === GoogleTransitData.STOPS[targetStop].name){
                     node.label = arrivalTimeStringOfTarget;
                 }
                 compactDecisionGraph.nodes.push(node);
@@ -276,17 +276,17 @@ export class DecisionGraphController {
     /**
      * Gets all arrival times of the target stop.
      * @param expandedTempEdges 
-     * @param targetStops 
+     * @param targetStop 
      * @returns 
      */
-    private static getArrivalTimeArrayOfTargetStop(expandedTempEdges: TempEdge[], targetStops: number[]){
+    private static getArrivalTimeArrayOfTargetStop(expandedTempEdges: TempEdge[], targetStop: number){
         if(expandedTempEdges.length === 0){
             return '';
         }
         let earliestArrivalTime = Number.MAX_VALUE;
         let latestArrivalTime = 0;
         for(let tempEdge of expandedTempEdges){
-            if(tempEdge.arrivalStop === GoogleTransitData.STOPS[targetStops[0]].name){
+            if(tempEdge.arrivalStop === GoogleTransitData.STOPS[targetStop].name){
                 if(tempEdge.arrivalTime < earliestArrivalTime){
                     earliestArrivalTime = tempEdge.arrivalTime;
                 }

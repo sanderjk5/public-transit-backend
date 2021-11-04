@@ -41,9 +41,9 @@ interface Label {
 
 export class RaptorMeatAlgorithmController {
     // source stops
-    private static sourceStops: number[];
+    private static sourceStop: number;
     // target stops
-    private static targetStops: number[];
+    private static targetStop: number;
 
     // the minimum departure time of the journey
     private static minDepartureTime: number;
@@ -91,8 +91,8 @@ export class RaptorMeatAlgorithmController {
                 return;
             }
             // gets the source and target stops
-            this.sourceStops = GoogleTransitData.getStopIdsByName(req.query.sourceStop);
-            this.targetStops = GoogleTransitData.getStopIdsByName(req.query.targetStop);
+            this.sourceStop = GoogleTransitData.getStopIdByName(req.query.sourceStop);
+            this.targetStop = GoogleTransitData.getStopIdByName(req.query.targetStop);
             // converts the source time
             this.minDepartureTime = Converter.timeToSeconds(req.query.sourceTime);
             // sets the source date
@@ -142,8 +142,8 @@ export class RaptorMeatAlgorithmController {
     public static testRaptorMeatAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
         try{
             // gets the source and target stops
-            this.sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
-            this.targetStops = GoogleTransitData.getStopIdsByName(targetStop);
+            this.sourceStop = GoogleTransitData.getStopIdByName(sourceStop);
+            this.targetStop = GoogleTransitData.getStopIdByName(targetStop);
             // converts the source time
             this.minDepartureTime = Converter.timeToSeconds(sourceTime);
             // sets the source date
@@ -168,7 +168,7 @@ export class RaptorMeatAlgorithmController {
             const startTime = performance.now();
             this.performAlgorithm();
             const duration = performance.now() - startTime;
-            return {expectedArrivalTime: this.expectedArrivalTimes[this.sourceStops[0]][0].expectedArrivalTime, duration: duration};
+            return {expectedArrivalTime: this.expectedArrivalTimes[this.sourceStop][0].expectedArrivalTime, duration: duration};
         } catch(error){
             return null;
         }
@@ -225,8 +225,8 @@ export class RaptorMeatAlgorithmController {
 
         this.markedStops = [];
         // sets the maximum departure time of the target stops
-        this.lastDepartureTimesOfLastRound[this.targetStops[0]] = this.maxArrivalTime;
-        this.markedStops.push(this.targetStops[0]);
+        this.lastDepartureTimesOfLastRound[this.targetStop] = this.maxArrivalTime;
+        this.markedStops.push(this.targetStop);
         
         // updates the footpaths of the source stops
         // for(let i = 0; i < sourceStops.length; i++) {
@@ -359,7 +359,7 @@ export class RaptorMeatAlgorithmController {
                 currentMaxDelay = MAX_D_C_LONG;
             }
             // sets the expected arrival time for target stops
-            if(this.targetStops.includes(pi)){
+            if(this.targetStop === pi){
                 let expectedDelay = Reliability.normalDistanceExpectedValue;
                 if(isLongDistanceTrip){
                     expectedDelay = Reliability.longDistanceExpectedValue;
@@ -618,19 +618,19 @@ export class RaptorMeatAlgorithmController {
      */
       private static extractDecisionGraphs() {
         // the minimum expected arrival time and date
-        let meatTime = this.expectedArrivalTimes[this.sourceStops[0]][0].expectedArrivalTime;
+        let meatTime = this.expectedArrivalTimes[this.sourceStop][0].expectedArrivalTime;
         this.meatDate = new Date(this.sourceDate);
         this.meatDate.setDate(this.meatDate.getDate() + Converter.getDayDifference(meatTime));
         // sets the departure time and date
-        let departureTime = this.expectedArrivalTimes[this.sourceStops[0]][0].departureTime;
+        let departureTime = this.expectedArrivalTimes[this.sourceStop][0].departureTime;
         let departureDate = new Date(this.sourceDate);
         departureDate.setDate(departureDate.getDate() + Converter.getDayDifference(departureTime))
         
         // sets the common values of the journey
         let meatResponse: MeatResponse = {
-            sourceStop: GoogleTransitData.STOPS[this.sourceStops[0]].name,
-            targetStop: GoogleTransitData.STOPS[this.targetStops[0]].name,
-            departureTime: Converter.secondsToTime(this.expectedArrivalTimes[this.sourceStops[0]][0].departureTime),
+            sourceStop: GoogleTransitData.STOPS[this.sourceStop].name,
+            targetStop: GoogleTransitData.STOPS[this.targetStop].name,
+            departureTime: Converter.secondsToTime(this.expectedArrivalTimes[this.sourceStop][0].departureTime),
             departureDate: departureDate.toLocaleDateString('de-DE'),
             meatTime: Converter.secondsToTime(meatTime),
             meatDate: this.meatDate.toLocaleDateString('de-DE'),
@@ -654,12 +654,12 @@ export class RaptorMeatAlgorithmController {
         let priorityQueue = new FastPriorityQueue<Label>((a, b) => {
             return a.departureTime < b.departureTime
         });
-        if(this.expectedArrivalTimes[this.sourceStops[0]][0].departureTime === Number.MAX_VALUE){
+        if(this.expectedArrivalTimes[this.sourceStop][0].departureTime === Number.MAX_VALUE){
             throw new Error("Couldn't find a connection.")
         }
         // adds the source stop
-        this.expectedArrivalTimes[this.sourceStops[0]][0].calcReliability = 1;
-        priorityQueue.add(this.expectedArrivalTimes[this.sourceStops[0]][0]);
+        this.expectedArrivalTimes[this.sourceStop][0].calcReliability = 1;
+        priorityQueue.add(this.expectedArrivalTimes[this.sourceStop][0]);
         while(!priorityQueue.isEmpty()){
             let p = priorityQueue.poll();
             let tripId = p.associatedTrip.tripId;
@@ -713,7 +713,7 @@ export class RaptorMeatAlgorithmController {
             //     }
             // }
             // checks if the current label reaches the target
-            if(p.exitTripAtStop !== this.targetStops[0]){
+            if(p.exitTripAtStop !== this.targetStop){
                 // sets max delay
                 let maxDelay: number;
                 let isLongDistanceTrip: boolean;
@@ -760,7 +760,7 @@ export class RaptorMeatAlgorithmController {
         }
         // let meat = this.calculateMEAT(targetStopLabels);
         // gets the two graph representations
-        const decisionGraphs = DecisionGraphController.getDecisionGraphs(expandedTempEdges, arrivalTimesPerStop, this.sourceStops, this.targetStops);
+        const decisionGraphs = DecisionGraphController.getDecisionGraphs(expandedTempEdges, arrivalTimesPerStop, this.sourceStop, this.targetStop);
         meatResponse.expandedDecisionGraph = decisionGraphs.expandedDecisionGraph;
         meatResponse.compactDecisionGraph = decisionGraphs.compactDecisionGraph;
         return meatResponse;
