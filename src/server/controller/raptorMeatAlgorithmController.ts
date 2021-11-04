@@ -66,9 +66,9 @@ export class RaptorMeatAlgorithmController {
     private static k: number;
 
     // stores for each stop the latest departure time of the last round
-    private static lastDepartureTimesOfLastRound: number[];
+    private static latestDepartureTimesOfLastRound: number[];
     // stores the labels of the current round for each stop
-    private static earliestArrivalTimesCurrentRound: Label[][];
+    private static expectedArrivalTimesOfCurrentRound: Label[][];
     // stores for each stop the expected arrival times sorted by departure time. A label dominates every label with a higher departure time.
     private static expectedArrivalTimes: Label[][];
     // stores the marked stops of the current round
@@ -122,6 +122,7 @@ export class RaptorMeatAlgorithmController {
             // calls the raptor meat algorithm
             this.performAlgorithm();
             console.timeEnd('raptor meat algorithm')
+            console.log(this.expectedArrivalTimes[this.sourceStop][0])
             // generates the http response which includes all information of the journey incl. its decision graphs
             const meatResponse = this.extractDecisionGraphs();
             res.status(200).send(meatResponse);
@@ -210,7 +211,7 @@ export class RaptorMeatAlgorithmController {
     private static init(){
         // creates the arrays
         const numberOfStops = GoogleTransitData.STOPS.length;
-        this.lastDepartureTimesOfLastRound = new Array(numberOfStops);
+        this.latestDepartureTimesOfLastRound = new Array(numberOfStops);
         this.expectedArrivalTimes = new Array(numberOfStops);
 
         // sets the default label of each stop
@@ -225,7 +226,7 @@ export class RaptorMeatAlgorithmController {
 
         this.markedStops = [];
         // sets the maximum departure time of the target stops
-        this.lastDepartureTimesOfLastRound[this.targetStop] = this.maxArrivalTime;
+        this.latestDepartureTimesOfLastRound[this.targetStop] = this.maxArrivalTime;
         this.markedStops.push(this.targetStop);
         
         // updates the footpaths of the source stops
@@ -260,9 +261,9 @@ export class RaptorMeatAlgorithmController {
      */
     private static initNextRound() {
         const numberOfStops = GoogleTransitData.STOPS.length;
-        this.earliestArrivalTimesCurrentRound = new Array(numberOfStops);
+        this.expectedArrivalTimesOfCurrentRound = new Array(numberOfStops);
         for(let i = 0; i < numberOfStops; i++){
-            this.earliestArrivalTimesCurrentRound[i] = [];
+            this.expectedArrivalTimesOfCurrentRound[i] = [];
         }
     }
 
@@ -327,7 +328,7 @@ export class RaptorMeatAlgorithmController {
                 // updates the route bag with the departure times of this stop
                 routeBag = this.updateRouteBag(routeBag, pi);
                 // merges the routeBag in the current round bag of the stop
-                this.mergeBagInRoundBag(routeBag, pi);
+                this.addBagToExpectedArrivalTimesOfRound(routeBag, pi);
                 // adds the labels of the last round of this stop to the route bag
                 routeBag = this.mergeLastRoundLabelsInRouteBag(r, pi, routeBag);
             }
@@ -343,14 +344,14 @@ export class RaptorMeatAlgorithmController {
      * @returns 
      */
     private static mergeLastRoundLabelsInRouteBag(r: number, pi: number, routeBag: Label[]){
-        if(this.lastDepartureTimesOfLastRound[pi] === undefined){
+        if(this.latestDepartureTimesOfLastRound[pi] === undefined){
             return routeBag;
         }
         // gets all trips between the minimum arrival time and the last departure of last round at this stop
-        let newTripInfos: EarliestTripInfo[] = this.getTripsOfInterval(r, pi, this.lastDepartureTimesOfLastRound[pi]);
+        let newTripInfos: EarliestTripInfo[] = this.getTripsOfInterval(r, pi, this.latestDepartureTimesOfLastRound[pi]);
         // creates a new label for each trip
         for(let newTripInfo of newTripInfos){
-            let newArrivalTime: number = 0;
+            let newExpectedArrivalTime: number = 0;
             // set the trip infos
             let isLongDistanceTrip = GoogleTransitData.TRIPS[newTripInfo.tripId].isLongDistance;
             let currentTripArrivalTime = newTripInfo.tripArrival;
@@ -364,7 +365,7 @@ export class RaptorMeatAlgorithmController {
                 if(isLongDistanceTrip){
                     expectedDelay = Reliability.longDistanceExpectedValue;
                 }
-                newArrivalTime = currentTripArrivalTime + expectedDelay;
+                newExpectedArrivalTime = currentTripArrivalTime + expectedDelay;
             } 
             // sets the expected arrival time for normal stops
             else {
@@ -384,13 +385,13 @@ export class RaptorMeatAlgorithmController {
                 // calculates the expected arrival time when transfering at this stop
                 for(let j = 0; j < relevantLabels.length; j++) {
                     label = relevantLabels[j];
-                    newArrivalTime += (label.expectedArrivalTime * Reliability.getReliability(labelLastDepartureTime - currentTripArrivalTime, label.departureTime - currentTripArrivalTime, isLongDistanceTrip));
+                    newExpectedArrivalTime += (label.expectedArrivalTime * Reliability.getReliability(labelLastDepartureTime - currentTripArrivalTime, label.departureTime - currentTripArrivalTime, isLongDistanceTrip));
                     labelLastDepartureTime = label.departureTime;
                 }
             }
             // sets the values of the new label and adds it to the route bag
             let newLabel: Label = {
-                expectedArrivalTime: newArrivalTime,
+                expectedArrivalTime: newExpectedArrivalTime,
                 associatedTrip: newTripInfo,
                 exitTripAtStop: pi,
                 transferRound: this.k,
@@ -436,24 +437,24 @@ export class RaptorMeatAlgorithmController {
     }
 
     // adds all labels of the route bag to the bag of the current stop
-    private static mergeBagInRoundBag(bag: Label[], pi: number){        
+    private static addBagToExpectedArrivalTimesOfRound(bag: Label[], pi: number){        
         for(let label of bag){
-            this.earliestArrivalTimesCurrentRound[pi].push(label);
+            this.expectedArrivalTimesOfCurrentRound[pi].push(label);
         }
     }
 
     // uses the new labels of the current round to update the bag of expected arrival times of each stop
     private static updateExpectedArrivalTimes(){
         // initializes the new array of departure times
-        this.lastDepartureTimesOfLastRound = new Array(GoogleTransitData.STOPS.length);
+        this.latestDepartureTimesOfLastRound = new Array(GoogleTransitData.STOPS.length);
         // updates the expected arrival times for each stop
         for(let i = 0; i < GoogleTransitData.STOPS.length; i++){
-            if(this.earliestArrivalTimesCurrentRound[i].length === 0){
+            if(this.expectedArrivalTimesOfCurrentRound[i].length === 0){
                 continue;
             }
             // adds all new labels to the labels of previous rounds
             let expectedArrivalTimesDeepClone = cloneDeep(this.expectedArrivalTimes[i]);
-            for(let label of this.earliestArrivalTimesCurrentRound[i]){
+            for(let label of this.expectedArrivalTimesOfCurrentRound[i]){
                 expectedArrivalTimesDeepClone.push(cloneDeep(label));
             }
             // sorts the expected arrival times by departure time
@@ -471,7 +472,7 @@ export class RaptorMeatAlgorithmController {
                     // adds the highest new departure time to the array and marks the stop if a label of the current round was added
                     if(currentLabel.transferRound === this.k && !this.markedStops.includes(i)){
                         this.markedStops.push(i);
-                        this.lastDepartureTimesOfLastRound[i] = currentLabel.departureTime;
+                        this.latestDepartureTimesOfLastRound[i] = currentLabel.departureTime;
                     }
                     lastLabel = currentLabel;
                 }

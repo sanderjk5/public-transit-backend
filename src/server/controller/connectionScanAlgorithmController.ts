@@ -116,12 +116,7 @@ export class ConnectionScanAlgorithmController {
             this.performAlgorithm();
             const duration = performance.now() - startTime;
             // gets the earliest arrival time at the target stops
-            let earliestTargetStopArrival = this.s[targetStop[0]];
-            for(let l = 1; l < targetStop.length; l++){
-                if(this.s[targetStop[l]] < earliestTargetStopArrival){
-                    earliestTargetStopArrival = this.s[targetStop[l]];
-                }
-            }
+            let earliestTargetStopArrival = this.s[this.targetStop];
             if(earliestTargetStopArrival === Number.MAX_VALUE){
                 throw new Error('invalid time');
             }

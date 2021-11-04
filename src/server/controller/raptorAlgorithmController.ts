@@ -110,7 +110,7 @@ export class RaptorAlgorithmController {
             this.performAlgorithm();
             const duration = performance.now() - startTime;
             // gets the earliest arrival time at the target stops
-            let earliestTargetStopArrival = this.earliestArrivalTime[targetStop];
+            let earliestTargetStopArrival = this.earliestArrivalTime[this.targetStop];
             if(earliestTargetStopArrival === Number.MAX_VALUE){
                 throw new Error('invalid time');
             }
