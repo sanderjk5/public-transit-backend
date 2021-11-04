@@ -153,6 +153,7 @@ export class ConnectionScanAlgorithmController {
     public static getEarliestArrivalTimes(sourceStop: string, sourceDate: Date, sourceTimeInSeconds: number, maxArrivalTime: number){
         // gets the source and target stops
         this.sourceStop = GoogleTransitData.getStopIdByName(sourceStop);
+        this.targetStop = undefined;
 
         this.sourceTime = sourceTimeInSeconds;
         this.sourceDate = sourceDate;
