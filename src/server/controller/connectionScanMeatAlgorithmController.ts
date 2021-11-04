@@ -5,8 +5,6 @@ import { Converter } from "../../data/converter";
 import { GoogleTransitData } from "../../data/google-transit-data";
 import { Searcher } from "../../data/searcher";
 import { Connection } from "../../models/Connection";
-import { JourneyResponse } from "../../models/JourneyResponse";
-import { Section } from "../../models/Section";
 import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmController";
 import { performance } from 'perf_hooks';
 import { Reliability } from "../../data/reliability";
@@ -18,7 +16,6 @@ import { Cluster } from "../../models/Cluster";
 import { MeatResponse } from "../../models/MeatResponse";
 import { TempNode } from "../../models/TempNode";
 import { TempEdge } from "../../models/TempEdge";
-import {cloneDeep} from 'lodash';
 
 // profile function entry
 interface SEntry {
@@ -51,7 +48,7 @@ interface DEntry {
     footpath: number,
 }
 
-export class ProfileConnectionScanAlgorithmController {
+export class ConnectionScanMeatAlgorithmController {
     // the profile function of each stop
     private static s: SEntry[][];
     // the earliest expected arrival time of each trip
@@ -84,7 +81,7 @@ export class ProfileConnectionScanAlgorithmController {
      * @param res 
      * @returns 
      */
-    public static profileConnectionScanAlgorithmRoute(req: express.Request, res: express.Response){
+    public static connectionScanMeatAlgorithmRoute(req: express.Request, res: express.Response){
         try {
             // checks the parameters of the http request
             if(!req.query || !req.query.sourceStop || !req.query.targetStop || !req.query.sourceTime || !req.query.date ||
@@ -141,7 +138,7 @@ export class ProfileConnectionScanAlgorithmController {
         }
     }
 
-    public static testProfileConnectionScanAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
+    public static testConnectionScanMeatAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
         try {
             this.sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
             this.targetStops = GoogleTransitData.getStopIdsByName(targetStop);

@@ -1,11 +1,9 @@
 import express from "express";
-import { ParsedQs } from "qs";
 import { Calculator } from "../../data/calculator";
 import { Converter } from "../../data/converter";
 import { GoogleTransitData } from "../../data/google-transit-data";
 import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmController";
 import FastPriorityQueue from 'fastpriorityqueue';
-import { RaptorAlgorithmController } from "./raptorAlgorithmController";
 import { MeatResponse } from "../../models/MeatResponse";
 import { DecisionGraph } from "../../models/DecisionGraph";
 import { TempNode } from "../../models/TempNode";
@@ -15,10 +13,8 @@ import { Link } from "../../models/Link";
 import {Node} from "../../models/Node";
 import { Cluster } from "../../models/Cluster";
 import { Reliability } from "../../data/reliability";
-import { McRaptorAlgorithmController } from "./mcRaptorAlgorithmController";
 import { RouteStopMapping } from "../../models/RouteStopMapping";
 import { StopTime } from "../../models/StopTime";
-import { JourneyPointerRaptor } from "../../models/JourneyPointerRaptor";
 import { performance } from 'perf_hooks';
 import {cloneDeep} from 'lodash';
 
@@ -107,17 +103,6 @@ export class RaptorMeatAlgorithmController {
             // calls the raptor
             this.performAlgorithm();
             console.timeEnd('raptor meat algorithm')
-            // console.log(this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][this.sourceStops[0]])
-            // for(let i = 0; i < this.earliestArrivalTimePerRound.length; i++){
-            //     console.log(i);
-            //     console.log(this.earliestArrivalTimePerRound[i][6352]);
-            // }
-            // console.log(this.earliestExpectedArrivalTimes[6340])
-            // console.log(this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][6340])
-            // console.log(Converter.secondsToTime(this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][6340][0].expectedArrivalTime))
-            // console.log(this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][this.sourceStops[0]][0].expectedArrivalTime)
-            // console.log(Converter.secondsToTime(this.earliestArrivalTimePerRound[this.earliestArrivalTimePerRound.length-1][6340][0].departureTime))
-            //McRaptorAlgorithmController.getJourneyPointersOfRaptorAlgorithm(this.sourceStops, this.targetStops, this.sourceDate, this.minDepartureTime, this.maxArrivalTime);
             // generates the http response which includes all information of the journey
             const meatResponse = this.extractDecisionGraphs();
             res.status(200).send(meatResponse);
@@ -161,9 +146,7 @@ export class RaptorMeatAlgorithmController {
         this.k = 0;
         while(true){
             // increases round counter
-            // console.log(this.earliestArrivalTimePerRound[k][this.sourceStops[0]]);
             this.k++;
-            // console.log('k: ' + this.k)
             // adds an empty array to the earliest arrival times
             this.addNextArrivalTimeRound();
             // fills the array of route-stop pairs
@@ -286,7 +269,6 @@ export class RaptorMeatAlgorithmController {
      */
     private static traverseRoutes() {
         // loop over all elements of q
-        // console.log(this.k)
         for(let i= 0; i < this.Q.length; i++){
             let r = this.Q[i].r;
             let p = this.Q[i].p;
@@ -358,9 +340,6 @@ export class RaptorMeatAlgorithmController {
                 exitTripAtStop: pi,
                 transferRound: this.k,
             }
-            // if(pi === 6340 && newTripInfo.tripId === 252){
-            //     console.log(newLabel)
-            // }
             routeBag.push(newLabel);
         }
         return routeBag;
@@ -434,9 +413,6 @@ export class RaptorMeatAlgorithmController {
                     this.earliestExpectedArrivalTimes[i].push(expectedArrivalTimesDeepClone[j]);
                 }
             }
-            // if(i === this.sourceStops[0]){
-            //     console.log(this.earliestExpectedArrivalTimes[i])
-            // }
         }
     }
 
@@ -698,9 +674,7 @@ export class RaptorMeatAlgorithmController {
                 targetStopLabels.push(p)
             }
         }
-        let meat = this.calculateMEAT(targetStopLabels);
-        console.log(meat);
-        console.log(Converter.secondsToTime(meat));
+        // let meat = this.calculateMEAT(targetStopLabels);
         let idCounter = 0;
         let tempNodes: TempNode[] = [];
         let tempNodeArr: TempNode;
@@ -847,7 +821,6 @@ export class RaptorMeatAlgorithmController {
             let arrivalTime = targetStopLabel.associatedTrip.tripArrival + expectedDelay;
             meat += (arrivalTime * targetStopLabel.calcReliability);
         }
-        console.log(probabilitySum)
         return meat;
     }
 

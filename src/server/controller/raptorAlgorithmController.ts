@@ -10,7 +10,6 @@ import { Calculator } from "../../data/calculator";
 import { CHANGE_TIME, SECONDS_OF_A_DAY } from "../../constants";
 import { Reliability } from "../../data/reliability";
 import { JourneyPointerRaptor } from "../../models/JourneyPointerRaptor";
-import { McRaptorAlgorithmController } from "./mcRaptorAlgorithmController";
 
 // entries of the q array
 interface QEntry {
@@ -109,19 +108,6 @@ export class RaptorAlgorithmController {
             }
             return {arrivalTime: earliestTargetStopArrival, duration: duration};
         } catch (err) {
-            return null;
-        }
-    }
-
-    public static getJourneyPointersOfRaptorAlgorithm(sourceStops: number[], targetStops: number[], sourceDate: Date, sourceTimeInSeconds: number): JourneyPointerRaptor[] {
-        try {
-            // sets the source Weekday
-            this.sourceWeekday = Calculator.moduloSeven((sourceDate.getDay() - 1));
-            this.init(sourceStops, sourceTimeInSeconds);
-            this.performAlgorithm(targetStops);
-            const journeyPointers: JourneyPointerRaptor[] = this.getJourneyPointers(sourceStops, targetStops);
-            return journeyPointers;
-        } catch (err){
             return null;
         }
     }

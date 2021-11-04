@@ -2,7 +2,7 @@ import { SECONDS_OF_A_DAY } from "../../constants";
 import { Converter } from "../../data/converter";
 import { GoogleTransitData } from "../../data/google-transit-data";
 import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmController";
-import { ProfileConnectionScanAlgorithmController } from "./profileConnectionScanAlgorithmController";
+import { ConnectionScanMeatAlgorithmController } from "./connectionScanMeatAlgorithmController";
 import { RaptorAlgorithmController } from "./raptorAlgorithmController";
 import { RaptorMeatAlgorithmController } from "./raptorMeatAlgorithmController";
 
@@ -80,7 +80,7 @@ export class TestController {
             let requestString = randomSourceStop + ', ' + randomTargetStop + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime);
             console.log('request: ' + requestString)
             const raptorResponse = RaptorMeatAlgorithmController.testRaptorMeatAlgorithm(randomSourceStop, randomTargetStop, Converter.secondsToTime(randomSourceTime), randomSourceDate);
-            const csaResponse = ProfileConnectionScanAlgorithmController.testProfileConnectionScanAlgorithm(randomSourceStop, randomTargetStop, Converter.secondsToTime(randomSourceTime), randomSourceDate);
+            const csaResponse = ConnectionScanMeatAlgorithmController.testConnectionScanMeatAlgorithm(randomSourceStop, randomTargetStop, Converter.secondsToTime(randomSourceTime), randomSourceDate);
             if(raptorResponse){
                 raptorMeatTimes += raptorResponse.duration;
                 numberOfSuccessfulRequestsRaptor++;

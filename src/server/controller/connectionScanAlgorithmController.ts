@@ -1,4 +1,4 @@
-import express, { response } from 'express';
+import express from 'express';
 import { Converter } from "../../data/converter";
 import { GoogleTransitData } from "../../data/google-transit-data";
 import { Searcher } from "../../data/searcher";
