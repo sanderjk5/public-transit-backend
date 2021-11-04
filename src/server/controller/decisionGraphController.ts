@@ -7,6 +7,7 @@ import {Node} from "../../models/Node";
 import { Cluster } from "../../models/Cluster";
 import { TempEdge } from "../../models/TempEdge";
 import { TempNode } from "../../models/TempNode";
+import { cloneDeep } from "lodash";
 
 export class DecisionGraphController {
 

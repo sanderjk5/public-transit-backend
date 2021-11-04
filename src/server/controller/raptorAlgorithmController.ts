@@ -135,7 +135,7 @@ export class RaptorAlgorithmController {
             // traverses each route and updates earliest arrival times
             this.traverseRoutes();
             // updates earliest arrival times with footpaths of marked stops
-            // this.handleFootpaths();
+            this.handleFootpaths();
             // termination condition
             if(this.markedStops.length === 0){
                 break;

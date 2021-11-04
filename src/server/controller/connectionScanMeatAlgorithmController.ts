@@ -337,18 +337,7 @@ export class ConnectionScanMeatAlgorithmController {
                 finalFootpath: this.t[currentConnection.trip].finalFootpath,
             }
 
-            // profile function with minimum expected arrival time of departure stop
-            // let q = this.s[currentConnection.departureStop][0];
             if(p.expectedArrivalTime !== Number.MAX_VALUE) {
-                // checks if q dominates p
-                // if(!this.dominates(q, p)){
-                //     // adds p to the s entry of the departure stop
-                //     if(q.departureTime !== p.departureTime){
-                //         this.s[currentConnection.departureStop].unshift(p)
-                //     } else {
-                //         this.s[currentConnection.departureStop][0] = p;
-                //     }
-                // }
                 let footpaths = GoogleTransitData.getAllFootpathsOfAArrivalStop(currentConnection.departureStop);
                 for(let footpath of footpaths) {
                     let pNew: SEntry= {
