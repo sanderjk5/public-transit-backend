@@ -465,7 +465,7 @@ export class RaptorMeatAlgorithmController {
             for(let j = expectedArrivalTimesDeepClone.length-2; j >= 0; j--){
                 let currentLabel = expectedArrivalTimesDeepClone[j];
                 // stores maximal one label for each departure time and deletes dominated labels
-                if(lastLabel.departureTime === currentLabel.departureTime || lastLabel.expectedArrivalTime <= currentLabel.expectedArrivalTime){
+                if(lastLabel.expectedArrivalTime <= currentLabel.expectedArrivalTime){
                     expectedArrivalTimesDeepClone[j] = undefined;
                 } else {
                     // adds the highest new departure time to the array and marks the stop if a label of the current round was added
