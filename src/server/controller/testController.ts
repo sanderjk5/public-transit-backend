@@ -71,11 +71,14 @@ export class TestController {
             newDate.setDate(initialDate.getDate() + i);
             dates.push(newDate);
         }
-        for(let i = 0; i < 10; i++){
+        const failedRequests = [];
+        for(let i = 0; i < 200; i++){
             const randomSourceStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
             const randomTargetStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
             const randomSourceTime = this.getRandomInt(numberOfSeconds);
             const randomSourceDate = dates[this.getRandomInt(numberOfDates)];
+            let requestString = randomSourceStop + ', ' + randomTargetStop + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime);
+            console.log('request: ' + requestString)
             const raptorResponse = RaptorMeatAlgorithmController.testRaptorMeatAlgorithm(randomSourceStop, randomTargetStop, Converter.secondsToTime(randomSourceTime), randomSourceDate);
             const csaResponse = ProfileConnectionScanAlgorithmController.testProfileConnectionScanAlgorithm(randomSourceStop, randomTargetStop, Converter.secondsToTime(randomSourceTime), randomSourceDate);
             if(raptorResponse){
@@ -88,19 +91,28 @@ export class TestController {
             }
             if(raptorResponse && csaResponse){
                 if(raptorResponse.expectedArrivalTime !== csaResponse.expectedArrivalTime){
-                    console.log('failed for: ' + randomSourceStop + ', ' + randomTargetStop + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime));
+                    console.log('result: failed');
+                    failedRequests.push(requestString)
                 } else {
-                    console.log('successful for: ' + randomSourceStop + ', ' + randomTargetStop + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime));
+                    console.log('result: successful');
                 }
             } else if (!(!raptorResponse && !csaResponse)){
-                console.log('failed for: ' + randomSourceStop + ', ' + randomTargetStop + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime));
+                console.log('result: failed');
+                failedRequests.push(requestString)
             } else {
-                console.log('found no solution for: ' + randomSourceStop + ', ' + randomTargetStop + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime));
+                console.log('result: no solution exists');
             }
         }
         console.log('average raptor: ' + raptorMeatTimes/numberOfSuccessfulRequestsRaptor)
         console.log('average csa: ' + csaMeatTimes/numberOfSuccessfulRequestsCSA)
+        if(failedRequests.length > 0){
+            console.log('failed requests:')
+            console.log(failedRequests)
+        } else {
+            console.log('no request failed')
+        }
     }
+
 
     /**
      * Returns a random integer of the interval [0, max).
