@@ -111,6 +111,9 @@ export class ConnectionScanAlgorithmController {
                     earliestTargetStopArrival = this.s[targetStops[l]];
                 }
             }
+            if(earliestTargetStopArrival === Number.MAX_VALUE){
+                throw new Error('invalid time');
+            }
             return {arrivalTime: earliestTargetStopArrival, duration: duration};
         } catch (err) {
             return null;
