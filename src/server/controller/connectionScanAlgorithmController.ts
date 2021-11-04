@@ -117,7 +117,7 @@ export class ConnectionScanAlgorithmController {
         }
     }
 
-    public static getEarliestArrivalTime(sourceStop: string, targetStop: string, sourceDate: Date, sourceTimeInSeconds: number, safeVariant: boolean){
+    public static getEarliestArrivalTime(sourceStop: string, targetStop: string, sourceDate: Date, sourceTimeInSeconds: number, safeVariant: boolean, maxArrivalTime: number){
         // gets the source and target stops
         const sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
         const targetStops = GoogleTransitData.getStopIdsByName(targetStop);
@@ -126,13 +126,16 @@ export class ConnectionScanAlgorithmController {
             // initializes the csa algorithm
             this.init(sourceStops, sourceTimeInSeconds, sourceDate);
             // calls the csa
-            this.performAlgorithm(targetStops, safeVariant);
+            this.performAlgorithm(targetStops, safeVariant, maxArrivalTime);
             // gets the earliest arrival time at the target stops
             let earliestTargetStopArrival = this.s[targetStops[0]];
             for(let i = 1; i < targetStops.length; i++){
                 if(this.s[targetStops[i]] < earliestTargetStopArrival){
                     earliestTargetStopArrival = this.s[targetStops[i]];
                 }
+            }
+            if(earliestTargetStopArrival === Number.MAX_VALUE){
+                earliestTargetStopArrival = null;
             }
             return earliestTargetStopArrival;
         } catch (err) {

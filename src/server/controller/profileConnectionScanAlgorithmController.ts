@@ -100,14 +100,15 @@ export class ProfileConnectionScanAlgorithmController {
             this.sourceDate = new Date(req.query.date);
 
             // gets the minimum times from the normal csa algorithm
-            this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, false);
-            this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, true);
+            this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, false, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
+            this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
             if(this.earliestSafeArrivalTimeCSA === null || this.earliestArrivalTimeCSA === null) {
                 throw new Error("Couldn't find a connection.")
             }
 
             // calculates the maximum arrival time of the alpha bounded version of the algorithm
-            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+            let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
             
             // sets the relevant dates
             this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
@@ -125,8 +126,8 @@ export class ProfileConnectionScanAlgorithmController {
 
             // console.log(this.s[this.sourceStops[0]])
             // console.log(this.s[6340])
-            console.log(this.s[this.sourceStops[0]][0].expectedArrivalTime)
-            console.log(Converter.secondsToTime(this.s[this.sourceStops[0]][0].expectedArrivalTime))
+            // console.log(this.s[this.sourceStops[0]][0].expectedArrivalTime)
+            // console.log(Converter.secondsToTime(this.s[this.sourceStops[0]][0].expectedArrivalTime))
             
             // console.log(Converter.secondsToTime(this.s[6340][0].departureTime))
             
@@ -141,38 +142,43 @@ export class ProfileConnectionScanAlgorithmController {
     }
 
     public static testProfileConnectionScanAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
-        this.sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
-        this.targetStops = GoogleTransitData.getStopIdsByName(targetStop);
-        // converts the source time
-        this.minDepartureTime = Converter.timeToSeconds(sourceTime);
-        this.currentDate = sourceDate;
-
-        this.minDepartureTime = Converter.timeToSeconds(sourceTime);
-        this.sourceDate = sourceDate;
-
-        // gets the minimum times from the normal csa algorithm
-        this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.sourceDate, this.minDepartureTime, false);
-        this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.sourceDate, this.minDepartureTime, true);
-        if(this.earliestSafeArrivalTimeCSA === null || this.earliestArrivalTimeCSA === null) {
+        try {
+            this.sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
+            this.targetStops = GoogleTransitData.getStopIdsByName(targetStop);
+            // converts the source time
+            this.minDepartureTime = Converter.timeToSeconds(sourceTime);
+            this.currentDate = sourceDate;
+    
+            this.minDepartureTime = Converter.timeToSeconds(sourceTime);
+            this.sourceDate = sourceDate;
+    
+            // gets the minimum times from the normal csa algorithm
+            this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.sourceDate, this.minDepartureTime, false, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
+            this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
+            if(this.earliestSafeArrivalTimeCSA === null || this.earliestArrivalTimeCSA === null) {
+                return null;
+            }
+    
+            // calculates the maximum arrival time of the alpha bounded version of the algorithm
+            let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
+            
+            // sets the relevant dates
+            this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
+            this.currentDate = new Date(this.sourceDate);
+    
+            this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
+            
+            this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
+        
+            this.init();
+            const startTime = performance.now();
+            this.performAlgorithm();
+            const duration = performance.now() - startTime;
+            return {expectedArrivalTime: this.s[this.sourceStops[0]][0].expectedArrivalTime, duration: duration};
+        } catch (error){
             return null;
         }
-
-        // calculates the maximum arrival time of the alpha bounded version of the algorithm
-        this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-        
-        // sets the relevant dates
-        this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
-        this.currentDate = new Date(this.sourceDate);
-
-        this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
-        
-        this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
-    
-        this.init();
-        const startTime = performance.now();
-        this.performAlgorithm();
-        const duration = performance.now() - startTime;
-        return {expectedArrivalTime: this.s[this.sourceStops[0]][0].expectedArrivalTime, duration: duration};
     }
 
     /**

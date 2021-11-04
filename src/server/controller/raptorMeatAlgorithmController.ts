@@ -89,13 +89,13 @@ export class RaptorMeatAlgorithmController {
 
             console.time('csa algorithms')
             // gets the minimum times from the normal csa algorithm
-            this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, false);
-            this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, true);
+            this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, false, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
+            this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
             if(this.earliestSafeArrivalTimeCSA === null || this.earliestArrivalTimeCSA === null) {
                 throw new Error("Couldn't find a connection.")
             }
-            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-            console.log(Converter.secondsToTime(this.maxArrivalTime))
+            let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
             this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(req.query.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
             console.timeEnd('csa algorithms')
             // calculates the maximum arrival time of the alpha bounded version of the algorithm
@@ -128,24 +128,29 @@ export class RaptorMeatAlgorithmController {
     }
 
     public static testRaptorMeatAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
-        this.sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
-        this.targetStops = GoogleTransitData.getStopIdsByName(targetStop);
-        // converts the source time
-        this.minDepartureTime = Converter.timeToSeconds(sourceTime);
-        this.sourceDate = sourceDate;
-        this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
-        this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.sourceDate, this.minDepartureTime, false);
-        this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.sourceDate, this.minDepartureTime, true);
-        if(this.earliestSafeArrivalTimeCSA === null || this.earliestArrivalTimeCSA === null) {
+        try{
+            this.sourceStops = GoogleTransitData.getStopIdsByName(sourceStop);
+            this.targetStops = GoogleTransitData.getStopIdsByName(targetStop);
+            // converts the source time
+            this.minDepartureTime = Converter.timeToSeconds(sourceTime);
+            this.sourceDate = sourceDate;
+            this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
+            this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.sourceDate, this.minDepartureTime, false, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
+            this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
+            if(this.earliestSafeArrivalTimeCSA === null || this.earliestArrivalTimeCSA === null) {
+                return null;
+            }
+            let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
+            this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
+            this.init();
+            const startTime = performance.now();
+            this.performAlgorithm();
+            const duration = performance.now() - startTime;
+            return {expectedArrivalTime: this.earliestExpectedArrivalTimes[this.sourceStops[0]][0].expectedArrivalTime, duration: duration};
+        } catch(error){
             return null;
         }
-        this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-        this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
-        this.init();
-        const startTime = performance.now();
-        this.performAlgorithm();
-        const duration = performance.now() - startTime;
-        return {expectedArrivalTime: this.earliestExpectedArrivalTimes[this.sourceStops[0]][0].expectedArrivalTime, duration: duration};
     }
 
     /**
@@ -487,13 +492,11 @@ export class RaptorMeatAlgorithmController {
      * @returns 
      */
     private static getLatestTrips(r: number, pi: number, earliestDeparture: number): EarliestTripInfo[] {
-        let tripId: number; 
-        let tripArrival: number = -1;
         let earliestTripInfos: EarliestTripInfo[] = [];
         
         let stopTimes: StopTime[] = GoogleTransitData.getStopTimesByStopAndRoute(pi, r);
 
-        if(stopTimes.length === 0) {
+        if(stopTimes.length === 0 || this.earliestArrivalTimes[pi] === Number.MAX_VALUE) {
             return earliestTripInfos;
         }
 
@@ -503,7 +506,6 @@ export class RaptorMeatAlgorithmController {
 
         let earliestArrival = this.earliestArrivalTimes[pi];
         let earliestDepartureDayOffset = Converter.getDayOffset(earliestDeparture);
-        let previousDay = false;
         let currentWeekday = Calculator.moduloSeven(this.sourceWeekday + Converter.getDayDifference(earliestDeparture));
         let previousWeekday = Calculator.moduloSeven(currentWeekday - 1);
         // loops over all stop times until it finds the first departure after the earliestArrival
