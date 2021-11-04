@@ -150,8 +150,7 @@ export class ConnectionScanMeatAlgorithmController {
             this.targetStop = GoogleTransitData.getStopIdByName(targetStop);
             // converts the source time
             this.minDepartureTime = Converter.timeToSeconds(sourceTime);
-            this.currentDate = sourceDate;
-    
+
             this.minDepartureTime = Converter.timeToSeconds(sourceTime);
             this.sourceDate = sourceDate;
     
@@ -452,13 +451,14 @@ export class ConnectionScanMeatAlgorithmController {
         let meatTime = this.s[this.sourceStop][0].expectedArrivalTime;
         this.meatDate = new Date(this.sourceDate);
         this.meatDate.setDate(this.meatDate.getDate() + Converter.getDayDifference(meatTime));
-        
+        let departureDate = new Date(this.sourceDate);
+        departureDate.setDate(this.sourceDate.getDate() + Converter.getDayDifference(this.s[this.sourceStop][0].departureTime));
         // sets the common values of the journey
         let meatResponse: MeatResponse = {
             sourceStop: GoogleTransitData.STOPS[this.sourceStop].name,
             targetStop: GoogleTransitData.STOPS[this.targetStop].name,
             departureTime: Converter.secondsToTime(this.s[this.sourceStop][0].departureTime),
-            departureDate: this.currentDate.toLocaleDateString('de-DE'),
+            departureDate: departureDate.toLocaleDateString('de-DE'),
             meatTime: Converter.secondsToTime(meatTime),
             meatDate: this.meatDate.toLocaleDateString('de-DE'),
             eatTime: Converter.secondsToTime(this.earliestArrivalTimeCSA),

@@ -106,7 +106,7 @@ export class TestController {
             }
             if(raptorResponse && csaResponse){
                 if(raptorResponse.expectedArrivalTime !== csaResponse.expectedArrivalTime){
-                    // console.log('result: failed');
+                    // console.log('result: failed, ' + csaResponse.expectedArrivalTime + ', ' + raptorResponse.expectedArrivalTime);
                     failedRequests.push(requestString)
                 } else {
                     // console.log('result: successful');
@@ -118,8 +118,8 @@ export class TestController {
                 // console.log('result: no solution exists');
             }
         }
-        console.log('average raptor: ' + raptorMeatTimes/numberOfSuccessfulRequestsRaptor)
-        console.log('average csa: ' + csaMeatTimes/numberOfSuccessfulRequestsCSA)
+        console.log('average raptor meat: ' + raptorMeatTimes/numberOfSuccessfulRequestsRaptor)
+        console.log('average csa meat: ' + csaMeatTimes/numberOfSuccessfulRequestsCSA)
         if(failedRequests.length > 0){
             console.log('failed requests:')
             console.log(failedRequests)
