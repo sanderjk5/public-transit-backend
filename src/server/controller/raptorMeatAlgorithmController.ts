@@ -189,8 +189,6 @@ export class RaptorMeatAlgorithmController {
             this.fillQ();
             // traverses each route and calculates the new expected arrival times
             this.traverseRoutes();
-            // updates expected arrival times with footpaths of marked stops
-            //this.handleFootpaths(k);
 
             // updates the array of expected arrival times
             this.updateExpectedArrivalTimes();
@@ -227,32 +225,6 @@ export class RaptorMeatAlgorithmController {
         // sets the maximum departure time of the target stops
         this.latestDepartureTimesOfLastRound[this.targetStop] = this.maxArrivalTime;
         this.markedStops.push(this.targetStop);
-        
-        // updates the footpaths of the source stops
-        // for(let i = 0; i < sourceStops.length; i++) {
-        //     let sourceStop = sourceStops[i];
-        //     let sourceFootpaths = GoogleTransitData.getAllFootpathsOfADepartureStop(sourceStop);
-        //     for(let j = 0; j < sourceFootpaths.length; j++){
-        //         let p = sourceFootpaths[j].departureStop;
-        //         let pN = sourceFootpaths[j].arrivalStop;
-        //         if(p !== pN && this.earliestArrivalTimePerRound[0][pN] > (this.earliestArrivalTimePerRound[0][p] + sourceFootpaths[j].duration)){
-        //             this.earliestArrivalTimePerRound[0][pN] = this.earliestArrivalTimePerRound[0][p] + sourceFootpaths[j].duration;
-        //             if(!this.markedStops.includes(pN)){
-        //                 this.markedStops.push(pN);
-        //             }
-        //             if(this.earliestArrivalTimePerRound[0][pN] < this.earliestArrivalTime[pN]){
-        //                 this.earliestArrivalTime[pN] = this.earliestArrivalTimePerRound[0][pN];
-        //                 this.j[pN] = {
-        //                     enterTripAtStop: p,
-        //                     departureTime: this.earliestArrivalTimePerRound[0][p],
-        //                     arrivalTime: this.earliestArrivalTime[pN],
-        //                     tripId: null,
-        //                     footpath: sourceFootpaths[j].id
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
     }
 
     /**
@@ -369,23 +341,18 @@ export class RaptorMeatAlgorithmController {
             // sets the expected arrival time for normal stops
             else {
                 let labelLastDepartureTime: number = -1;
-                let relevantLabels: Label[] = [];
+                // let relevantLabels: Label[] = [];
                 let label: Label;
-                // finds all labels at this stop which have a departure time between trip arrival time and trip arrival time + maxD_c (and the first departure after max delay)
+                // finds all labels at this stop which have a departure time between trip arrival time and trip arrival time + maxD_c (and the first departure after max delay) and calculates the expected arrival time
                 for(let j = 0; j < this.expectedArrivalTimes[pi].length; j++) {
                     label = this.expectedArrivalTimes[pi][j];
                     if(label.departureTime >= currentTripArrivalTime && label.departureTime <= currentTripArrivalTime + currentMaxDelay){
-                        relevantLabels.push(label);
+                        newExpectedArrivalTime += (label.expectedArrivalTime * Reliability.getReliability(labelLastDepartureTime - currentTripArrivalTime, label.departureTime - currentTripArrivalTime, isLongDistanceTrip));
+                        labelLastDepartureTime = label.departureTime;
                     } else if(label.departureTime > currentTripArrivalTime + currentMaxDelay) {
-                        relevantLabels.push(label);
+                        newExpectedArrivalTime += (label.expectedArrivalTime * Reliability.getReliability(labelLastDepartureTime - currentTripArrivalTime, label.departureTime - currentTripArrivalTime, isLongDistanceTrip));
                         break;
                     }
-                }
-                // calculates the expected arrival time when transfering at this stop
-                for(let j = 0; j < relevantLabels.length; j++) {
-                    label = relevantLabels[j];
-                    newExpectedArrivalTime += (label.expectedArrivalTime * Reliability.getReliability(labelLastDepartureTime - currentTripArrivalTime, label.departureTime - currentTripArrivalTime, isLongDistanceTrip));
-                    labelLastDepartureTime = label.departureTime;
                 }
             }
             // sets the values of the new label and adds it to the route bag
@@ -503,50 +470,6 @@ export class RaptorMeatAlgorithmController {
     }
 
     /**
-     * Uses the footpaths to update the earliest arrival times.
-     * @param k 
-     */
-    // private static handleFootpaths(k: number) {
-    //     // uses the arrival times before they are updated by footpaths
-    //     let numberOfMarkedStops = this.markedStops.length;
-    //     let arrivalTimesInRoundK = [];
-    //     for(let i = 0; i < numberOfMarkedStops; i++){
-    //         let markedStop = this.markedStops[i];
-    //         arrivalTimesInRoundK.push(this.earliestArrivalTimePerRound[k][markedStop])
-    //     }
-
-    //     // loop over all marked stops
-    //     for(let i = 0; i < numberOfMarkedStops; i++){
-    //         let markedStop = this.markedStops[i];
-    //         let arrivalTimeOfMarkedStop = arrivalTimesInRoundK[i];
-    //         let footPaths = GoogleTransitData.getAllFootpathsOfADepartureStop(markedStop);
-    //         for(let j = 0; j < footPaths.length; j++){
-    //             let p = footPaths[j].departureStop;
-    //             let pN = footPaths[j].arrivalStop;
-    //             // checks if the footpath minimizes the arrival time in round k
-    //             if(p !== pN && this.earliestArrivalTimePerRound[k][pN] > (arrivalTimeOfMarkedStop + footPaths[j].duration)){
-    //                 this.earliestArrivalTimePerRound[k][pN] = arrivalTimeOfMarkedStop + footPaths[j].duration;
-    //                 if(!this.markedStops.includes(pN)){
-    //                     this.markedStops.push(pN);
-    //                 }
-    //                 // checks if the new arrival time is smaller than the overall earliest arrival time
-    //                 if(this.earliestArrivalTimePerRound[k][pN] < this.earliestArrivalTime[pN]){
-    //                     this.earliestArrivalTime[pN] = this.earliestArrivalTimePerRound[k][pN];
-    //                     // updates the journey pointer
-    //                     this.j[pN] = {
-    //                         enterTripAtStop: p,
-    //                         departureTime: arrivalTimeOfMarkedStop,
-    //                         arrivalTime: this.earliestArrivalTime[pN],
-    //                         tripId: null,
-    //                         footpath: footPaths[j].id
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    /**
      * Gets all trips of the route between maximum departure and minimum arrival at this trip.
      * @param r 
      * @param pi 
@@ -647,7 +570,6 @@ export class RaptorMeatAlgorithmController {
                 clusters: [],
             }
         }
-        let targetStopLabels: Label[] = [];
         let expandedTempEdges: TempEdge[] = [];
         let arrivalTimesPerStop: Map<string, number[]> = new Map<string, number[]>();
         // priority queue sorted by the departure times
@@ -663,22 +585,6 @@ export class RaptorMeatAlgorithmController {
         while(!priorityQueue.isEmpty()){
             let p = priorityQueue.poll();
             let tripId = p.associatedTrip.tripId;
-            // let transfer = GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath];
-            // if(transfer.departureStop !== transfer.arrivalStop){
-            //     let transferEdge: TempEdge = {
-            //         departureStop: GoogleTransitData.STOPS[transfer.departureStop].name,
-            //         departureTime: p.departureTime,
-            //         arrivalStop: GoogleTransitData.STOPS[transfer.arrivalStop].name,
-            //         arrivalTime: p.departureTime + transfer.duration,
-            //         type: 'Footpath',
-            //     }
-            //     expandedTempEdges.push(transferEdge);
-            //     if(arrivalTimesPerStop.get(transferEdge.arrivalStop) === undefined) {
-            //         arrivalTimesPerStop.set(transferEdge.arrivalStop, [transferEdge.arrivalTime]);
-            //     } else {
-            //         arrivalTimesPerStop.get(transferEdge.arrivalStop).push(transferEdge.arrivalTime);
-            //     }
-            // }
             // uses the information of the label to create an edge
             let edge: TempEdge = {
                 departureStop: GoogleTransitData.STOPS[p.enterTripAtStop].name,
@@ -693,25 +599,6 @@ export class RaptorMeatAlgorithmController {
             } else {
                 arrivalTimesPerStop.get(edge.arrivalStop).push(edge.arrivalTime);
             }
-            // if(p.finalFootpath !== undefined){
-            //     let finalFootpath = GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.finalFootpath];
-            //     if(finalFootpath.departureStop !== finalFootpath.arrivalStop){
-            //         let finalFootpathEdge: TempEdge = {
-            //             departureStop: GoogleTransitData.STOPS[finalFootpath.departureStop].name,
-            //             departureTime: p.exitTime,
-            //             arrivalStop: GoogleTransitData.STOPS[finalFootpath.arrivalStop].name,
-            //             arrivalTime: p.exitTime + finalFootpath.duration,
-            //             type: 'Footpath',
-            //         }
-            //         expandedTempEdges.push(finalFootpathEdge);
-            //         if(arrivalTimesPerStop.get(finalFootpathEdge.arrivalStop) === undefined) {
-            //             arrivalTimesPerStop.set(finalFootpathEdge.arrivalStop, [finalFootpathEdge.arrivalTime]);
-            //         } else {
-            //             arrivalTimesPerStop.get(finalFootpathEdge.arrivalStop).push(finalFootpathEdge.arrivalTime);
-            //         }
-            //         continue;
-            //     }
-            // }
             // checks if the current label reaches the target
             if(p.exitTripAtStop !== this.targetStop){
                 // sets max delay
@@ -725,61 +612,23 @@ export class RaptorMeatAlgorithmController {
                     isLongDistanceTrip = false;
                 }
                 // finds the next labels which can be added to the queue (every label between departure and departure + max Delay and the first one after the max Delay).
-                let relevantPs: Label[] = [];
+                // let relevantPs: Label[] = [];
                 for(let i = 0; i < this.expectedArrivalTimes[p.exitTripAtStop].length; i++) {
                     let nextP = this.expectedArrivalTimes[p.exitTripAtStop][i];
                     if(nextP.departureTime >= p.associatedTrip.tripArrival && nextP.departureTime <= (p.associatedTrip.tripArrival + maxDelay)){
-                        relevantPs.push(nextP);
+                        priorityQueue.add(nextP);
                     }
                     if(nextP.departureTime > (p.associatedTrip.tripArrival + maxDelay) && nextP.departureTime !== Number.MAX_VALUE){
-                        relevantPs.push(nextP);
+                        priorityQueue.add(nextP);
                         break;
                     }
                 }
-                let pLastDepartureTime = -1;
-                let probabilityToTakeJourney: number;
-                let nextP: Label;
-                for (let i = 0; i < relevantPs.length; i++) {
-                    nextP = relevantPs[i];
-                    probabilityToTakeJourney = Reliability.getReliability(pLastDepartureTime - p.associatedTrip.tripArrival, nextP.departureTime - p.associatedTrip.tripArrival, isLongDistanceTrip);
-                    let newP: Label = {
-                        departureTime: nextP.departureTime,
-                        expectedArrivalTime: nextP.expectedArrivalTime,
-                        associatedTrip: nextP.associatedTrip,
-                        enterTripAtStop: nextP.enterTripAtStop,
-                        exitTripAtStop: nextP.exitTripAtStop,
-                        transferRound: nextP.transferRound,
-                        calcReliability:  p.calcReliability * probabilityToTakeJourney,
-                    }
-                    pLastDepartureTime = newP.departureTime;
-                    priorityQueue.add(newP);
-                }
-            } else {
-                targetStopLabels.push(p)
-            }
+            } 
         }
-        // let meat = this.calculateMEAT(targetStopLabels);
         // gets the two graph representations
         const decisionGraphs = DecisionGraphController.getDecisionGraphs(expandedTempEdges, arrivalTimesPerStop, this.sourceStop, this.targetStop);
         meatResponse.expandedDecisionGraph = decisionGraphs.expandedDecisionGraph;
         meatResponse.compactDecisionGraph = decisionGraphs.compactDecisionGraph;
         return meatResponse;
-    }
-
-    private static calculateMEAT(targetStopLabels: Label[]){
-        let meat: number = 0;
-        let probabilitySum = 0;
-        for(let targetStopLabel of targetStopLabels){
-            let expectedDelay: number;
-            if(GoogleTransitData.TRIPS[targetStopLabel.associatedTrip.tripId].isLongDistance){
-                expectedDelay = Reliability.longDistanceExpectedValue;
-            } else {
-                expectedDelay = Reliability.normalDistanceExpectedValue;
-            }
-            probabilitySum += targetStopLabel.calcReliability;
-            let arrivalTime = targetStopLabel.associatedTrip.tripArrival + expectedDelay;
-            meat += (arrivalTime * targetStopLabel.calcReliability);
-        }
-        return meat;
     }
 }

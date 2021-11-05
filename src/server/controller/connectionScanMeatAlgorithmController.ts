@@ -54,8 +54,6 @@ export class ConnectionScanMeatAlgorithmController {
     private static s: SEntry[][];
     // the earliest expected arrival time of each trip
     private static t: TEntry[];
-    // the duration of the shortest footpath to the target
-    private static d: DEntry[];
     // source stops
     private static sourceStop: number;
     // target stops
@@ -267,43 +265,30 @@ export class ConnectionScanMeatAlgorithmController {
             let time3: number;
             let timeC: number;
             let p: SEntry;
-            // expected arrival time when walking to the target
-            if(this.d[currentConnection.arrivalStop].duration !== Number.MAX_VALUE) {
-                time1 = currentConnectionArrivalTime + currentExpectedDelay + this.d[currentConnection.arrivalStop].duration;
+            // checks if the arrival stop of the connection is a target stop (expected arrival time when walking to the target)
+            if(currentConnection.arrivalStop === this.targetStop) {
+                time1 = currentConnectionArrivalTime + currentExpectedDelay;
             } else {
                 time1 = Number.MAX_VALUE;
             }
-            // checks if the arrival stop of the connection is a target stop (expected arrival time when walking to the target)
-            // if(currentConnection.arrivalStop === this.targetStops[0]) {
-            //     time1 = currentConnectionArrivalTime + currentExpectedDelay;
-            // } else {
-            //     time1 = Number.MAX_VALUE;
-            // }
             // expected arrival time when remaining seated
             time2 = this.t[currentConnection.trip].expectedArrivalTime;
-            let expectedArrivalTime = Number.MAX_VALUE;
-            let pLastDepartureTime: number;
-            let relevantPairs: SEntry[] = [];
+            let expectedArrivalTime = 0;
+            let pLastDepartureTime: number = -1;
+            // let relevantPairs: SEntry[] = [];
             // finds all outgoing trips which have a departure time between c_arr and c_arr + maxD_c (and the departure after max delay)
             for(let j = 0; j < this.s[currentConnection.arrivalStop].length; j++) {
                 p = this.s[currentConnection.arrivalStop][j];
                 if(p.departureTime >= currentConnectionArrivalTime && p.departureTime <= currentConnectionArrivalTime + currentMaxDelay){
-                    relevantPairs.push(p);
+                    expectedArrivalTime += (p.expectedArrivalTime * Reliability.getReliability(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
+                    pLastDepartureTime = p.departureTime;
                 } else if(p.departureTime > currentConnectionArrivalTime + currentMaxDelay) {
-                    relevantPairs.push(p);
+                    expectedArrivalTime += (p.expectedArrivalTime * Reliability.getReliability(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
                     break;
                 }
             }
-            // calculates the expected arrival time when transfering at the arrival stop of the current connection
-            if(relevantPairs.length > 0){
-                p = relevantPairs[0];
-                expectedArrivalTime = p.expectedArrivalTime * Reliability.getReliability(-1, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip);
-                pLastDepartureTime = p.departureTime;
-            }
-            for(let j = 1; j < relevantPairs.length; j++) {
-                p = relevantPairs[j];
-                expectedArrivalTime += (p.expectedArrivalTime * Reliability.getReliability(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
-                pLastDepartureTime = p.departureTime;
+            if(expectedArrivalTime === 0){
+                expectedArrivalTime = Number.MAX_VALUE;
             }
             // expected arrival time when transferring
             time3 = expectedArrivalTime;
@@ -318,9 +303,6 @@ export class ConnectionScanMeatAlgorithmController {
                     connectionArrivalTime: currentConnectionArrivalTime,
                     connectionArrivalStop: currentConnection.arrivalStop,
                 };
-                if(time1 === timeC && currentConnection.arrivalStop !== this.targetStop){
-                    this.t[currentConnection.trip].finalFootpath = this.d[currentConnection.arrivalStop].footpath;
-                }
             }
 
             // sets the new profile function of the departure stop of the connection
@@ -338,50 +320,15 @@ export class ConnectionScanMeatAlgorithmController {
             }
 
             // profile function with minimum expected arrival time of departure stop
-            // let q = this.s[currentConnection.departureStop][0];
+            let q = this.s[currentConnection.departureStop][0];
             if(p.expectedArrivalTime !== Number.MAX_VALUE) {
                 // checks if q dominates p
-                // if(!this.dominates(q, p)){
-                //     // adds p to the s entry of the departure stop
-                //     if(q.departureTime !== p.departureTime){
-                //         this.s[currentConnection.departureStop].unshift(p)
-                //     } else {
-                //         this.s[currentConnection.departureStop][0] = p;
-                //     }
-                // }
-                let footpaths = GoogleTransitData.getAllFootpathsOfAArrivalStop(currentConnection.departureStop);
-                for(let footpath of footpaths) {
-                    let pNew: SEntry= {
-                        departureTime: currentConnectionDepartureTime - footpath.duration,
-                        expectedArrivalTime: p.expectedArrivalTime,
-                        departureDate: p.departureDate,
-                        arrivalDate: p.arrivalDate,
-                        enterTime: p.enterTime,
-                        enterStop: p.enterStop,
-                        exitTime: p.exitTime,
-                        exitStop: p.exitStop,
-                        tripId: p.tripId,
-                        transferFootpath: footpath.idArrival,
-                        finalFootpath: p.finalFootpath,
-                    }
-                    if(pNew.departureTime < this.minDepartureTime){
-                        continue;
-                    }
-                    if(this.notDominatedInProfile(pNew, footpath.departureStop)){
-                        let shiftedPairs = [];
-                        let currentPair = this.s[footpath.departureStop][0];
-                        while(pNew.departureTime >= currentPair.departureTime){
-                            let removedPair = this.s[footpath.departureStop].shift()
-                            shiftedPairs.push(removedPair);
-                            currentPair = this.s[footpath.departureStop][0];
-                        }
-                        this.s[footpath.departureStop].unshift(pNew);
-                        for(let j = 0; j < shiftedPairs.length; j++) {
-                            let removedPair = shiftedPairs[j];
-                            if(!this.dominates(pNew, removedPair)){
-                                this.s[footpath.departureStop].unshift(removedPair);
-                            }
-                        }
+                if(!this.dominates(q, p)){
+                    // adds p to the s entry of the departure stop
+                    if(q.departureTime !== p.departureTime){
+                        this.s[currentConnection.departureStop].unshift(p)
+                    } else {
+                        this.s[currentConnection.departureStop][0] = p;
                     }
                 }
             }
@@ -396,7 +343,6 @@ export class ConnectionScanMeatAlgorithmController {
         this.s = new Array(GoogleTransitData.STOPS.length);
         // sets the trip array
         this.t = new Array(GoogleTransitData.TRIPS.length);
-        this.d = new Array(GoogleTransitData.STOPS.length);
 
         // default entry for each stop
         const defaultSEntry: SEntry = {
@@ -405,10 +351,6 @@ export class ConnectionScanMeatAlgorithmController {
         }
         for(let i = 0; i < GoogleTransitData.STOPS.length; i++) {
             this.s[i] = [defaultSEntry];
-            this.d[i] = {
-                duration: Number.MAX_VALUE,
-                footpath: undefined,
-            }
         }
         // default entry for each trip
         for(let i = 0; i < this.t.length; i++) {
@@ -416,14 +358,6 @@ export class ConnectionScanMeatAlgorithmController {
                 expectedArrivalTime: Number.MAX_VALUE
             };
         }
-        let finalFootpaths = GoogleTransitData.getAllFootpathsOfAArrivalStop(this.targetStop);
-        for(let footpath of finalFootpaths){
-            if(this.d[footpath.departureStop].duration > footpath.duration){
-                this.d[footpath.departureStop].duration = footpath.duration;
-                this.d[footpath.departureStop].footpath = footpath.idArrival;
-            }
-        }
-        
     }
 
     /**
@@ -480,7 +414,6 @@ export class ConnectionScanMeatAlgorithmController {
         let priorityQueue = new FastPriorityQueue<SEntry>((a, b) => {
             return a.departureTime < b.departureTime
         });
-        let targetStopPairs: SEntry[] = [];
         if(this.s[this.sourceStop][0].departureTime === Number.MAX_VALUE){
             throw new Error("Couldn't find a connection.")
         }
@@ -490,22 +423,6 @@ export class ConnectionScanMeatAlgorithmController {
         while(!priorityQueue.isEmpty()){
             let p = priorityQueue.poll();
             let tripId = p.tripId;
-            let transfer = GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.transferFootpath];
-            if(transfer.departureStop !== transfer.arrivalStop){
-                let transferEdge: TempEdge = {
-                    departureStop: GoogleTransitData.STOPS[transfer.departureStop].name,
-                    departureTime: p.departureTime,
-                    arrivalStop: GoogleTransitData.STOPS[transfer.arrivalStop].name,
-                    arrivalTime: p.departureTime + transfer.duration,
-                    type: 'Footpath',
-                }
-                expandedTempEdges.push(transferEdge);
-                if(arrivalTimesPerStop.get(transferEdge.arrivalStop) === undefined) {
-                    arrivalTimesPerStop.set(transferEdge.arrivalStop, [transferEdge.arrivalTime]);
-                } else {
-                    arrivalTimesPerStop.get(transferEdge.arrivalStop).push(transferEdge.arrivalTime);
-                }
-            }
             // uses the information of the profile function to create an edge
             let edge: TempEdge = {
                 departureStop: GoogleTransitData.STOPS[p.enterStop].name,
@@ -520,25 +437,6 @@ export class ConnectionScanMeatAlgorithmController {
             } else {
                 arrivalTimesPerStop.get(edge.arrivalStop).push(edge.arrivalTime);
             }
-            if(p.finalFootpath !== undefined){
-                let finalFootpath = GoogleTransitData.FOOTPATHS_SORTED_BY_ARRIVAL_STOP[p.finalFootpath];
-                if(finalFootpath.departureStop !== finalFootpath.arrivalStop){
-                    let finalFootpathEdge: TempEdge = {
-                        departureStop: GoogleTransitData.STOPS[finalFootpath.departureStop].name,
-                        departureTime: p.exitTime,
-                        arrivalStop: GoogleTransitData.STOPS[finalFootpath.arrivalStop].name,
-                        arrivalTime: p.exitTime + finalFootpath.duration,
-                        type: 'Footpath',
-                    }
-                    expandedTempEdges.push(finalFootpathEdge);
-                    if(arrivalTimesPerStop.get(finalFootpathEdge.arrivalStop) === undefined) {
-                        arrivalTimesPerStop.set(finalFootpathEdge.arrivalStop, [finalFootpathEdge.arrivalTime]);
-                    } else {
-                        arrivalTimesPerStop.get(finalFootpathEdge.arrivalStop).push(finalFootpathEdge.arrivalTime);
-                    }
-                    continue;
-                }
-            }
             // checks if the current profile reaches the target
             if(this.targetStop !== p.exitStop){
                 // sets max delay
@@ -552,74 +450,21 @@ export class ConnectionScanMeatAlgorithmController {
                     isLongDistanceTrip = false;
                 }
                 // finds the next profile functions which can be added to the queue (every profile between departure and departure + max Delay and the first one after the max Delay).
-                let relevantPs: SEntry[] = [];
                 for(let i = 0; i < this.s[p.exitStop].length; i++) {
                     let nextP = this.s[p.exitStop][i];
                     if(nextP.departureTime >= p.exitTime && nextP.departureTime <= (p.exitTime + maxDelay)){
-                        relevantPs.push(nextP);
+                        priorityQueue.add(nextP);
                     }
                     if(nextP.departureTime > (p.exitTime + maxDelay) && nextP.departureTime !== Number.MAX_VALUE){
-                        relevantPs.push(nextP);
+                        priorityQueue.add(nextP);
                         break;
                     }
                 }
-                let pLastDepartureTime = -1;
-                let probabilityToTakeJourney: number;
-                let nextP: SEntry;
-                for (let i = 0; i < relevantPs.length; i++) {
-                    nextP = relevantPs[i];
-                    probabilityToTakeJourney = Reliability.getReliability(pLastDepartureTime - p.exitTime, nextP.departureTime - p.exitTime, isLongDistanceTrip);
-                    let newP: SEntry = {
-                        departureTime: nextP.departureTime,
-                        expectedArrivalTime: nextP.expectedArrivalTime,
-                        departureDate: nextP.departureDate,
-                        arrivalDate: nextP.arrivalDate,
-                        enterTime: nextP.enterTime,
-                        enterStop: nextP.enterStop,
-                        exitTime: nextP.exitTime,
-                        exitStop: nextP.exitStop,
-                        tripId: nextP.tripId,
-                        transferFootpath: nextP.transferFootpath,
-                        calcReliability:  p.calcReliability * probabilityToTakeJourney,
-                    }
-                    pLastDepartureTime = newP.departureTime;
-                    priorityQueue.add(newP);
-                }
-            } else {
-                targetStopPairs.push(p)
-            }
+            } 
         }
-        // let meat = this.calculateMEAT(targetStopPairs);
         const decisionGraphs = DecisionGraphController.getDecisionGraphs(expandedTempEdges, arrivalTimesPerStop, this.sourceStop, this.targetStop);
         meatResponse.expandedDecisionGraph = decisionGraphs.expandedDecisionGraph;
         meatResponse.compactDecisionGraph = decisionGraphs.compactDecisionGraph;
         return meatResponse;
-    }
-
-    private static calculateMEAT(targetStopPairs: SEntry[]){
-        let meat: number = 0;
-        let probabilitySum = 0;
-        for(let targetStopPair of targetStopPairs){
-            let expectedDelay: number;
-            if(GoogleTransitData.TRIPS[targetStopPair.tripId].isLongDistance){
-                expectedDelay = Reliability.longDistanceExpectedValue;
-            } else {
-                expectedDelay = Reliability.normalDistanceExpectedValue;
-            }
-            probabilitySum += targetStopPair.calcReliability;
-            let arrivalTime = targetStopPair.exitTime + expectedDelay;
-            meat += (arrivalTime * targetStopPair.calcReliability);
-        }
-        console.log(probabilitySum)
-        return meat;
-    }
-
-    private static notDominatedInProfile(p: SEntry, stopId: number): boolean{
-        for(let q of this.s[stopId]){
-            if(this.dominates(q, p)){
-                return false;
-            }
-        }
-        return true;
     }
 }
