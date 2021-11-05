@@ -93,7 +93,7 @@ export class TestController {
             const randomSourceTime = this.getRandomInt(numberOfSeconds);
             const randomSourceDate = dates[this.getRandomInt(numberOfDates)];
             let requestString = randomSourceStop + ', ' + randomTargetStop + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime);
-            // console.log('request: ' + requestString)
+            console.log('request: ' + requestString)
             const raptorResponse = RaptorMeatAlgorithmController.testRaptorMeatAlgorithm(randomSourceStop, randomTargetStop, Converter.secondsToTime(randomSourceTime), randomSourceDate);
             const csaResponse = ConnectionScanMeatAlgorithmController.testConnectionScanMeatAlgorithm(randomSourceStop, randomTargetStop, Converter.secondsToTime(randomSourceTime), randomSourceDate);
             if(raptorResponse){
@@ -106,16 +106,16 @@ export class TestController {
             }
             if(raptorResponse && csaResponse){
                 if(raptorResponse.expectedArrivalTime !== csaResponse.expectedArrivalTime){
-                    // console.log('result: failed, ' + csaResponse.expectedArrivalTime + ', ' + raptorResponse.expectedArrivalTime);
+                    console.log('result: failed, ' + csaResponse.expectedArrivalTime + ', ' + raptorResponse.expectedArrivalTime);
                     failedRequests.push(requestString)
                 } else {
-                    // console.log('result: successful');
+                    console.log('result: successful');
                 }
             } else if (!(!raptorResponse && !csaResponse)){
-                // console.log('result: failed');
+                console.log('result: failed');
                 failedRequests.push(requestString)
             } else {
-                // console.log('result: no solution exists');
+                console.log('result: no solution exists');
             }
         }
         console.log('average raptor meat: ' + raptorMeatTimes/numberOfSuccessfulRequestsRaptor)

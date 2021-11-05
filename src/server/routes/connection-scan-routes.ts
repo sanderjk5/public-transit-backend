@@ -1,13 +1,17 @@
 import express from 'express';
 import { ConnectionScanAlgorithmController } from '../controller/connectionScanAlgorithmController';
+import { ConnectionScanEatAlgorithmController } from '../controller/connectionScanEatAlgorithmController';
 import { ConnectionScanMeatAlgorithmController } from '../controller/connectionScanMeatAlgorithmController';
 
 
 const router = express.Router();
-router.get('/earliestArrival', (req, res) => {
+router.get('/earliestArrivalTime', (req, res) => {
     ConnectionScanAlgorithmController.connectionScanAlgorithmRoute(req, res);
 });
-router.get('/earliestArrivalProfile', (req, res) => {
+router.get('/earliestArrivalTimeWithEat', (req, res) => {
+    ConnectionScanEatAlgorithmController.connectionScanEatAlgorithmRoute(req, res);
+});
+router.get('/minimumExpectedArrivalTime', (req, res) => {
     ConnectionScanMeatAlgorithmController.connectionScanMeatAlgorithmRoute(req, res);
 });
 

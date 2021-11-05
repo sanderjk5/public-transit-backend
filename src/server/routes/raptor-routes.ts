@@ -4,10 +4,10 @@ import { RaptorMeatAlgorithmController } from '../controller/raptorMeatAlgorithm
 
 
 const router = express.Router();
-router.get('/earliestArrival', (req, res) => {
+router.get('/earliestArrivalTime', (req, res) => {
     RaptorAlgorithmController.raptorAlgorithm(req, res);
 });
-router.get('/meat', (req, res) => {
+router.get('/minimumExpectedArrivalTime', (req, res) => {
     RaptorMeatAlgorithmController.raptorMeatAlgorithm(req, res);
 });
 export default router

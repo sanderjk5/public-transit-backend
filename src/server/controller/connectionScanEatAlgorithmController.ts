@@ -21,6 +21,7 @@ import { DecisionGraphController } from "./decisionGraphController";
 // profile function entry
 interface SEntry {
     departureTime: number,
+    arrivalTime: number,
     expectedArrivalTime: number,
     departureDate?: Date,
     arrivalDate?: Date,
@@ -36,6 +37,7 @@ interface SEntry {
 
 // information for each trip
 interface TEntry {
+    arrivalTime: number;
     expectedArrivalTime: number,
     arrivalDate?: Date,
     connectionArrivalTime?: number,
@@ -43,7 +45,7 @@ interface TEntry {
     finalFootpath?: number,
 }
 
-export class ConnectionScanMeatAlgorithmController {
+export class ConnectionScanEatAlgorithmController {
     // the profile function of each stop
     private static s: SEntry[][];
     // the earliest expected arrival time of each trip
@@ -74,7 +76,7 @@ export class ConnectionScanMeatAlgorithmController {
      * @param res 
      * @returns 
      */
-    public static connectionScanMeatAlgorithmRoute(req: express.Request, res: express.Response){
+    public static connectionScanEatAlgorithmRoute(req: express.Request, res: express.Response){
         try {
             // checks the parameters of the http request
             if(!req.query || !req.query.sourceStop || !req.query.targetStop || !req.query.sourceTime || !req.query.date ||
@@ -100,7 +102,7 @@ export class ConnectionScanMeatAlgorithmController {
             }
 
             // calculates the maximum arrival time of the alpha bounded version of the algorithm
-            let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+            let difference = 3 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
             this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
             
             // sets the relevant dates
@@ -113,9 +115,9 @@ export class ConnectionScanMeatAlgorithmController {
             // initializes the csa meat algorithm
             this.init();
             // calls the csa meat algorithm
-            console.time('connection scan meat algorithm')
+            console.time('connection scan eat algorithm')
             this.performAlgorithm();
-            console.timeEnd('connection scan meat algorithm')
+            console.timeEnd('connection scan eat algorithm')
             
             // generates the http response which includes all information of the journey incl. the graphs
             const meatResponse = this.extractDecisionGraphs();
@@ -258,25 +260,38 @@ export class ConnectionScanMeatAlgorithmController {
             let time2: number;
             let time3: number;
             let timeC: number;
+            let expectedTime1: number;
+            let expectedTime2: number;
+            let expectedTime3: number;
+            let expectedTimeC: number;
             let p: SEntry;
             // checks if the arrival stop of the connection is a target stop (expected arrival time when walking to the target)
             if(currentConnection.arrivalStop === this.targetStop) {
-                time1 = currentConnectionArrivalTime + currentExpectedDelay;
+                time1 = currentConnectionArrivalTime;
+                expectedTime1 = currentConnectionArrivalTime + currentExpectedDelay;
             } else {
                 time1 = Number.MAX_VALUE;
+                expectedTime1 = Number.MAX_VALUE;
             }
             // expected arrival time when remaining seated
-            time2 = this.t[currentConnection.trip].expectedArrivalTime;
+            time2 = this.t[currentConnection.trip].arrivalTime;
+            expectedTime2 = this.t[currentConnection.trip].expectedArrivalTime;
+            time3 = Number.MAX_VALUE;
             let expectedArrivalTime = 0;
             let pLastDepartureTime: number = -1;
-            // let relevantPairs: SEntry[] = [];
             // finds all outgoing trips which have a departure time between c_arr and c_arr + maxD_c (and the departure after max delay)
             for(let j = 0; j < this.s[currentConnection.arrivalStop].length; j++) {
                 p = this.s[currentConnection.arrivalStop][j];
                 if(p.departureTime >= currentConnectionArrivalTime && p.departureTime <= currentConnectionArrivalTime + currentMaxDelay){
+                    if(time3 === Number.MAX_VALUE){
+                        time3 = p.arrivalTime;
+                    }
                     expectedArrivalTime += (p.expectedArrivalTime * Reliability.getReliability(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
                     pLastDepartureTime = p.departureTime;
                 } else if(p.departureTime > currentConnectionArrivalTime + currentMaxDelay) {
+                    if(time3 === Number.MAX_VALUE){
+                        time3 = p.arrivalTime;
+                    }
                     expectedArrivalTime += (p.expectedArrivalTime * Reliability.getReliability(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
                     break;
                 }
@@ -285,14 +300,23 @@ export class ConnectionScanMeatAlgorithmController {
                 expectedArrivalTime = Number.MAX_VALUE;
             }
             // expected arrival time when transferring
-            time3 = expectedArrivalTime;
+            expectedTime3 = expectedArrivalTime;
             // finds the minimum expected arrival time
             timeC = Math.min(time1, time2, time3);
 
+            if(time1 === timeC){
+                expectedTimeC = expectedTime1;
+            } else if(time2 === timeC){
+                expectedTimeC = expectedTime2;
+            } else {
+                expectedTimeC = expectedTime3;
+            }
+
             // sets the pointer of the t array
-            if(timeC !== Number.MAX_VALUE && timeC < this.t[currentConnection.trip].expectedArrivalTime){
+            if(timeC !== Number.MAX_VALUE && timeC < this.t[currentConnection.trip].arrivalTime){
                 this.t[currentConnection.trip] = {
-                    expectedArrivalTime: timeC,
+                    arrivalTime: timeC,
+                    expectedArrivalTime: expectedTimeC,
                     arrivalDate: currentArrivalDate,
                     connectionArrivalTime: currentConnectionArrivalTime,
                     connectionArrivalStop: currentConnection.arrivalStop,
@@ -302,7 +326,8 @@ export class ConnectionScanMeatAlgorithmController {
             // sets the new profile function of the departure stop of the connection
             p = {
                 departureTime: currentConnectionDepartureTime,
-                expectedArrivalTime: timeC,
+                arrivalTime: timeC,
+                expectedArrivalTime: expectedTimeC,
                 departureDate: this.currentDate,
                 arrivalDate: this.t[currentConnection.trip].arrivalDate,
                 enterTime: currentConnectionDepartureTime,
@@ -315,7 +340,7 @@ export class ConnectionScanMeatAlgorithmController {
 
             // profile function with minimum expected arrival time of departure stop
             let q = this.s[currentConnection.departureStop][0];
-            if(p.expectedArrivalTime !== Number.MAX_VALUE) {
+            if(p.arrivalTime !== Number.MAX_VALUE) {
                 // checks if q dominates p
                 if(!this.dominates(q, p)){
                     // adds p to the s entry of the departure stop
@@ -341,6 +366,7 @@ export class ConnectionScanMeatAlgorithmController {
         // default entry for each stop
         const defaultSEntry: SEntry = {
             departureTime: Number.MAX_VALUE,
+            arrivalTime: Number.MAX_VALUE,
             expectedArrivalTime: Number.MAX_VALUE,
         }
         for(let i = 0; i < GoogleTransitData.STOPS.length; i++) {
@@ -349,6 +375,7 @@ export class ConnectionScanMeatAlgorithmController {
         // default entry for each trip
         for(let i = 0; i < this.t.length; i++) {
             this.t[i] = {
+                arrivalTime: Number.MAX_VALUE,
                 expectedArrivalTime: Number.MAX_VALUE
             };
         }
@@ -361,10 +388,10 @@ export class ConnectionScanMeatAlgorithmController {
      * @returns 
      */
     private static dominates(q: SEntry, p: SEntry): boolean {
-        if(q.expectedArrivalTime < p.expectedArrivalTime) {
+        if(q.arrivalTime < p.arrivalTime) {
             return true;
         }
-        if(q.expectedArrivalTime === p.expectedArrivalTime && q.departureTime > p.departureTime) {
+        if(q.arrivalTime === p.arrivalTime && q.departureTime > p.departureTime) {
             return true;
         }
         return false;
