@@ -126,10 +126,10 @@ export class ConnectionScanAlgorithmController {
         }
     }
 
-    public static getEarliestArrivalTime(sourceStop: string, targetStop: string, sourceDate: Date, sourceTimeInSeconds: number, safeVariant: boolean, maxArrivalTime: number){
+    public static getEarliestArrivalTime(sourceStop: number, targetStop: number, sourceDate: Date, sourceTimeInSeconds: number, safeVariant: boolean, maxArrivalTime: number){
         // gets the source and target stops
-        this.sourceStop = GoogleTransitData.getStopIdByName(sourceStop);
-        this.targetStop = GoogleTransitData.getStopIdByName(targetStop);
+        this.sourceStop = sourceStop;
+        this.targetStop = targetStop;
 
         this.sourceTime = sourceTimeInSeconds;
         this.sourceDate = sourceDate;
@@ -150,9 +150,9 @@ export class ConnectionScanAlgorithmController {
         }
     }
 
-    public static getEarliestArrivalTimes(sourceStop: string, sourceDate: Date, sourceTimeInSeconds: number, maxArrivalTime: number){
+    public static getEarliestArrivalTimes(sourceStop: number, sourceDate: Date, sourceTimeInSeconds: number, maxArrivalTime: number){
         // gets the source and target stops
-        this.sourceStop = GoogleTransitData.getStopIdByName(sourceStop);
+        this.sourceStop = sourceStop;
         this.targetStop = undefined;
 
         this.sourceTime = sourceTimeInSeconds;
@@ -173,10 +173,8 @@ export class ConnectionScanAlgorithmController {
 
     /**
      * Performs the connection scan algorithm.
-     * @param sourceStops 
-     * @param targetStop 
-     * @param sourceTime 
-     * @returns 
+     * @param safeVariant 
+     * @param maxArrivalTime 
      */
     private static performAlgorithm(safeVariant?: boolean, maxArrivalTime?: number){
         let reachedTargetStop = false;

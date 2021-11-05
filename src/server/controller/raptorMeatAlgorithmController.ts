@@ -47,8 +47,6 @@ export class RaptorMeatAlgorithmController {
 
     // the minimum departure time of the journey
     private static minDepartureTime: number;
-    // earliest arrival time of csa
-    private static earliestArrivalTimeCSA: number;
     // earliest safe arrival time of csa
     private static earliestSafeArrivalTimeCSA: number;
     // the maximum arrival time of the journey
@@ -100,22 +98,6 @@ export class RaptorMeatAlgorithmController {
             // sets the source weekday
             this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
 
-            console.time('csa algorithms')
-            // gets the minimum arrival times from the normal csa algorithm
-            this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, false, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
-            if(this.earliestArrivalTimeCSA === null) {
-                throw new Error("Couldn't find a connection.")
-            }
-            this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(req.query.sourceStop, req.query.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
-            if(this.earliestSafeArrivalTimeCSA === null) {
-                throw new Error("Couldn't find a connection.")
-            }
-            // calculates the maximum arrival time
-            let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
-            this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(req.query.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
-            console.timeEnd('csa algorithms')
-
             // initializes the raptor meat algorithm
             this.init();
             console.time('raptor meat algorithm')
@@ -150,19 +132,7 @@ export class RaptorMeatAlgorithmController {
             this.sourceDate = sourceDate;
             // sets the source weekday
             this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
-            // gets the minimum arrival times from the normal csa algorithm
-            this.earliestArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.sourceDate, this.minDepartureTime, false, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
-            if(this.earliestArrivalTimeCSA === null) {
-                return null
-            }
-            this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(sourceStop, targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
-            if(this.earliestSafeArrivalTimeCSA === null) {
-                return null;
-            }
-            // calculates the maximum arrival time
-            let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
-            this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
+            
             // initializes the raptor meat algorithm
             this.init();
             const startTime = performance.now();
@@ -206,6 +176,16 @@ export class RaptorMeatAlgorithmController {
      * @param sourceTime 
      */
     private static init(){
+        this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(this.sourceStop, this.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
+        if(this.earliestSafeArrivalTimeCSA === null) {
+            throw new Error("Couldn't find a connection.");
+        }
+        // calculates the maximum arrival time
+
+        let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+        this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
+        this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
+
         // creates the arrays
         const numberOfStops = GoogleTransitData.STOPS.length;
         this.latestDepartureTimesOfLastRound = new Array(numberOfStops);
@@ -557,7 +537,7 @@ export class RaptorMeatAlgorithmController {
             departureDate: departureDate.toLocaleDateString('de-DE'),
             meatTime: Converter.secondsToTime(meatTime),
             meatDate: this.meatDate.toLocaleDateString('de-DE'),
-            eatTime: Converter.secondsToTime(this.earliestArrivalTimeCSA),
+            eatTime: Converter.secondsToTime(this.earliestArrivalTimes[this.targetStop]),
             esatTime: Converter.secondsToTime(this.earliestSafeArrivalTimeCSA),
             expandedDecisionGraph: {
                 nodes: [],
