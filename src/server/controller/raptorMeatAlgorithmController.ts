@@ -13,6 +13,7 @@ import { StopTime } from "../../models/StopTime";
 import { performance } from 'perf_hooks';
 import {cloneDeep} from 'lodash';
 import { DecisionGraphController } from "./decisionGraphController";
+import { ConnectionScanMeatAlgorithmController } from "./connectionScanMeatAlgorithmController";
 
 // entries of the q array
 interface QEntry {
@@ -49,6 +50,7 @@ export class RaptorMeatAlgorithmController {
     private static minDepartureTime: number;
     // earliest safe arrival time of csa
     private static earliestSafeArrivalTimeCSA: number;
+    private static meatCSA: number;
     // the maximum arrival time of the journey
     private static maxArrivalTime: number;
     // the earliest possible arrival time of each stop
@@ -74,6 +76,9 @@ export class RaptorMeatAlgorithmController {
     // stores the route-stop pairs of the marked stops
     private static Q: QEntry[];
 
+    private static useTransferOptitimization: boolean;
+    private static meatDifference: number;
+
     /**
      * Initializes and calls the raptor meat algorithm.
      * @param req 
@@ -84,7 +89,8 @@ export class RaptorMeatAlgorithmController {
         try {
             // checks the parameters of the http request
             if(!req.query || !req.query.sourceStop || !req.query.targetStop || !req.query.sourceTime ||  !req.query.date ||
-                typeof req.query.sourceStop !== 'string' || typeof req.query.targetStop !== 'string' || typeof req.query.sourceTime !== 'string' || typeof req.query.date !== 'string'){
+                typeof req.query.sourceStop !== 'string' || typeof req.query.targetStop !== 'string' || typeof req.query.sourceTime !== 'string' || 
+                typeof req.query.date !== 'string' || typeof req.query.meatDifference !== 'string'){
                 res.status(400).send();
                 return;
             }
@@ -97,6 +103,12 @@ export class RaptorMeatAlgorithmController {
             this.sourceDate = new Date(req.query.date);
             // sets the source weekday
             this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
+
+            this.meatDifference = Number(req.query.meatDifference);
+            this.useTransferOptitimization = false;
+            if(this.meatDifference > 0){
+                this.useTransferOptitimization = true;
+            }
 
             // initializes the raptor meat algorithm
             this.init();
@@ -184,7 +196,9 @@ export class RaptorMeatAlgorithmController {
             this.updateExpectedArrivalTimes();
 
             // termination condition
-            if(this.markedStops.length === 0){
+            if(this.markedStops.length === 0 
+                || (this.useTransferOptitimization && (this.expectedArrivalTimes[this.sourceStop][0].expectedArrivalTime - this.meatCSA) < this.meatDifference)
+            ){
                 break;
             }
         }
@@ -206,6 +220,10 @@ export class RaptorMeatAlgorithmController {
         this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
         this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
 
+        if(this.useTransferOptitimization){
+            this.meatCSA = ConnectionScanMeatAlgorithmController.getMeat(this.sourceStop, this.targetStop, this.minDepartureTime, this.sourceDate, this.earliestSafeArrivalTimeCSA, this.earliestArrivalTimes);
+        }
+        
         // creates the arrays
         const numberOfStops = GoogleTransitData.STOPS.length;
         this.latestDepartureTimesOfLastRound = new Array(numberOfStops);

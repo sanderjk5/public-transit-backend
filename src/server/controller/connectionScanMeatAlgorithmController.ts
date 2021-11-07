@@ -89,7 +89,7 @@ export class ConnectionScanMeatAlgorithmController {
             this.sourceDate = new Date(req.query.date);
 
             // initializes the csa meat algorithm
-            this.init();
+            this.init(true);
             // calls the csa meat algorithm
             console.time('connection scan meat algorithm')
             this.performAlgorithm();
@@ -128,7 +128,7 @@ export class ConnectionScanMeatAlgorithmController {
 
             // initializes the csa meat algorithm
             const initStartTime = performance.now();
-            this.init();
+            this.init(true);
             const initDuration = performance.now() - initStartTime;
 
             // calls the csa meat algorithm
@@ -153,6 +153,31 @@ export class ConnectionScanMeatAlgorithmController {
         } catch (error){
             return null;
         }
+    }
+
+    public static getMeat(sourceStop: number, targetStop: number, sourceTime: number, sourceDate: Date, earliestSafeArrivalTimeCSA: number, earliestArrivalTimes: number[]){
+        // gets the source and target stops
+        this.sourceStop = sourceStop;
+        this.targetStop = targetStop;
+        // converts the source time
+        this.minDepartureTime = sourceTime;
+
+        this.minDepartureTime = sourceTime;
+        this.sourceDate = sourceDate;
+
+        this.earliestSafeArrivalTimeCSA = earliestSafeArrivalTimeCSA;
+
+        // calculates the maximum arrival time of the alpha bounded version of the algorithm
+        let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+        this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
+
+        this.earliestArrivalTimes = earliestArrivalTimes;
+
+        this.init(false);
+
+        this.performAlgorithm();
+
+        return this.s[this.sourceStop][0].expectedArrivalTime;
     }
 
     /**
@@ -308,15 +333,20 @@ export class ConnectionScanMeatAlgorithmController {
     /**
      * Initializes the values of the algorithm.
      */
-    private static init(){
-        this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(this.sourceStop, this.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
-        if(this.earliestSafeArrivalTimeCSA === null) {
-            throw new Error("Couldn't find a connection.")
-        }
+    private static init(calculateCSAValues: boolean){
+        if(calculateCSAValues){
+            this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(this.sourceStop, this.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
+            if(this.earliestSafeArrivalTimeCSA === null) {
+                throw new Error("Couldn't find a connection.")
+            }
 
-        // calculates the maximum arrival time of the alpha bounded version of the algorithm
-        let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-        this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
+            // calculates the maximum arrival time of the alpha bounded version of the algorithm
+            let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
+
+            this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
+        }
+        
         
         // sets the relevant dates
         this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
@@ -324,8 +354,6 @@ export class ConnectionScanMeatAlgorithmController {
 
         this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
         
-        this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
-
         // sets the profile function array
         this.s = new Array(GoogleTransitData.STOPS.length);
         // sets the trip array
