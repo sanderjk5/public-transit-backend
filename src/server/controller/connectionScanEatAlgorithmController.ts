@@ -101,7 +101,7 @@ export class ConnectionScanEatAlgorithmController {
             const meatResponse = this.extractDecisionGraphs();
             res.send(meatResponse);
         } catch(error) {
-            console.log(error);
+            // console.log(error);
             console.timeEnd('connection scan algorithm')
             res.status(500).send(error);
         }
@@ -115,7 +115,7 @@ export class ConnectionScanEatAlgorithmController {
      * @param sourceDate 
      * @returns 
      */
-    public static testConnectionScanMeatAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
+    public static testConnectionScanEatAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
         try {
             // gets the source and target stops
             this.sourceStop = GoogleTransitData.getStopIdByName(sourceStop);
@@ -125,14 +125,36 @@ export class ConnectionScanEatAlgorithmController {
 
             this.minDepartureTime = Converter.timeToSeconds(sourceTime);
             this.sourceDate = sourceDate;
-        
+
+            const completeStartTime = performance.now();
+
             // initializes the csa meat algorithm
+            const initStartTime = performance.now();
             this.init();
-            const startTime = performance.now();
+            const initDuration = performance.now() - initStartTime;
+
             // calls the csa meat algorithm
+            const algorithmStartTime = performance.now();
             this.performAlgorithm();
-            const duration = performance.now() - startTime;
-            return {expectedArrivalTime: this.s[this.sourceStop][0].expectedArrivalTime, duration: duration};
+            const algorithmDuration = performance.now() - algorithmStartTime;
+
+            // extracts decision graph
+            const decisionGraphStartTime = performance.now();
+            this.extractDecisionGraphs();
+            const decisionGraphDuration = performance.now() - decisionGraphStartTime;
+
+            const completeDuration = performance.now() - completeStartTime;
+            let result = true;
+            if(this.s[this.sourceStop][0].arrivalTime !== this.earliestArrivalTimes[this.targetStop]){
+                result = false;
+            }
+            return {
+                result: result, 
+                completeDuration: completeDuration,
+                initDuration: initDuration, 
+                algorithmDuration: algorithmDuration, 
+                decisionGraphDuration: decisionGraphDuration,
+            };
         } catch (error){
             return null;
         }
@@ -322,7 +344,7 @@ export class ConnectionScanEatAlgorithmController {
         }
 
         // calculates the maximum arrival time of the alpha bounded version of the algorithm
-        let difference = 3 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+        let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
         this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
         
         // sets the relevant dates

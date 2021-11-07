@@ -81,7 +81,7 @@ export class RaptorAlgorithmController {
             const journeyResponse = this.getJourneyResponse();
             res.status(200).send(journeyResponse);
         } catch (err) {
-            console.log(err)
+            // console.log(err)
             res.status(500).send(err);
         }
     }

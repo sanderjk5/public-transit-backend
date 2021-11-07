@@ -108,7 +108,7 @@ export class RaptorMeatAlgorithmController {
             const meatResponse = this.extractDecisionGraphs();
             res.status(200).send(meatResponse);
         } catch (err) {
-            console.log(err);
+            // console.log(err);
             res.status(500).send(err);
         }
     }
@@ -133,12 +133,32 @@ export class RaptorMeatAlgorithmController {
             // sets the source weekday
             this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
             
-            // initializes the raptor meat algorithm
+            const completeStartTime = performance.now();
+
+            // initializes the csa meat algorithm
+            const initStartTime = performance.now();
             this.init();
-            const startTime = performance.now();
+            const initDuration = performance.now() - initStartTime;
+
+            // calls the csa meat algorithm
+            const algorithmStartTime = performance.now();
             this.performAlgorithm();
-            const duration = performance.now() - startTime;
-            return {expectedArrivalTime: this.expectedArrivalTimes[this.sourceStop][0].expectedArrivalTime, duration: duration};
+            const algorithmDuration = performance.now() - algorithmStartTime;
+
+            // extracts decision graph
+            const decisionGraphStartTime = performance.now();
+            this.extractDecisionGraphs();
+            const decisionGraphDuration = performance.now() - decisionGraphStartTime;
+
+            const completeDuration = performance.now() - completeStartTime;
+
+            return {
+                expectedArrivalTime: this.expectedArrivalTimes[this.sourceStop][0].expectedArrivalTime, 
+                completeDuration: completeDuration,
+                initDuration: initDuration, 
+                algorithmDuration: algorithmDuration, 
+                decisionGraphDuration: decisionGraphDuration,
+            };
         } catch(error){
             return null;
         }

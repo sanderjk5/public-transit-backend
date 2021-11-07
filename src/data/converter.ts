@@ -24,7 +24,7 @@ export class Converter {
      */
     public static secondsToTime(timeInSeconds: number): string {
         //Would give a invalid time.
-        if(timeInSeconds === Number.MAX_VALUE){
+        if(timeInSeconds > 10 * SECONDS_OF_A_DAY){
             return timeInSeconds.toString();
         }
         timeInSeconds = Math.floor(timeInSeconds);
@@ -61,7 +61,7 @@ export class Converter {
      * @returns 
      */
     public static getDayOffset(timeInSeconds: number): number {
-        if(timeInSeconds === Number.MAX_VALUE) {
+        if(timeInSeconds > 10 * SECONDS_OF_A_DAY) {
             return 0;
         }
         timeInSeconds = Math.floor(timeInSeconds);
@@ -79,7 +79,7 @@ export class Converter {
      * @returns 
      */
     public static getDayDifference(timeInSeconds: number): number {
-        if(timeInSeconds === Number.MAX_VALUE) {
+        if(timeInSeconds > 10 * SECONDS_OF_A_DAY) {
             return 0;
         }
         timeInSeconds = Math.floor(timeInSeconds);

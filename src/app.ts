@@ -19,6 +19,7 @@ Generator.generateSortedConnections();
 Generator.generateFootpaths();
 Reliability.initReliability();
 // TestController.testAlgorithms();
+// TestController.testEatAlgorithm();
 // TestController.testMeatAlgorithms();
 
 const port = 1337;
