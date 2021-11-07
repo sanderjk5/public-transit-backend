@@ -11,7 +11,7 @@ import { Reliability } from "../../data/reliability";
 import { RouteStopMapping } from "../../models/RouteStopMapping";
 import { StopTime } from "../../models/StopTime";
 import { performance } from 'perf_hooks';
-import {cloneDeep} from 'lodash';
+import {add, cloneDeep} from 'lodash';
 import { DecisionGraphController } from "./decisionGraphController";
 import { ConnectionScanMeatAlgorithmController } from "./connectionScanMeatAlgorithmController";
 
@@ -120,7 +120,7 @@ export class RaptorMeatAlgorithmController {
             const meatResponse = this.extractDecisionGraphs();
             res.status(200).send(meatResponse);
         } catch (err) {
-            // console.log(err);
+            console.log(err);
             res.status(500).send(err);
         }
     }
@@ -144,6 +144,9 @@ export class RaptorMeatAlgorithmController {
             this.sourceDate = sourceDate;
             // sets the source weekday
             this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
+
+            this.meatDifference = 0;
+            this.useTransferOptitimization = false;
             
             const completeStartTime = performance.now();
 
@@ -417,14 +420,85 @@ export class RaptorMeatAlgorithmController {
             }
             newRouteBag.push(newLabel)
         }
+        newRouteBag = this.clearRouteBag(newRouteBag);
+        return newRouteBag;
+    }
+
+    private static clearRouteBag(routeBag: Label[]){
+        // sorts the expected arrival times by departure time
+        routeBag.sort((a, b) => {
+            return this.sortLabelsByDepartureTime(a, b);
+        })
+        let lastLabel = routeBag[routeBag.length-1];
+        for(let j = routeBag.length-2; j >= 0; j--){
+            let currentLabel = routeBag[j];
+            // stores maximal one label for each departure time and deletes dominated labels
+            if(lastLabel.expectedArrivalTime <= currentLabel.expectedArrivalTime){
+                routeBag[j] = undefined;
+            } else {
+                lastLabel = currentLabel;
+            }
+        }
+        // adds all label of the new array which are not undefined to the expected arrival time array
+        let newRouteBag = [];
+        for(let j = 0; j < routeBag.length; j++){
+            if(routeBag[j] !== undefined){
+                newRouteBag.push(routeBag[j]);
+            }
+        }
         return newRouteBag;
     }
 
     // adds all labels of the route bag to the bag of the current stop
-    private static addBagToExpectedArrivalTimesOfRound(bag: Label[], pi: number){        
-        for(let label of bag){
-            this.expectedArrivalTimesOfCurrentRound[pi].push(label);
+    private static addBagToExpectedArrivalTimesOfRound(bag: Label[], pi: number){ 
+        if(this.expectedArrivalTimesOfCurrentRound[pi].length === 0){
+            for(let label of bag){
+                this.expectedArrivalTimesOfCurrentRound[pi].push(label)
+            }
+            return;
         }
+        if(bag.length === 0){
+            return;
+        }
+        let newExpectedArrivalTimesOfCurrentRound: Label[] = [];
+        let bagIndex = bag.length-1;
+        let expectedArrivalTimesIndex = this.expectedArrivalTimesOfCurrentRound[pi].length-1;
+        while(bagIndex >= 0 || expectedArrivalTimesIndex >= 0){
+            let lastBagLabel: Label = undefined;
+            let lastExpectedArrivalTimesLabel: Label = undefined;
+            if(bagIndex >= 0){
+                lastBagLabel = bag[bagIndex];
+            }
+            if(expectedArrivalTimesIndex >= 0){
+                lastExpectedArrivalTimesLabel = this.expectedArrivalTimesOfCurrentRound[pi][expectedArrivalTimesIndex];
+            }
+            let nextLabel: Label;
+            if(lastBagLabel && lastExpectedArrivalTimesLabel){
+                if(lastBagLabel.departureTime < lastExpectedArrivalTimesLabel.departureTime){
+                    nextLabel = lastExpectedArrivalTimesLabel;
+                    expectedArrivalTimesIndex--;
+                } else {
+                    nextLabel = lastBagLabel;
+                    bagIndex--;
+                }
+            } else if(lastBagLabel){
+                nextLabel = lastBagLabel;
+                bagIndex--;
+            } else if(lastExpectedArrivalTimesLabel){
+                nextLabel = lastExpectedArrivalTimesLabel;
+                expectedArrivalTimesIndex--;
+            }
+            if(newExpectedArrivalTimesOfCurrentRound.length === 0){
+                newExpectedArrivalTimesOfCurrentRound.unshift(nextLabel);
+            } else if(nextLabel.expectedArrivalTime < newExpectedArrivalTimesOfCurrentRound[0].expectedArrivalTime) {
+                if(nextLabel.departureTime === newExpectedArrivalTimesOfCurrentRound[0].departureTime){
+                    newExpectedArrivalTimesOfCurrentRound[0] = nextLabel;
+                } else {
+                    newExpectedArrivalTimesOfCurrentRound.unshift(nextLabel);
+                }
+            }
+        }
+        this.expectedArrivalTimesOfCurrentRound[pi] = newExpectedArrivalTimesOfCurrentRound;
     }
 
     // uses the new labels of the current round to update the bag of expected arrival times of each stop
@@ -436,38 +510,53 @@ export class RaptorMeatAlgorithmController {
             if(this.expectedArrivalTimesOfCurrentRound[i].length === 0){
                 continue;
             }
-            // adds all new labels to the labels of previous rounds
-            let expectedArrivalTimesDeepClone = cloneDeep(this.expectedArrivalTimes[i]);
-            for(let label of this.expectedArrivalTimesOfCurrentRound[i]){
-                expectedArrivalTimesDeepClone.push(cloneDeep(label));
-            }
-            // sorts the expected arrival times by departure time
-            expectedArrivalTimesDeepClone.sort((a, b) => {
-                return this.sortLabelsByDepartureTime(a, b);
-            })
-            // checks for each label if it dominates all labels with a higher departure time
-            let lastLabel = expectedArrivalTimesDeepClone[expectedArrivalTimesDeepClone.length-1];
-            for(let j = expectedArrivalTimesDeepClone.length-2; j >= 0; j--){
-                let currentLabel = expectedArrivalTimesDeepClone[j];
-                // stores maximal one label for each departure time and deletes dominated labels
-                if(lastLabel.expectedArrivalTime <= currentLabel.expectedArrivalTime){
-                    expectedArrivalTimesDeepClone[j] = undefined;
-                } else {
-                    // adds the highest new departure time to the array and marks the stop if a label of the current round was added
-                    if(currentLabel.transferRound === this.k && !this.markedStops.includes(i)){
-                        this.markedStops.push(i);
-                        this.latestDepartureTimesOfLastRound[i] = currentLabel.departureTime;
+            let newExpectedArrivalTimes: Label[] = [];
+            let expectedArrivalTimesIndex = this.expectedArrivalTimes[i].length-1;
+            let expectedArrivalTimesIndexCurrentRound = this.expectedArrivalTimesOfCurrentRound[i].length-1;
+            while(expectedArrivalTimesIndex >= 0 || expectedArrivalTimesIndexCurrentRound >= 0){
+                let lastExpectedArrivalTimesLabel: Label = undefined;
+                let lastExpectedArrivalTimesCurrentRoundLabel: Label = undefined;
+                if(expectedArrivalTimesIndex >= 0){
+                    lastExpectedArrivalTimesLabel = this.expectedArrivalTimes[i][expectedArrivalTimesIndex];
+                }
+                if(expectedArrivalTimesIndexCurrentRound >= 0){
+                    lastExpectedArrivalTimesCurrentRoundLabel = this.expectedArrivalTimesOfCurrentRound[i][expectedArrivalTimesIndexCurrentRound];
+                }
+                let nextLabel: Label;
+                if(lastExpectedArrivalTimesLabel && lastExpectedArrivalTimesCurrentRoundLabel){
+                    if(lastExpectedArrivalTimesLabel.departureTime < lastExpectedArrivalTimesCurrentRoundLabel.departureTime){
+                        nextLabel = lastExpectedArrivalTimesCurrentRoundLabel;
+                        expectedArrivalTimesIndexCurrentRound--;
+                    } else {
+                        nextLabel = lastExpectedArrivalTimesLabel;
+                        expectedArrivalTimesIndex--;
                     }
-                    lastLabel = currentLabel;
+                } else if(lastExpectedArrivalTimesLabel){
+                    nextLabel = lastExpectedArrivalTimesLabel;
+                    expectedArrivalTimesIndex--;
+                } else if(lastExpectedArrivalTimesCurrentRoundLabel){
+                    nextLabel = lastExpectedArrivalTimesCurrentRoundLabel;
+                    expectedArrivalTimesIndexCurrentRound--;
+                }
+                if(newExpectedArrivalTimes.length === 0){
+                    newExpectedArrivalTimes.unshift(nextLabel);
+                    if(nextLabel.transferRound === this.k && !this.markedStops.includes(i)){
+                        this.markedStops.push(i);
+                        this.latestDepartureTimesOfLastRound[i] = nextLabel.departureTime;
+                    }
+                } else if(nextLabel.expectedArrivalTime < newExpectedArrivalTimes[0].expectedArrivalTime) {
+                    if(nextLabel.departureTime === newExpectedArrivalTimes[0].departureTime){
+                        newExpectedArrivalTimes[0] = nextLabel;
+                    } else {
+                        newExpectedArrivalTimes.unshift(nextLabel);
+                    }
+                    if(nextLabel.transferRound === this.k && !this.markedStops.includes(i)){
+                        this.markedStops.push(i);
+                        this.latestDepartureTimesOfLastRound[i] = nextLabel.departureTime;
+                    }
                 }
             }
-            // adds all label of the new array which are not undefined to the expected arrival time array
-            this.expectedArrivalTimes[i] = [];
-            for(let j = 0; j < expectedArrivalTimesDeepClone.length; j++){
-                if(expectedArrivalTimesDeepClone[j] !== undefined){
-                    this.expectedArrivalTimes[i].push(expectedArrivalTimesDeepClone[j]);
-                }
-            }
+            this.expectedArrivalTimes[i] = newExpectedArrivalTimes;
         }
     }
 
