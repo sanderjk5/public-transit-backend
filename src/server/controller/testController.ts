@@ -28,7 +28,7 @@ export class TestController {
             dates.push(newDate);
         }
         const failedRequests = [];
-        for(let i = 0; i < 500; i++){
+        for(let i = 0; i < 1000; i++){
             const randomSourceStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
             const randomTargetStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
             const randomSourceTime = this.getRandomInt(numberOfSeconds);
@@ -94,7 +94,7 @@ export class TestController {
             dates.push(newDate);
         }
         const failedRequests = [];
-        for(let i = 0; i < 500; i++){
+        for(let i = 0; i < 1000; i++){
             const randomSourceStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
             const randomTargetStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
             const randomSourceTime = this.getRandomInt(numberOfSeconds);
@@ -167,7 +167,7 @@ export class TestController {
             dates.push(newDate);
         }
         const failedRequests = [];
-        for(let i = 0; i < 500; i++){
+        for(let i = 0; i < 1000; i++){
             const randomSourceStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
             const randomTargetStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
             const randomSourceTime = this.getRandomInt(numberOfSeconds);
