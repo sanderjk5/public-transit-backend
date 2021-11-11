@@ -26,6 +26,7 @@ interface QEntry {
 interface EarliestTripInfo {
     tripId: number,
     tripArrival: number,
+    departureTime?: number,
     dayOffset: number,
 }
 
@@ -305,6 +306,7 @@ export class RaptorMeatAlgorithmController {
             let p = this.Q[i].p;
             let routeBag: Label[] = [];
             let reachedP = false;
+            let addedLabelsAtLastStop = true;
             // loop over all stops of r beggining with p (from last to first stop)
             for(let j = GoogleTransitData.STOPS_OF_A_ROUTE[r].length-1; j >= 0; j--){     
                 let pi = GoogleTransitData.STOPS_OF_A_ROUTE[r][j];
@@ -318,11 +320,16 @@ export class RaptorMeatAlgorithmController {
                     continue;
                 }
                 // updates the route bag with the departure times of this stop
-                routeBag = this.updateRouteBag(routeBag, pi);
+                routeBag = this.updateRouteBag(routeBag, pi, addedLabelsAtLastStop);
                 // merges the routeBag in the current round bag of the stop
-                this.addBagToExpectedArrivalTimesOfRound(routeBag, pi);
+                this.mergeBagInExpectedArrivalTimesOfRound(routeBag, pi);
                 // adds the labels of the last round of this stop to the route bag
-                routeBag = this.mergeLastRoundLabelsInRouteBag(r, pi, routeBag);
+                if(this.latestDepartureTimesOfLastRound[pi] !== undefined){
+                    routeBag = this.mergeLastRoundLabelsInRouteBag(r, pi, routeBag);
+                    addedLabelsAtLastStop = true;
+                } else {
+                    addedLabelsAtLastStop = false;
+                }
             }
         }
     }
@@ -336,9 +343,6 @@ export class RaptorMeatAlgorithmController {
      * @returns 
      */
     private static mergeLastRoundLabelsInRouteBag(r: number, pi: number, routeBag: Label[]){
-        if(this.latestDepartureTimesOfLastRound[pi] === undefined){
-            return routeBag;
-        }
         // gets all trips between the minimum arrival time and the last departure of last round at this stop
         let newTripInfos: EarliestTripInfo[] = this.getTripsOfInterval(r, pi, this.latestDepartureTimesOfLastRound[pi]);
         // creates a new label for each trip
@@ -379,6 +383,7 @@ export class RaptorMeatAlgorithmController {
             // sets the values of the new label and adds it to the route bag
             let newLabel: Label = {
                 expectedArrivalTime: newExpectedArrivalTime,
+                departureTime: newTripInfo.departureTime,
                 associatedTrip: newTripInfo,
                 exitTripAtStop: pi,
                 transferRound: this.k,
@@ -388,13 +393,64 @@ export class RaptorMeatAlgorithmController {
         return routeBag;
     }
 
+    private static addLabelsToRouteBag(newLabels: Label[], routeBag: Label[]){
+        if(routeBag.length === 0){
+            for(let label of routeBag){
+                routeBag.push(label)
+            }
+            return;
+        }
+        if(newLabels.length === 0){
+            return;
+        }
+        let newRouteBag: Label[] = [];
+        let newLabelsIndex = newLabels.length-1;
+        let routeBagIndex = routeBag.length-1;
+        while(newLabelsIndex >= 0 || routeBagIndex >= 0){
+            let lastNewLabel: Label = undefined;
+            let lastRouteBagLabel: Label = undefined;
+            if(newLabelsIndex >= 0){
+                lastNewLabel = newLabels[newLabelsIndex];
+            }
+            if(routeBagIndex >= 0){
+                lastRouteBagLabel = routeBag[routeBagIndex];
+            }
+            let nextLabel: Label;
+            if(lastNewLabel && lastRouteBagLabel){
+                if(lastNewLabel.departureTime < lastRouteBagLabel.departureTime){
+                    nextLabel = lastRouteBagLabel;
+                    routeBagIndex--;
+                } else {
+                    nextLabel = lastNewLabel;
+                    newLabelsIndex--;
+                }
+            } else if(lastNewLabel){
+                nextLabel = lastNewLabel;
+                newLabelsIndex--;
+            } else if(lastRouteBagLabel){
+                nextLabel = lastRouteBagLabel;
+                routeBagIndex--;
+            }
+            if(newRouteBag.length === 0){
+                newRouteBag.unshift(nextLabel);
+            } else if(nextLabel.expectedArrivalTime < newRouteBag[0].expectedArrivalTime) {
+                if(nextLabel.departureTime === newRouteBag[0].departureTime){
+                    newRouteBag[0] = nextLabel;
+                } else {
+                    newRouteBag.unshift(nextLabel);
+                }
+            }
+        }
+        return newRouteBag;
+    }
+
     /**
      * Uses the stop times of the current stop to update the departure times of the current stop
      * @param routeBag 
      * @param pi 
      * @returns 
      */
-    private static updateRouteBag(routeBag: Label[], pi: number){
+    private static updateRouteBag(routeBag: Label[], pi: number, clearRouteBag: boolean){
         let newRouteBag: Label[] = [];
         // updates the departure time for each label of the route bag
         for(let label of routeBag){
@@ -420,7 +476,9 @@ export class RaptorMeatAlgorithmController {
             }
             newRouteBag.push(newLabel)
         }
-        newRouteBag = this.clearRouteBag(newRouteBag);
+        if(clearRouteBag){
+            newRouteBag = this.clearRouteBag(newRouteBag);
+        }
         return newRouteBag;
     }
 
@@ -450,7 +508,7 @@ export class RaptorMeatAlgorithmController {
     }
 
     // adds all labels of the route bag to the bag of the current stop
-    private static addBagToExpectedArrivalTimesOfRound(bag: Label[], pi: number){ 
+    private static mergeBagInExpectedArrivalTimesOfRound(bag: Label[], pi: number){ 
         if(this.expectedArrivalTimesOfCurrentRound[pi].length === 0){
             for(let label of bag){
                 this.expectedArrivalTimesOfCurrentRound[pi].push(label)
@@ -609,6 +667,7 @@ export class RaptorMeatAlgorithmController {
             for(let j = stopTimes.length-1; j >= 0; j--) {
                 let stopTime = stopTimes[j];
                 let arrivalTime = stopTime.arrivalTime;
+                let departureTime = stopTime.departureTime;
                 let serviceId = GoogleTransitData.TRIPS[stopTime.tripId].serviceId;
                 // checks if the trip is available and if it departs in the given interval
                 if(GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday] && (arrivalTime + earliestDepartureDayOffset) <= latestDeparture 
@@ -617,6 +676,7 @@ export class RaptorMeatAlgorithmController {
                     let earliestTripInfo: EarliestTripInfo = {
                         tripId: stopTime.tripId,
                         tripArrival: arrivalTime + earliestDepartureDayOffset,
+                        departureTime: departureTime,
                         dayOffset: earliestDepartureDayOffset,
                     }
                     earliestTripInfos.push(earliestTripInfo);
@@ -629,6 +689,7 @@ export class RaptorMeatAlgorithmController {
                     let earliestTripInfo: EarliestTripInfo = {
                         tripId: stopTime.tripId,
                         tripArrival: arrivalTime + earliestDepartureDayOffset,
+                        departureTime: departureTime,
                         dayOffset: earliestDepartureDayOffset-SECONDS_OF_A_DAY,
                     }
                     earliestTripInfos.push(earliestTripInfo);
