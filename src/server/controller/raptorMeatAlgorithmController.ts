@@ -345,6 +345,7 @@ export class RaptorMeatAlgorithmController {
     private static mergeLastRoundLabelsInRouteBag(r: number, pi: number, routeBag: Label[]){
         // gets all trips between the minimum arrival time and the last departure of last round at this stop
         let newTripInfos: EarliestTripInfo[] = this.getTripsOfInterval(r, pi, this.latestDepartureTimesOfLastRound[pi]);
+        let newLabels: Label[] = []
         // creates a new label for each trip
         for(let newTripInfo of newTripInfos){
             let newExpectedArrivalTime: number = 0;
@@ -380,6 +381,10 @@ export class RaptorMeatAlgorithmController {
                     }
                 }
             }
+            let departureTime = newTripInfo.departureTime + newTripInfo.dayOffset;
+            if(departureTime > newTripInfo.tripArrival){
+                departureTime -= SECONDS_OF_A_DAY;
+            }
             // sets the values of the new label and adds it to the route bag
             let newLabel: Label = {
                 expectedArrivalTime: newExpectedArrivalTime,
@@ -388,20 +393,23 @@ export class RaptorMeatAlgorithmController {
                 exitTripAtStop: pi,
                 transferRound: this.k,
             }
-            routeBag.push(newLabel);
+            newLabels.push(newLabel);
+        }
+        if(newLabels.length > 0){
+            routeBag = this.addLabelsToRouteBag(newLabels, routeBag);
         }
         return routeBag;
     }
 
     private static addLabelsToRouteBag(newLabels: Label[], routeBag: Label[]){
-        if(routeBag.length === 0){
-            for(let label of routeBag){
-                routeBag.push(label)
-            }
-            return;
-        }
         if(newLabels.length === 0){
-            return;
+            return routeBag;
+        }
+        newLabels.sort((a, b) => {
+            return this.sortLabelsByDepartureTime(a, b);
+        })
+        if(routeBag.length === 0){
+            return newLabels;
         }
         let newRouteBag: Label[] = [];
         let newLabelsIndex = newLabels.length-1;
@@ -476,9 +484,9 @@ export class RaptorMeatAlgorithmController {
             }
             newRouteBag.push(newLabel)
         }
-        if(clearRouteBag){
-            newRouteBag = this.clearRouteBag(newRouteBag);
-        }
+        // if(clearRouteBag){
+        //     newRouteBag = this.clearRouteBag(newRouteBag);
+        // }
         return newRouteBag;
     }
 
@@ -688,7 +696,7 @@ export class RaptorMeatAlgorithmController {
                     // adds the new trip info
                     let earliestTripInfo: EarliestTripInfo = {
                         tripId: stopTime.tripId,
-                        tripArrival: arrivalTime + earliestDepartureDayOffset,
+                        tripArrival: arrivalTime + earliestDepartureDayOffset-SECONDS_OF_A_DAY,
                         departureTime: departureTime,
                         dayOffset: earliestDepartureDayOffset-SECONDS_OF_A_DAY,
                     }
