@@ -382,13 +382,10 @@ export class RaptorMeatAlgorithmController {
                 }
             }
             let departureTime = newTripInfo.departureTime + newTripInfo.dayOffset;
-            if(departureTime > newTripInfo.tripArrival){
-                departureTime -= SECONDS_OF_A_DAY;
-            }
             // sets the values of the new label and adds it to the route bag
             let newLabel: Label = {
                 expectedArrivalTime: newExpectedArrivalTime,
-                departureTime: newTripInfo.departureTime,
+                departureTime: departureTime,
                 associatedTrip: newTripInfo,
                 exitTripAtStop: pi,
                 transferRound: this.k,

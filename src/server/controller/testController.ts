@@ -119,7 +119,8 @@ export class TestController {
             }
             if(raptorResponse && csaResponse){
                 if(raptorResponse.expectedArrivalTime !== csaResponse.expectedArrivalTime){
-                    // console.log('result: failed, ' + csaResponse.expectedArrivalTime + ', ' + raptorResponse.expectedArrivalTime);
+                    console.log('request: ' + requestString)
+                    console.log('result: failed, ' + csaResponse.expectedArrivalTime + ', ' + raptorResponse.expectedArrivalTime);
                     failedRequests.push(requestString)
                 } else {
                     // console.log('result: successful');
