@@ -11,7 +11,6 @@ import { Reliability } from "../../data/reliability";
 import { RouteStopMapping } from "../../models/RouteStopMapping";
 import { StopTime } from "../../models/StopTime";
 import { performance } from 'perf_hooks';
-import {add, cloneDeep} from 'lodash';
 import { DecisionGraphController } from "./decisionGraphController";
 import { ConnectionScanMeatAlgorithmController } from "./connectionScanMeatAlgorithmController";
 
@@ -219,7 +218,6 @@ export class RaptorMeatAlgorithmController {
             throw new Error("Couldn't find a connection.");
         }
         // calculates the maximum arrival time
-
         let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
         this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
         this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
@@ -666,9 +664,8 @@ export class RaptorMeatAlgorithmController {
         let earliestDepartureDayOffset = Converter.getDayOffset(latestDeparture);
         // sets the weekdays
         let currentWeekday = Calculator.moduloSeven(this.sourceWeekday + Converter.getDayDifference(latestDeparture));
-        let previousWeekday = Calculator.moduloSeven(currentWeekday - 1);
         // loops over all stop times to find all trips of the interval
-        for(let i = Converter.getDayDifference(latestDeparture)+1; i >= Converter.getDayDifference(earliestArrival); i--) {
+        for(let i = Converter.getDayDifference(latestDeparture)+1; i >= Converter.getDayDifference(earliestArrival)-1; i--) {
             for(let j = stopTimes.length-1; j >= 0; j--) {
                 let stopTime = stopTimes[j];
                 let arrivalTime = stopTime.arrivalTime;
@@ -686,23 +683,9 @@ export class RaptorMeatAlgorithmController {
                     }
                     earliestTripInfos.push(earliestTripInfo);
                 }
-                // checks if the trip which corresponds to the previous day could be catched at the current day in the interval
-                let arrivalTimeOfPreviousDay = arrivalTime - SECONDS_OF_A_DAY;
-                if(GoogleTransitData.CALENDAR[serviceId].isAvailable[previousWeekday] && arrivalTimeOfPreviousDay >= 0 
-                    && (arrivalTimeOfPreviousDay + earliestDepartureDayOffset) <= latestDeparture && (arrivalTimeOfPreviousDay + earliestDepartureDayOffset) >= earliestArrival){
-                    // adds the new trip info
-                    let earliestTripInfo: EarliestTripInfo = {
-                        tripId: stopTime.tripId,
-                        tripArrival: arrivalTime + earliestDepartureDayOffset-SECONDS_OF_A_DAY,
-                        departureTime: departureTime,
-                        dayOffset: earliestDepartureDayOffset-SECONDS_OF_A_DAY,
-                    }
-                    earliestTripInfos.push(earliestTripInfo);
-                }
             }
             // sets the new weekday
-            currentWeekday = previousWeekday;
-            previousWeekday = Calculator.moduloSeven(currentWeekday - 1);
+            currentWeekday = Calculator.moduloSeven(currentWeekday - 1);
             earliestDepartureDayOffset -= SECONDS_OF_A_DAY;
         }
         return earliestTripInfos;
