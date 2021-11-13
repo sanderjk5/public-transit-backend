@@ -5,6 +5,7 @@ import { Importer } from './data/importer';
 import { Generator } from './data/generator';
 import { TestController } from './server/controller/testController';
 import { Reliability } from './data/reliability';
+import { GoogleTransitData } from './data/google-transit-data';
 
 const app = express();
 
@@ -13,6 +14,8 @@ Importer.importGoogleTransitData();
 // generates routes which can be used by the raptor algorithm
 Generator.combineStops();
 Generator.generateValidRoutes();
+Generator.setIsAvailableOfTrips();
+Generator.clearAndSortTrips();
 // genreates connections which can be used by the csa
 Generator.generateSortedConnections();
 // generates footpaths which can be used by raptor and csa
@@ -20,7 +23,7 @@ Generator.generateFootpaths();
 Reliability.initReliability();
 // TestController.testAlgorithms();
 // TestController.testEatAlgorithm();
-TestController.testMeatAlgorithms();
+// TestController.testMeatAlgorithms();
 
 const port = 1337;
 const corsOptions = {

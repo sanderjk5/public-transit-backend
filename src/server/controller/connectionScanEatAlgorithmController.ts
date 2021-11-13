@@ -216,8 +216,7 @@ export class ConnectionScanEatAlgorithmController {
             // sets the last departure time
             lastDepartureTime = currentConnectionDepartureTime;
             // checks if the connection is available on this weekday
-            let serviceId = GoogleTransitData.TRIPS[currentConnection.trip].serviceId;
-            if(!GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday]){
+            if(!GoogleTransitData.isAvailable(currentWeekday, GoogleTransitData.TRIPS[currentConnection.trip].isAvailable)){
                 continue;
             }
             // checks if the connection arrives earlier than the maximum arrival time and can be reached from the source stop

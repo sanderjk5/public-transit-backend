@@ -13,6 +13,7 @@ import { StopTime } from "../../models/StopTime";
 import { performance } from 'perf_hooks';
 import { DecisionGraphController } from "./decisionGraphController";
 import { ConnectionScanMeatAlgorithmController } from "./connectionScanMeatAlgorithmController";
+import { cloneDeep } from "lodash";
 
 // entries of the q array
 interface QEntry {
@@ -116,6 +117,8 @@ export class RaptorMeatAlgorithmController {
             // calls the raptor meat algorithm
             this.performAlgorithm();
             console.timeEnd('raptor meat algorithm')
+            console.log(this.expectedArrivalTimes[this.sourceStop][0])
+            console.log(Converter.secondsToTime(this.expectedArrivalTimes[this.sourceStop][0].expectedArrivalTime))
             // generates the http response which includes all information of the journey incl. its decision graphs
             const meatResponse = this.extractDecisionGraphs();
             res.status(200).send(meatResponse);
@@ -370,10 +373,10 @@ export class RaptorMeatAlgorithmController {
                 // finds all labels at this stop which have a departure time between trip arrival time and trip arrival time + maxD_c (and the first departure after max delay) and calculates the expected arrival time
                 for(let j = 0; j < this.expectedArrivalTimes[pi].length; j++) {
                     label = this.expectedArrivalTimes[pi][j];
-                    if(label.departureTime >= currentTripArrivalTime && label.departureTime <= currentTripArrivalTime + currentMaxDelay){
+                    if(label.departureTime >= currentTripArrivalTime && label.departureTime < currentTripArrivalTime + currentMaxDelay){
                         newExpectedArrivalTime += (label.expectedArrivalTime * Reliability.getReliability(labelLastDepartureTime - currentTripArrivalTime, label.departureTime - currentTripArrivalTime, isLongDistanceTrip));
                         labelLastDepartureTime = label.departureTime;
-                    } else if(label.departureTime > currentTripArrivalTime + currentMaxDelay) {
+                    } else if(label.departureTime >= currentTripArrivalTime + currentMaxDelay) {
                         newExpectedArrivalTime += (label.expectedArrivalTime * Reliability.getReliability(labelLastDepartureTime - currentTripArrivalTime, label.departureTime - currentTripArrivalTime, isLongDistanceTrip));
                         break;
                     }
@@ -665,14 +668,14 @@ export class RaptorMeatAlgorithmController {
         // sets the weekdays
         let currentWeekday = Calculator.moduloSeven(this.sourceWeekday + Converter.getDayDifference(latestDeparture));
         // loops over all stop times to find all trips of the interval
-        for(let i = Converter.getDayDifference(latestDeparture)+1; i >= Converter.getDayDifference(earliestArrival)-1; i--) {
+        for(let i = Converter.getDayDifference(latestDeparture); i >= Converter.getDayDifference(earliestArrival)-1; i--) {
             for(let j = stopTimes.length-1; j >= 0; j--) {
                 let stopTime = stopTimes[j];
                 let arrivalTime = stopTime.arrivalTime;
                 let departureTime = stopTime.departureTime;
                 let serviceId = GoogleTransitData.TRIPS[stopTime.tripId].serviceId;
                 // checks if the trip is available and if it departs in the given interval
-                if(GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday] && (arrivalTime + earliestDepartureDayOffset) <= latestDeparture 
+                if(GoogleTransitData.isAvailable(currentWeekday, GoogleTransitData.TRIPS[stopTime.tripId].isAvailable) && (arrivalTime + earliestDepartureDayOffset) <= latestDeparture 
                     && (arrivalTime + earliestDepartureDayOffset) >= earliestArrival) {
                     // adds the new trip info
                     let earliestTripInfo: EarliestTripInfo = {
@@ -735,6 +738,7 @@ export class RaptorMeatAlgorithmController {
         if(this.expectedArrivalTimes[this.sourceStop][0].departureTime === Number.MAX_VALUE){
             throw new Error("Couldn't find a connection.")
         }
+        let targetStopLabels: Label[] = [];
         // adds the source stop
         this.expectedArrivalTimes[this.sourceStop][0].calcReliability = 1;
         priorityQueue.add(this.expectedArrivalTimes[this.sourceStop][0]);
@@ -767,24 +771,61 @@ export class RaptorMeatAlgorithmController {
                     maxDelay = MAX_D_C_NORMAL;
                     isLongDistanceTrip = false;
                 }
+                let pLastDepartureTime = -1;
                 // finds the next labels which can be added to the queue (every label between departure and departure + max Delay and the first one after the max Delay).
                 // let relevantPs: Label[] = [];
                 for(let i = 0; i < this.expectedArrivalTimes[p.exitTripAtStop].length; i++) {
                     let nextP = this.expectedArrivalTimes[p.exitTripAtStop][i];
-                    if(nextP.departureTime >= p.associatedTrip.tripArrival && nextP.departureTime <= (p.associatedTrip.tripArrival + maxDelay)){
-                        priorityQueue.add(nextP);
+                    if(nextP.departureTime >= p.associatedTrip.tripArrival && nextP.departureTime < (p.associatedTrip.tripArrival + maxDelay) 
+                        //&& nextP.transferRound < p.transferRound
+                    ){
+                        let nextPCopy = cloneDeep(nextP)
+                        let probabilityToTakeJourney = Reliability.getReliability(pLastDepartureTime - p.associatedTrip.tripArrival, nextP.departureTime - p.associatedTrip.tripArrival, isLongDistanceTrip);
+                        nextPCopy.calcReliability = p.calcReliability * probabilityToTakeJourney;
+                        priorityQueue.add(nextPCopy);
+                        pLastDepartureTime = nextPCopy.departureTime;
                     }
-                    if(nextP.departureTime > (p.associatedTrip.tripArrival + maxDelay) && nextP.departureTime !== Number.MAX_VALUE){
-                        priorityQueue.add(nextP);
+                    if(nextP.departureTime >= (p.associatedTrip.tripArrival + maxDelay) && nextP.departureTime !== Number.MAX_VALUE 
+                        //&& nextP.transferRound < p.transferRound
+                    ){
+                        let nextPCopy = cloneDeep(nextP)
+                        let probabilityToTakeJourney = Reliability.getReliability(pLastDepartureTime - p.associatedTrip.tripArrival, nextP.departureTime - p.associatedTrip.tripArrival, isLongDistanceTrip);
+                        nextPCopy.calcReliability = p.calcReliability * probabilityToTakeJourney;
+                        priorityQueue.add(nextPCopy);
+                        pLastDepartureTime = nextPCopy.departureTime;
                         break;
                     }
                 }
             } 
+            else {
+                targetStopLabels.push(p)
+            }
         }
+        // let meat = this.calculateMEAT(targetStopLabels);
+        // console.log(meat);
+        // console.log(Converter.secondsToTime(meat));
         // gets the two graph representations
         const decisionGraphs = DecisionGraphController.getDecisionGraphs(expandedTempEdges, arrivalTimesPerStop, this.sourceStop, this.targetStop);
         meatResponse.expandedDecisionGraph = decisionGraphs.expandedDecisionGraph;
         meatResponse.compactDecisionGraph = decisionGraphs.compactDecisionGraph;
         return meatResponse;
+    }
+
+    private static calculateMEAT(targetStopLabels: Label[]){
+        let meat: number = 0;
+        let probabilitySum = 0;
+        for(let targetStopLabel of targetStopLabels){
+            let expectedDelay: number;
+            if(GoogleTransitData.TRIPS[targetStopLabel.associatedTrip.tripId].isLongDistance){
+                expectedDelay = Reliability.longDistanceExpectedValue;
+            } else {
+                expectedDelay = Reliability.normalDistanceExpectedValue;
+            }
+            probabilitySum += targetStopLabel.calcReliability;
+            let arrivalTime = targetStopLabel.associatedTrip.tripArrival + expectedDelay;
+            meat += (arrivalTime * targetStopLabel.calcReliability);
+        }
+        console.log(probabilitySum)
+        return meat;
     }
 }

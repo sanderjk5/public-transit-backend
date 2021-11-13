@@ -398,9 +398,8 @@ export class RaptorAlgorithmController {
             for(let j = 0; j < stopTimes.length; j++) {
                 let stopTime = stopTimes[j];
                 let departureTime = stopTime.departureTime;
-                let serviceId = GoogleTransitData.TRIPS[stopTime.tripId].serviceId;
                 // checks if the trip is available and if it is a candidat for the earliest trip
-                if(GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday] && (departureTime + earliestArrivalDayOffset) >= earliestArrival 
+                if(GoogleTransitData.isAvailable(currentWeekday, GoogleTransitData.TRIPS[stopTime.tripId].isAvailable) && (departureTime + earliestArrivalDayOffset) >= earliestArrival 
                     && (departureTime + earliestArrivalDayOffset) < tripDeparture) {
                     tripId = stopTime.tripId;
                     tripDeparture = departureTime + earliestArrivalDayOffset;
@@ -408,7 +407,7 @@ export class RaptorAlgorithmController {
                 }
                 // checks if the trip corresponds to the previous day but could be catched at the current day
                 let departureTimeOfPreviousDay = departureTime - SECONDS_OF_A_DAY;
-                if(GoogleTransitData.CALENDAR[serviceId].isAvailable[previousWeekday] && departureTimeOfPreviousDay >= 0 
+                if(GoogleTransitData.isAvailable(previousWeekday, GoogleTransitData.TRIPS[stopTime.tripId].isAvailable) && departureTimeOfPreviousDay >= 0 
                     && (departureTimeOfPreviousDay + earliestArrivalDayOffset) >= earliestArrival && (departureTimeOfPreviousDay + earliestArrivalDayOffset) < tripDeparture){
                     tripId = stopTime.tripId;
                     tripDeparture = departureTimeOfPreviousDay + earliestArrivalDayOffset;

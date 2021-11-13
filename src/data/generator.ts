@@ -6,10 +6,16 @@ import { Sorter } from "./sorter";
 import { Stop } from "../models/Stop";
 import { Calculator } from "./calculator";
 import { CHANGE_TIME } from "../constants";
+import { cloneDeep } from "lodash";
 
 interface newStopMapEntry {
     stopId: number,
     stopSequence: number,
+}
+
+interface TripDeparturePair {
+    tripId: number,
+    departureTime: number,
 }
 
 export class Generator {
@@ -253,6 +259,72 @@ export class Generator {
                 GoogleTransitData.STOPS_OF_A_ROUTE[routeId][duplicatedStop.stopSequence] = newStopId;
                 GoogleTransitData.ROUTES_SERVING_STOPS.push([{routeId: routeId, stopSequence: duplicatedStop.stopSequence}]);
             }
+        }
+    }
+
+    public static setIsAvailableOfTrips(){
+        let serviceIdToBinaryNumberMap = new Map<number, number>();
+        for(let calendarEntry of GoogleTransitData.CALENDAR){
+            let bit = 1;
+            let binaryNumber = 0;
+            for(let i = 6; i >= 0; i--){
+                if(calendarEntry.isAvailable[i]){
+                    binaryNumber += bit;
+                }
+                bit *= 2;
+            }
+            serviceIdToBinaryNumberMap.set(calendarEntry.serviceId, binaryNumber);
+        }
+        for(let trip of GoogleTransitData.TRIPS){
+            trip.isAvailable = serviceIdToBinaryNumberMap.get(trip.serviceId);
+        }
+    }
+
+    public static clearAndSortTrips(){
+        for(let i = 0; i < GoogleTransitData.TRIPS_OF_A_ROUTE.length; i++){
+            let tripsOfARoute = cloneDeep(GoogleTransitData.TRIPS_OF_A_ROUTE[i]);
+            let sortedTripsOfARoute = [];
+            let tripDeparturePairs: TripDeparturePair[] = [];
+            for(let trip of tripsOfARoute){
+                let tripDeparturePair: TripDeparturePair = {
+                    tripId: trip,
+                    departureTime: GoogleTransitData.STOPTIMES[GoogleTransitData.STOPTIMES_OF_A_TRIP[trip]].departureTime,
+                }
+                tripDeparturePairs.push(tripDeparturePair);
+            }
+            tripDeparturePairs.sort((a, b) => {
+                return a.departureTime - b.departureTime;
+            })
+            let stopTimesOfLastTrip: StopTime[] = GoogleTransitData.getStopTimesByTrip(tripDeparturePairs[0].tripId);
+            let stopTimesOfCurrentTrip: StopTime[];
+            let isAvailableOfLastTrip: number = GoogleTransitData.TRIPS[tripDeparturePairs[0].tripId].isAvailable;
+            let isAvailableOfCurrentTrip: number;
+            sortedTripsOfARoute.push(tripDeparturePairs[0].tripId)
+            for(let j = 1; j < tripDeparturePairs.length; j++){
+                stopTimesOfCurrentTrip = GoogleTransitData.getStopTimesByTrip(tripDeparturePairs[j].tripId);
+                isAvailableOfCurrentTrip = GoogleTransitData.TRIPS[tripDeparturePairs[j].tripId].isAvailable;
+                let bit = 1;
+                for(let l = 6; l >= 0; l--){
+                    let removeStopTimesOfWeekday = false;
+                    if(GoogleTransitData.isAvailable(l, isAvailableOfLastTrip) && GoogleTransitData.isAvailable(l, isAvailableOfCurrentTrip)){
+                        for(let k = 0; k < stopTimesOfLastTrip.length; k++){
+                            if(stopTimesOfLastTrip[k].departureTime >= stopTimesOfCurrentTrip[k].departureTime){
+                                removeStopTimesOfWeekday = true;
+                                break;
+                            }
+                        }
+                    }
+                    if(removeStopTimesOfWeekday){
+                        isAvailableOfCurrentTrip = isAvailableOfCurrentTrip - bit;
+                    }
+                    bit *= 2;
+                }
+                GoogleTransitData.TRIPS[tripDeparturePairs[j].tripId].isAvailable = isAvailableOfCurrentTrip;
+                sortedTripsOfARoute.push(tripDeparturePairs[j].tripId);
+                stopTimesOfLastTrip = stopTimesOfCurrentTrip;
+                isAvailableOfLastTrip = isAvailableOfCurrentTrip;
+            }
+            GoogleTransitData.TRIPS_OF_A_ROUTE[i] = sortedTripsOfARoute;
         }
     }
 
