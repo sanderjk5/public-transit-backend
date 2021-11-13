@@ -24,6 +24,10 @@ Reliability.initReliability();
 // TestController.testAlgorithms();
 // TestController.testEatAlgorithm();
 // TestController.testMeatAlgorithms();
+// console.log(GoogleTransitData.TRIPS[24161])
+// for(let stops of GoogleTransitData.STOPS_OF_A_ROUTE[3854]){
+//   console.log(GoogleTransitData.STOPS[stops].id)
+// }
 
 const port = 1337;
 const corsOptions = {

@@ -295,25 +295,29 @@ export class Generator {
             tripDeparturePairs.sort((a, b) => {
                 return a.departureTime - b.departureTime;
             })
-            let stopTimesOfLastTrip: StopTime[] = GoogleTransitData.getStopTimesByTrip(tripDeparturePairs[0].tripId);
+            let lastStopTimesPerDay: StopTime[][] = new Array(7);
             let stopTimesOfCurrentTrip: StopTime[];
-            let isAvailableOfLastTrip: number = GoogleTransitData.TRIPS[tripDeparturePairs[0].tripId].isAvailable;
             let isAvailableOfCurrentTrip: number;
             sortedTripsOfARoute.push(tripDeparturePairs[0].tripId)
-            for(let j = 1; j < tripDeparturePairs.length; j++){
+            for(let j = 0; j < tripDeparturePairs.length; j++){
                 stopTimesOfCurrentTrip = GoogleTransitData.getStopTimesByTrip(tripDeparturePairs[j].tripId);
                 isAvailableOfCurrentTrip = GoogleTransitData.TRIPS[tripDeparturePairs[j].tripId].isAvailable;
                 let bit = 1;
                 for(let l = 6; l >= 0; l--){
                     let removeStopTimesOfWeekday = false;
-                    if(GoogleTransitData.isAvailable(l, isAvailableOfLastTrip) && GoogleTransitData.isAvailable(l, isAvailableOfCurrentTrip)){
-                        for(let k = 0; k < stopTimesOfLastTrip.length; k++){
-                            if(stopTimesOfLastTrip[k].departureTime >= stopTimesOfCurrentTrip[k].departureTime){
-                                removeStopTimesOfWeekday = true;
-                                break;
+                    if(GoogleTransitData.isAvailable(l, isAvailableOfCurrentTrip)){
+                        if(lastStopTimesPerDay[l] !== undefined){
+                            for(let k = 0; k < lastStopTimesPerDay[l].length; k++){
+                                if(lastStopTimesPerDay[l][k].departureTime >= stopTimesOfCurrentTrip[k].departureTime){
+                                    removeStopTimesOfWeekday = true;
+                                    break;
+                                }
                             }
+                        } else {
+                            lastStopTimesPerDay[l] = stopTimesOfCurrentTrip;
                         }
                     }
+                    
                     if(removeStopTimesOfWeekday){
                         isAvailableOfCurrentTrip = isAvailableOfCurrentTrip - bit;
                     }
@@ -321,8 +325,6 @@ export class Generator {
                 }
                 GoogleTransitData.TRIPS[tripDeparturePairs[j].tripId].isAvailable = isAvailableOfCurrentTrip;
                 sortedTripsOfARoute.push(tripDeparturePairs[j].tripId);
-                stopTimesOfLastTrip = stopTimesOfCurrentTrip;
-                isAvailableOfLastTrip = isAvailableOfCurrentTrip;
             }
             GoogleTransitData.TRIPS_OF_A_ROUTE[i] = sortedTripsOfARoute;
         }

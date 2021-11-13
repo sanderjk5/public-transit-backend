@@ -41,6 +41,7 @@ interface TEntry {
     arrivalDate?: Date,
     connectionArrivalTime?: number,
     connectionArrivalStop?: number,
+    stopSequence?: number,
     finalFootpath?: number,
 }
 
@@ -95,8 +96,10 @@ export class ConnectionScanMeatAlgorithmController {
             console.time('connection scan meat algorithm')
             this.performAlgorithm();
             console.timeEnd('connection scan meat algorithm')
-            console.log(this.s[this.sourceStop][0])
-            console.log(Converter.secondsToTime(this.s[this.sourceStop][0].expectedArrivalTime))
+            // console.log(this.s[6711])
+            // console.log(Converter.secondsToTime(this.s[6711][0].expectedArrivalTime))
+            // console.log(this.s[this.sourceStop][0])
+            // console.log(Converter.secondsToTime(this.s[this.sourceStop][0].expectedArrivalTime))
             // generates the http response which includes all information of the journey incl. the graphs
             const meatResponse = this.extractDecisionGraphs();
             res.send(meatResponse);
@@ -268,7 +271,16 @@ export class ConnectionScanMeatAlgorithmController {
                 time1 = Number.MAX_VALUE;
             }
             // expected arrival time when remaining seated
-            time2 = this.t[currentConnection.trip].expectedArrivalTime;
+            let stopTime = GoogleTransitData.getStopTimeByTripAndStop(currentConnection.trip, currentConnection.arrivalStop);
+            let stopSequence: number;
+            if(stopTime){
+                stopSequence = stopTime.stopSequence
+            }
+            if(stopSequence !== undefined && stopSequence < this.t[currentConnection.trip].stopSequence){
+                time2 = this.t[currentConnection.trip].expectedArrivalTime;
+            } else {
+                time2 = Number.MAX_VALUE;
+            }
             let expectedArrivalTime = 0;
             let pLastDepartureTime: number = -1;
             // let relevantPairs: SEntry[] = [];
@@ -298,6 +310,7 @@ export class ConnectionScanMeatAlgorithmController {
                     arrivalDate: currentArrivalDate,
                     connectionArrivalTime: currentConnectionArrivalTime,
                     connectionArrivalStop: currentConnection.arrivalStop,
+                    stopSequence: stopSequence,
                 };
             }
 
@@ -371,7 +384,8 @@ export class ConnectionScanMeatAlgorithmController {
         // default entry for each trip
         for(let i = 0; i < this.t.length; i++) {
             this.t[i] = {
-                expectedArrivalTime: Number.MAX_VALUE
+                expectedArrivalTime: Number.MAX_VALUE,
+                stopSequence: Number.MAX_VALUE,
             };
         }
     }
@@ -491,9 +505,9 @@ export class ConnectionScanMeatAlgorithmController {
                 targetStopLabels.push(p)
             }
         }
-        // let meat = this.calculateMEAT(targetStopLabels);
-        // console.log(meat);
-        // console.log(Converter.secondsToTime(meat));
+        let meat = this.calculateMEAT(targetStopLabels);
+        console.log(meat);
+        console.log(Converter.secondsToTime(meat));
         const decisionGraphs = DecisionGraphController.getDecisionGraphs(expandedTempEdges, arrivalTimesPerStop, this.sourceStop, this.targetStop);
         meatResponse.expandedDecisionGraph = decisionGraphs.expandedDecisionGraph;
         meatResponse.compactDecisionGraph = decisionGraphs.compactDecisionGraph;
@@ -510,6 +524,9 @@ export class ConnectionScanMeatAlgorithmController {
             } else {
                 expectedDelay = Reliability.normalDistanceExpectedValue;
             }
+            // console.log(targetStopPair.exitTime)
+            // console.log(targetStopPair.calcReliability)
+            // console.log(targetStopPair)
             probabilitySum += targetStopPair.calcReliability;
             let arrivalTime = targetStopPair.exitTime + expectedDelay;
             meat += (arrivalTime * targetStopPair.calcReliability);

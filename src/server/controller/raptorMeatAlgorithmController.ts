@@ -123,7 +123,7 @@ export class RaptorMeatAlgorithmController {
             const meatResponse = this.extractDecisionGraphs();
             res.status(200).send(meatResponse);
         } catch (err) {
-            console.log(err);
+            // console.log(err);
             res.status(500).send(err);
         }
     }
@@ -224,7 +224,8 @@ export class RaptorMeatAlgorithmController {
         let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
         this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
         this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
-
+        // console.log(this.earliestArrivalTimes[this.targetStop])
+        // console.log(this.earliestSafeArrivalTimeCSA)
         if(this.useTransferOptitimization){
             this.meatCSA = ConnectionScanMeatAlgorithmController.getMeat(this.sourceStop, this.targetStop, this.minDepartureTime, this.sourceDate, this.earliestSafeArrivalTimeCSA, this.earliestArrivalTimes);
         }
@@ -673,7 +674,6 @@ export class RaptorMeatAlgorithmController {
                 let stopTime = stopTimes[j];
                 let arrivalTime = stopTime.arrivalTime;
                 let departureTime = stopTime.departureTime;
-                let serviceId = GoogleTransitData.TRIPS[stopTime.tripId].serviceId;
                 // checks if the trip is available and if it departs in the given interval
                 if(GoogleTransitData.isAvailable(currentWeekday, GoogleTransitData.TRIPS[stopTime.tripId].isAvailable) && (arrivalTime + earliestDepartureDayOffset) <= latestDeparture 
                     && (arrivalTime + earliestDepartureDayOffset) >= earliestArrival) {
@@ -777,7 +777,7 @@ export class RaptorMeatAlgorithmController {
                 for(let i = 0; i < this.expectedArrivalTimes[p.exitTripAtStop].length; i++) {
                     let nextP = this.expectedArrivalTimes[p.exitTripAtStop][i];
                     if(nextP.departureTime >= p.associatedTrip.tripArrival && nextP.departureTime < (p.associatedTrip.tripArrival + maxDelay) 
-                        //&& nextP.transferRound < p.transferRound
+                        // && nextP.transferRound < p.transferRound
                     ){
                         let nextPCopy = cloneDeep(nextP)
                         let probabilityToTakeJourney = Reliability.getReliability(pLastDepartureTime - p.associatedTrip.tripArrival, nextP.departureTime - p.associatedTrip.tripArrival, isLongDistanceTrip);
@@ -786,7 +786,7 @@ export class RaptorMeatAlgorithmController {
                         pLastDepartureTime = nextPCopy.departureTime;
                     }
                     if(nextP.departureTime >= (p.associatedTrip.tripArrival + maxDelay) && nextP.departureTime !== Number.MAX_VALUE 
-                        //&& nextP.transferRound < p.transferRound
+                        // && nextP.transferRound < p.transferRound
                     ){
                         let nextPCopy = cloneDeep(nextP)
                         let probabilityToTakeJourney = Reliability.getReliability(pLastDepartureTime - p.associatedTrip.tripArrival, nextP.departureTime - p.associatedTrip.tripArrival, isLongDistanceTrip);
@@ -801,9 +801,9 @@ export class RaptorMeatAlgorithmController {
                 targetStopLabels.push(p)
             }
         }
-        // let meat = this.calculateMEAT(targetStopLabels);
-        // console.log(meat);
-        // console.log(Converter.secondsToTime(meat));
+        let meat = this.calculateMEAT(targetStopLabels);
+        console.log(meat);
+        console.log(Converter.secondsToTime(meat));
         // gets the two graph representations
         const decisionGraphs = DecisionGraphController.getDecisionGraphs(expandedTempEdges, arrivalTimesPerStop, this.sourceStop, this.targetStop);
         meatResponse.expandedDecisionGraph = decisionGraphs.expandedDecisionGraph;
@@ -821,6 +821,8 @@ export class RaptorMeatAlgorithmController {
             } else {
                 expectedDelay = Reliability.normalDistanceExpectedValue;
             }
+            // console.log(targetStopLabel.associatedTrip.tripArrival)
+            // console.log(targetStopLabel.calcReliability)
             probabilitySum += targetStopLabel.calcReliability;
             let arrivalTime = targetStopLabel.associatedTrip.tripArrival + expectedDelay;
             meat += (arrivalTime * targetStopLabel.calcReliability);
