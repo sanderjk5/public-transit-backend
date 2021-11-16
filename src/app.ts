@@ -6,6 +6,7 @@ import { Generator } from './data/generator';
 import { TestController } from './server/controller/testController';
 import { Reliability } from './data/reliability';
 import { GoogleTransitData } from './data/google-transit-data';
+import { ApproximationTestController } from './server/controller/approximationTestController';
 
 const app = express();
 
@@ -24,9 +25,22 @@ Reliability.initReliability();
 // TestController.testAlgorithms();
 // TestController.testEatAlgorithm();
 // TestController.testMeatAlgorithms();
-// console.log(GoogleTransitData.TRIPS[24161])
-// for(let stops of GoogleTransitData.STOPS_OF_A_ROUTE[3854]){
-//   console.log(GoogleTransitData.STOPS[stops].id)
+// ApproximationTestController.performApproximationTests();
+// console.log(GoogleTransitData.TRIPS[23589])
+// console.log(GoogleTransitData.isAvailable(0, GoogleTransitData.TRIPS[23593].isAvailable))
+// console.log(GoogleTransitData.isAvailable(1, GoogleTransitData.TRIPS[23593].isAvailable))
+// console.log(GoogleTransitData.isAvailable(2, GoogleTransitData.TRIPS[23593].isAvailable))
+// console.log(GoogleTransitData.isAvailable(3, GoogleTransitData.TRIPS[23593].isAvailable))
+// console.log(GoogleTransitData.isAvailable(4, GoogleTransitData.TRIPS[23593].isAvailable))
+// console.log(GoogleTransitData.isAvailable(5, GoogleTransitData.TRIPS[23593].isAvailable))
+// console.log(GoogleTransitData.isAvailable(6, GoogleTransitData.TRIPS[23593].isAvailable))
+// for(let stops of GoogleTransitData.STOPS_OF_A_ROUTE[GoogleTransitData.TRIPS[23593].routeId]){
+//   console.log(GoogleTransitData.STOPS[stops].name)
+// }
+// for(let entry of GoogleTransitData.ROUTES_SERVING_STOPS[1887]){
+//   if(entry.routeId === 7296){
+//     console.log(entry)
+//   }
 // }
 
 const port = 1337;

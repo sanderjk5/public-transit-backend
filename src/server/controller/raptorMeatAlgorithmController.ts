@@ -185,6 +185,31 @@ export class RaptorMeatAlgorithmController {
         }
     }
 
+    public static getExpectedArrivalTimesArray(sourceStop: number, targetStop: number, sourceTime: number, sourceDate: Date){
+        try {
+            // gets the source and target stops
+            this.sourceStop = sourceStop;
+            this.targetStop = targetStop;
+            // converts the source time
+            this.minDepartureTime = sourceTime;
+            this.sourceDate = sourceDate;
+
+            this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
+
+            this.meatDifference = 0;
+            this.useTransferOptitimization = false;
+
+            // initializes the raptor meat algorithm
+            this.init();
+
+            // calls the raptor meat algorithm
+            this.performAlgorithm();
+            return this.expectedArrivalTimes;
+        } catch (error){
+            return null;
+        }
+    }
+
     /**
      * Performs the raptor meat algorithm.
      * @param targetStops 

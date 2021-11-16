@@ -126,8 +126,6 @@ export class ConnectionScanMeatAlgorithmController {
             this.targetStop = GoogleTransitData.getStopIdByName(targetStop);
             // converts the source time
             this.minDepartureTime = Converter.timeToSeconds(sourceTime);
-
-            this.minDepartureTime = Converter.timeToSeconds(sourceTime);
             this.sourceDate = sourceDate;
 
             const completeStartTime = performance.now();
@@ -161,6 +159,27 @@ export class ConnectionScanMeatAlgorithmController {
         }
     }
 
+    public static getSArray(sourceStop: number, targetStop: number, sourceTime: number, sourceDate: Date){
+        try {
+            // gets the source and target stops
+            this.sourceStop = sourceStop;
+            this.targetStop = targetStop;
+            // converts the source time
+            this.minDepartureTime = sourceTime;
+            this.sourceDate = sourceDate;
+
+            // initializes the csa meat algorithm
+            this.init(true);
+
+            // calls the csa meat algorithm
+            this.performAlgorithm();
+
+            return this.s;
+        } catch (error){
+            return null;
+        }
+    }
+
     public static getMeat(sourceStop: number, targetStop: number, sourceTime: number, sourceDate: Date, earliestSafeArrivalTimeCSA: number, earliestArrivalTimes: number[]){
         // gets the source and target stops
         this.sourceStop = sourceStop;
@@ -185,6 +204,8 @@ export class ConnectionScanMeatAlgorithmController {
 
         return this.s[this.sourceStop][0].expectedArrivalTime;
     }
+
+    
 
     /**
      * Performs the modified version of the profile algorithm to solve the minimum expected arrival time problem.
