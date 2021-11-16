@@ -4,5 +4,6 @@ export interface Connection{
     arrivalStop: number,
     departureTime: number,
     arrivalTime: number,
-    trip: number
+    trip: number,
+    stopSequence: number,
 }

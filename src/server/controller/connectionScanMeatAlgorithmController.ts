@@ -98,8 +98,9 @@ export class ConnectionScanMeatAlgorithmController {
             console.timeEnd('connection scan meat algorithm')
             // console.log(this.s[6711])
             // console.log(Converter.secondsToTime(this.s[6711][0].expectedArrivalTime))
-            // console.log(this.s[this.sourceStop][0])
+            // console.log(this.s[2124])
             // console.log(Converter.secondsToTime(this.s[this.sourceStop][0].expectedArrivalTime))
+            // console.log(this.s[GoogleTransitData.getStopIdByName('Frankfurt(Main)Hbf')])
             // generates the http response which includes all information of the journey incl. the graphs
             const meatResponse = this.extractDecisionGraphs();
             res.send(meatResponse);
@@ -271,12 +272,8 @@ export class ConnectionScanMeatAlgorithmController {
                 time1 = Number.MAX_VALUE;
             }
             // expected arrival time when remaining seated
-            let stopTime = GoogleTransitData.getStopTimeByTripAndStop(currentConnection.trip, currentConnection.arrivalStop);
-            let stopSequence: number;
-            if(stopTime){
-                stopSequence = stopTime.stopSequence
-            }
-            if(stopSequence !== undefined && stopSequence < this.t[currentConnection.trip].stopSequence){
+            let stopSequence = currentConnection.stopSequence;
+            if(stopSequence < this.t[currentConnection.trip].stopSequence){
                 time2 = this.t[currentConnection.trip].expectedArrivalTime;
             } else {
                 time2 = Number.MAX_VALUE;
@@ -505,9 +502,9 @@ export class ConnectionScanMeatAlgorithmController {
                 targetStopLabels.push(p)
             }
         }
-        let meat = this.calculateMEAT(targetStopLabels);
-        console.log(meat);
-        console.log(Converter.secondsToTime(meat));
+        // let meat = this.calculateMEAT(targetStopLabels);
+        // console.log(meat);
+        // console.log(Converter.secondsToTime(meat));
         const decisionGraphs = DecisionGraphController.getDecisionGraphs(expandedTempEdges, arrivalTimesPerStop, this.sourceStop, this.targetStop);
         meatResponse.expandedDecisionGraph = decisionGraphs.expandedDecisionGraph;
         meatResponse.compactDecisionGraph = decisionGraphs.compactDecisionGraph;

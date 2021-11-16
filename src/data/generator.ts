@@ -42,6 +42,7 @@ export class Generator {
                     departureTime: lastStopTime.departureTime,
                     arrivalTime: stopTime.arrivalTime,
                     trip: tripId,
+                    stopSequence: stopTime.stopSequence,
                 }
                 connections.push(connection);
                 lastStopTime = stopTime;
@@ -298,7 +299,6 @@ export class Generator {
             let lastStopTimesPerDay: StopTime[][] = new Array(7);
             let stopTimesOfCurrentTrip: StopTime[];
             let isAvailableOfCurrentTrip: number;
-            sortedTripsOfARoute.push(tripDeparturePairs[0].tripId)
             for(let j = 0; j < tripDeparturePairs.length; j++){
                 stopTimesOfCurrentTrip = GoogleTransitData.getStopTimesByTrip(tripDeparturePairs[j].tripId);
                 isAvailableOfCurrentTrip = GoogleTransitData.TRIPS[tripDeparturePairs[j].tripId].isAvailable;
@@ -313,13 +313,12 @@ export class Generator {
                                     break;
                                 }
                             }
+                        }
+                        if(removeStopTimesOfWeekday){
+                            isAvailableOfCurrentTrip = isAvailableOfCurrentTrip - bit;
                         } else {
                             lastStopTimesPerDay[l] = stopTimesOfCurrentTrip;
                         }
-                    }
-                    
-                    if(removeStopTimesOfWeekday){
-                        isAvailableOfCurrentTrip = isAvailableOfCurrentTrip - bit;
                     }
                     bit *= 2;
                 }

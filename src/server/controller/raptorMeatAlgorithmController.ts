@@ -104,7 +104,7 @@ export class RaptorMeatAlgorithmController {
             this.sourceDate = new Date(req.query.date);
             // sets the source weekday
             this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
-
+            // console.log(this.sourceWeekday)
             this.meatDifference = Number(req.query.meatDifference);
             this.useTransferOptitimization = false;
             if(this.meatDifference > 0){
@@ -117,8 +117,11 @@ export class RaptorMeatAlgorithmController {
             // calls the raptor meat algorithm
             this.performAlgorithm();
             console.timeEnd('raptor meat algorithm')
-            console.log(this.expectedArrivalTimes[this.sourceStop][0])
-            console.log(Converter.secondsToTime(this.expectedArrivalTimes[this.sourceStop][0].expectedArrivalTime))
+            // console.log(this.expectedArrivalTimes[1667])
+            // console.log(Converter.secondsToTime(this.expectedArrivalTimes[this.sourceStop][0].expectedArrivalTime))
+            // console.log(this.expectedArrivalTimes[GoogleTransitData.getStopIdByName('Frankfurt(Main)Hbf')])
+            // console.log(this.expectedArrivalTimes[this.sourceStop][0])
+            // console.log(Converter.secondsToTime(this.expectedArrivalTimes[this.sourceStop][0].expectedArrivalTime))
             // generates the http response which includes all information of the journey incl. its decision graphs
             const meatResponse = this.extractDecisionGraphs();
             res.status(200).send(meatResponse);
@@ -200,7 +203,7 @@ export class RaptorMeatAlgorithmController {
 
             // updates the array of expected arrival times
             this.updateExpectedArrivalTimes();
-
+            
             // termination condition
             if(this.markedStops.length === 0 
                 || (this.useTransferOptitimization && (this.expectedArrivalTimes[this.sourceStop][0].expectedArrivalTime - this.meatCSA) < this.meatDifference)
@@ -288,7 +291,7 @@ export class RaptorMeatAlgorithmController {
         }
         // uses qTemp and routeSequenceMaxima to add the last route-stop pair of each route to Q
         for(let i = 0; i < qTemp.length; i++){
-            let qEntry = qTemp[i];
+            let qEntry = qTemp[i];   
             if(routeSequenceMaxima[qEntry.r] === qEntry.stopSequence){
                 this.Q.push(qEntry);
                 routeSequenceMaxima[qEntry.r] = -1;
@@ -305,26 +308,16 @@ export class RaptorMeatAlgorithmController {
         // loop over all elements of q
         for(let i= 0; i < this.Q.length; i++){
             let r = this.Q[i].r;
-            let p = this.Q[i].p;
             let routeBag: Label[] = [];
-            let reachedP = false;
             let addedLabelsAtLastStop = true;
             // loop over all stops of r beggining with p (from last to first stop)
-            for(let j = GoogleTransitData.STOPS_OF_A_ROUTE[r].length-1; j >= 0; j--){     
+            for(let j = this.Q[i].stopSequence; j >= 0; j--){     
                 let pi = GoogleTransitData.STOPS_OF_A_ROUTE[r][j];
-                if(pi === p){
-                    reachedP = true;
-                    // gets all labels of the last round which should be updated
-                    routeBag = this.mergeLastRoundLabelsInRouteBag(r, pi, routeBag);
-                    continue;
-                }
-                if(!reachedP){
-                    continue;
-                }
                 // updates the route bag with the departure times of this stop
                 routeBag = this.updateRouteBag(routeBag, pi, addedLabelsAtLastStop);
                 // merges the routeBag in the current round bag of the stop
                 this.mergeBagInExpectedArrivalTimesOfRound(routeBag, pi);
+                
                 // adds the labels of the last round of this stop to the route bag
                 if(this.latestDepartureTimesOfLastRound[pi] !== undefined){
                     routeBag = this.mergeLastRoundLabelsInRouteBag(r, pi, routeBag);
@@ -383,11 +376,11 @@ export class RaptorMeatAlgorithmController {
                     }
                 }
             }
-            let departureTime = newTripInfo.departureTime + newTripInfo.dayOffset;
+            
             // sets the values of the new label and adds it to the route bag
             let newLabel: Label = {
                 expectedArrivalTime: newExpectedArrivalTime,
-                departureTime: departureTime,
+                departureTime: newTripInfo.departureTime,
                 associatedTrip: newTripInfo,
                 exitTripAtStop: pi,
                 transferRound: this.k,
@@ -396,7 +389,7 @@ export class RaptorMeatAlgorithmController {
         }
         if(newLabels.length > 0){
             routeBag = this.addLabelsToRouteBag(newLabels, routeBag);
-        }
+        }  
         return routeBag;
     }
 
@@ -404,9 +397,9 @@ export class RaptorMeatAlgorithmController {
         if(newLabels.length === 0){
             return routeBag;
         }
-        newLabels.sort((a, b) => {
-            return this.sortLabelsByDepartureTime(a, b);
-        })
+        // newLabels.sort((a, b) => {
+        //     return this.sortLabelsByDepartureTime(a, b);
+        // })
         if(routeBag.length === 0){
             return newLabels;
         }
@@ -424,7 +417,7 @@ export class RaptorMeatAlgorithmController {
             }
             let nextLabel: Label;
             if(lastNewLabel && lastRouteBagLabel){
-                if(lastNewLabel.departureTime < lastRouteBagLabel.departureTime){
+                if(lastNewLabel.departureTime <= lastRouteBagLabel.departureTime){
                     nextLabel = lastRouteBagLabel;
                     routeBagIndex--;
                 } else {
@@ -516,13 +509,13 @@ export class RaptorMeatAlgorithmController {
 
     // adds all labels of the route bag to the bag of the current stop
     private static mergeBagInExpectedArrivalTimesOfRound(bag: Label[], pi: number){ 
+        if(bag.length === 0){
+            return;
+        }
         if(this.expectedArrivalTimesOfCurrentRound[pi].length === 0){
             for(let label of bag){
                 this.expectedArrivalTimesOfCurrentRound[pi].push(label)
             }
-            return;
-        }
-        if(bag.length === 0){
             return;
         }
         let newExpectedArrivalTimesOfCurrentRound: Label[] = [];
@@ -675,16 +668,22 @@ export class RaptorMeatAlgorithmController {
                 let arrivalTime = stopTime.arrivalTime;
                 let departureTime = stopTime.departureTime;
                 // checks if the trip is available and if it departs in the given interval
+                // if(stopTime.tripId === 23589){
+                //     console.log(GoogleTransitData.isAvailable(currentWeekday, GoogleTransitData.TRIPS[stopTime.tripId].isAvailable) + ', ' + currentWeekday + GoogleTransitData.STOPS[pi].name)
+                // }
                 if(GoogleTransitData.isAvailable(currentWeekday, GoogleTransitData.TRIPS[stopTime.tripId].isAvailable) && (arrivalTime + earliestDepartureDayOffset) <= latestDeparture 
                     && (arrivalTime + earliestDepartureDayOffset) >= earliestArrival) {
                     // adds the new trip info
                     let earliestTripInfo: EarliestTripInfo = {
                         tripId: stopTime.tripId,
                         tripArrival: arrivalTime + earliestDepartureDayOffset,
-                        departureTime: departureTime,
+                        departureTime: departureTime + earliestDepartureDayOffset,
                         dayOffset: earliestDepartureDayOffset,
                     }
-                    earliestTripInfos.push(earliestTripInfo);
+                    // if(stopTime.tripId === 23589){
+                    //     console.log(earliestTripInfo)
+                    // }
+                    earliestTripInfos.unshift(earliestTripInfo);
                 }
             }
             // sets the new weekday
@@ -801,9 +800,9 @@ export class RaptorMeatAlgorithmController {
                 targetStopLabels.push(p)
             }
         }
-        let meat = this.calculateMEAT(targetStopLabels);
-        console.log(meat);
-        console.log(Converter.secondsToTime(meat));
+        // let meat = this.calculateMEAT(targetStopLabels);
+        // console.log(meat);
+        // console.log(Converter.secondsToTime(meat));
         // gets the two graph representations
         const decisionGraphs = DecisionGraphController.getDecisionGraphs(expandedTempEdges, arrivalTimesPerStop, this.sourceStop, this.targetStop);
         meatResponse.expandedDecisionGraph = decisionGraphs.expandedDecisionGraph;
