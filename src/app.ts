@@ -22,9 +22,9 @@ Generator.generateSortedConnections();
 // generates footpaths which can be used by raptor and csa
 Generator.generateFootpaths();
 Reliability.initReliability();
-// TestController.testAlgorithms();
-// TestController.testEatAlgorithm();
-// TestController.testMeatAlgorithms();
+TestController.testAlgorithms();
+TestController.testEatAlgorithm();
+TestController.testMeatAlgorithms();
 // ApproximationTestController.performApproximationTests();
 // console.log(GoogleTransitData.TRIPS[23589])
 // console.log(GoogleTransitData.isAvailable(0, GoogleTransitData.TRIPS[23593].isAvailable))

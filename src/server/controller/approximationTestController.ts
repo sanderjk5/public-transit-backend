@@ -18,7 +18,7 @@ export class ApproximationTestController{
             newDate.setDate(initialDate.getDate() + i);
             dates.push(newDate);
         }
-        for(let i = 0; i < 10; i++){
+        for(let i = 0; i < 20; i++){
             const randomSourceStop = this.getRandomInt(numberOfStops);
             const randomTargetStop = this.getRandomInt(numberOfStops);
             const randomSourceTime = this.getRandomInt(numberOfSeconds);

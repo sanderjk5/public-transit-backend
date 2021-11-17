@@ -80,6 +80,10 @@ export class RaptorMeatAlgorithmController {
     private static useTransferOptitimization: boolean;
     private static meatDifference: number;
 
+    private static initTime: number;
+    private static traverseRoutesTime: number;
+    private static updateExpectedArrivalTimesTime: number;
+
     /**
      * Initializes and calls the raptor meat algorithm.
      * @param req 
@@ -178,6 +182,9 @@ export class RaptorMeatAlgorithmController {
                 completeDuration: completeDuration,
                 initDuration: initDuration, 
                 algorithmDuration: algorithmDuration, 
+                initLoopDuration: this.initTime,
+                traverseRoutesLoopDuration: this.traverseRoutesTime,
+                updateExpectedArrivalTimesLoopDuration: this.updateExpectedArrivalTimesTime,
                 decisionGraphDuration: decisionGraphDuration,
             };
         } catch(error){
@@ -219,15 +226,23 @@ export class RaptorMeatAlgorithmController {
         while(true){
             // increases round counter
             this.k++;
+
             // intitializes the expected arrival time array for the next round
+            let startTime = performance.now();
             this.initNextRound();
             // fills the array of route-stop pairs
             this.fillQ();
+            this.initTime += performance.now() - startTime;
+
             // traverses each route and calculates the new expected arrival times
+            startTime = performance.now();
             this.traverseRoutes();
+            this.traverseRoutesTime += performance.now() - startTime;
 
             // updates the array of expected arrival times
+            startTime = performance.now();
             this.updateExpectedArrivalTimes();
+            this.updateExpectedArrivalTimesTime += performance.now() - startTime;
             
             // termination condition
             if(this.markedStops.length === 0 
@@ -277,6 +292,10 @@ export class RaptorMeatAlgorithmController {
         // sets the maximum departure time of the target stops
         this.latestDepartureTimesOfLastRound[this.targetStop] = this.maxArrivalTime;
         this.markedStops.push(this.targetStop);
+
+        this.initTime = 0;
+        this.traverseRoutesTime = 0;
+        this.updateExpectedArrivalTimesTime = 0;
     }
 
     /**
