@@ -17,6 +17,7 @@ import { MeatResponse } from "../../models/MeatResponse";
 import { TempNode } from "../../models/TempNode";
 import { TempEdge } from "../../models/TempEdge";
 import { DecisionGraphController } from "./decisionGraphController";
+import { cloneDeep } from "lodash";
 
 // profile function entry
 interface SEntry {
@@ -40,6 +41,7 @@ interface TEntry {
     arrivalDate?: Date,
     connectionArrivalTime?: number,
     connectionArrivalStop?: number,
+    stopSequence?: number,
     finalFootpath?: number,
 }
 
@@ -94,7 +96,6 @@ export class ConnectionScanMeatAlgorithmController {
             console.time('connection scan meat algorithm')
             this.performAlgorithm();
             console.timeEnd('connection scan meat algorithm')
-            
             // generates the http response which includes all information of the journey incl. the graphs
             const meatResponse = this.extractDecisionGraphs();
             res.send(meatResponse);
@@ -119,8 +120,6 @@ export class ConnectionScanMeatAlgorithmController {
             this.sourceStop = GoogleTransitData.getStopIdByName(sourceStop);
             this.targetStop = GoogleTransitData.getStopIdByName(targetStop);
             // converts the source time
-            this.minDepartureTime = Converter.timeToSeconds(sourceTime);
-
             this.minDepartureTime = Converter.timeToSeconds(sourceTime);
             this.sourceDate = sourceDate;
 
@@ -155,6 +154,35 @@ export class ConnectionScanMeatAlgorithmController {
         }
     }
 
+    /**
+     * Performs the CSA MEAT algorithm and returns the resulting S-Array.
+     * @param sourceStop 
+     * @param targetStop 
+     * @param sourceTime 
+     * @param sourceDate 
+     * @returns 
+     */
+    public static getSArray(sourceStop: number, targetStop: number, sourceTime: number, sourceDate: Date){
+        try {
+            // gets the source and target stops
+            this.sourceStop = sourceStop;
+            this.targetStop = targetStop;
+            // converts the source time
+            this.minDepartureTime = sourceTime;
+            this.sourceDate = sourceDate;
+
+            // initializes the csa meat algorithm
+            this.init(true);
+
+            // calls the csa meat algorithm
+            this.performAlgorithm();
+
+            return this.s;
+        } catch (error){
+            return null;
+        }
+    }
+
     public static getMeat(sourceStop: number, targetStop: number, sourceTime: number, sourceDate: Date, earliestSafeArrivalTimeCSA: number, earliestArrivalTimes: number[]){
         // gets the source and target stops
         this.sourceStop = sourceStop;
@@ -179,6 +207,8 @@ export class ConnectionScanMeatAlgorithmController {
 
         return this.s[this.sourceStop][0].expectedArrivalTime;
     }
+
+    
 
     /**
      * Performs the modified version of the profile algorithm to solve the minimum expected arrival time problem.
@@ -236,8 +266,7 @@ export class ConnectionScanMeatAlgorithmController {
             // sets the last departure time
             lastDepartureTime = currentConnectionDepartureTime;
             // checks if the connection is available on this weekday
-            let serviceId = GoogleTransitData.TRIPS[currentConnection.trip].serviceId;
-            if(!GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday]){
+            if(!GoogleTransitData.isAvailable(currentWeekday, GoogleTransitData.TRIPS[currentConnection.trip].isAvailable)){
                 continue;
             }
             // checks if the connection arrives earlier than the maximum arrival time and can be reached from the source stop
@@ -267,17 +296,22 @@ export class ConnectionScanMeatAlgorithmController {
                 time1 = Number.MAX_VALUE;
             }
             // expected arrival time when remaining seated
-            time2 = this.t[currentConnection.trip].expectedArrivalTime;
+            let stopSequence = currentConnection.stopSequence;
+            if(stopSequence < this.t[currentConnection.trip].stopSequence){
+                time2 = this.t[currentConnection.trip].expectedArrivalTime;
+            } else {
+                time2 = Number.MAX_VALUE;
+            }
             let expectedArrivalTime = 0;
             let pLastDepartureTime: number = -1;
             // let relevantPairs: SEntry[] = [];
             // finds all outgoing trips which have a departure time between c_arr and c_arr + maxD_c (and the departure after max delay)
             for(let j = 0; j < this.s[currentConnection.arrivalStop].length; j++) {
                 p = this.s[currentConnection.arrivalStop][j];
-                if(p.departureTime >= currentConnectionArrivalTime && p.departureTime <= currentConnectionArrivalTime + currentMaxDelay){
+                if(p.departureTime >= currentConnectionArrivalTime && p.departureTime < currentConnectionArrivalTime + currentMaxDelay){
                     expectedArrivalTime += (p.expectedArrivalTime * Reliability.getReliability(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
                     pLastDepartureTime = p.departureTime;
-                } else if(p.departureTime > currentConnectionArrivalTime + currentMaxDelay) {
+                } else if(p.departureTime >= currentConnectionArrivalTime + currentMaxDelay) {
                     expectedArrivalTime += (p.expectedArrivalTime * Reliability.getReliability(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
                     break;
                 }
@@ -297,6 +331,7 @@ export class ConnectionScanMeatAlgorithmController {
                     arrivalDate: currentArrivalDate,
                     connectionArrivalTime: currentConnectionArrivalTime,
                     connectionArrivalStop: currentConnection.arrivalStop,
+                    stopSequence: stopSequence,
                 };
             }
 
@@ -370,7 +405,8 @@ export class ConnectionScanMeatAlgorithmController {
         // default entry for each trip
         for(let i = 0; i < this.t.length; i++) {
             this.t[i] = {
-                expectedArrivalTime: Number.MAX_VALUE
+                expectedArrivalTime: Number.MAX_VALUE,
+                stopSequence: Number.MAX_VALUE,
             };
         }
     }
@@ -433,6 +469,7 @@ export class ConnectionScanMeatAlgorithmController {
             throw new Error("Couldn't find a connection.")
         }
         // adds the source stop
+        let targetStopLabels: SEntry[] = [];
         this.s[this.sourceStop][0].calcReliability = 1;
         priorityQueue.add(this.s[this.sourceStop][0]);
         while(!priorityQueue.isEmpty()){
@@ -464,22 +501,55 @@ export class ConnectionScanMeatAlgorithmController {
                     maxDelay = MAX_D_C_NORMAL;
                     isLongDistanceTrip = false;
                 }
+                let pLastDepartureTime = -1;
                 // finds the next profile functions which can be added to the queue (every profile between departure and departure + max Delay and the first one after the max Delay).
                 for(let i = 0; i < this.s[p.exitStop].length; i++) {
                     let nextP = this.s[p.exitStop][i];
-                    if(nextP.departureTime >= p.exitTime && nextP.departureTime <= (p.exitTime + maxDelay)){
-                        priorityQueue.add(nextP);
+                    if(nextP.departureTime >= p.exitTime && nextP.departureTime < (p.exitTime + maxDelay)){
+                        let nextPCopy = cloneDeep(nextP)
+                        let probabilityToTakeJourney = Reliability.getReliability(pLastDepartureTime - p.exitTime, nextP.departureTime - p.exitTime, isLongDistanceTrip);
+                        nextPCopy.calcReliability = p.calcReliability * probabilityToTakeJourney;
+                        priorityQueue.add(nextPCopy);
+                        pLastDepartureTime = nextPCopy.departureTime;
                     }
-                    if(nextP.departureTime > (p.exitTime + maxDelay) && nextP.departureTime !== Number.MAX_VALUE){
-                        priorityQueue.add(nextP);
+                    if(nextP.departureTime >= (p.exitTime + maxDelay) && nextP.departureTime !== Number.MAX_VALUE){
+                        let nextPCopy = cloneDeep(nextP)
+                        let probabilityToTakeJourney = Reliability.getReliability(pLastDepartureTime - p.exitTime, nextP.departureTime - p.exitTime, isLongDistanceTrip);
+                        nextPCopy.calcReliability = p.calcReliability * probabilityToTakeJourney;
+                        priorityQueue.add(nextPCopy);
+                        pLastDepartureTime = nextPCopy.departureTime;
                         break;
                     }
                 }
             } 
+            else {
+                targetStopLabels.push(p)
+            }
         }
+        // let meat = this.calculateMEAT(targetStopLabels);
+        // console.log(meat);
+        // console.log(Converter.secondsToTime(meat));
         const decisionGraphs = DecisionGraphController.getDecisionGraphs(expandedTempEdges, arrivalTimesPerStop, this.sourceStop, this.targetStop);
         meatResponse.expandedDecisionGraph = decisionGraphs.expandedDecisionGraph;
         meatResponse.compactDecisionGraph = decisionGraphs.compactDecisionGraph;
         return meatResponse;
+    }
+
+    private static calculateMEAT(targetStopPairs: SEntry[]){
+        let meat: number = 0;
+        let probabilitySum = 0;
+        for(let targetStopPair of targetStopPairs){
+            let expectedDelay: number;
+            if(GoogleTransitData.TRIPS[targetStopPair.tripId].isLongDistance){
+                expectedDelay = Reliability.longDistanceExpectedValue;
+            } else {
+                expectedDelay = Reliability.normalDistanceExpectedValue;
+            }
+            probabilitySum += targetStopPair.calcReliability;
+            let arrivalTime = targetStopPair.exitTime + expectedDelay;
+            meat += (arrivalTime * targetStopPair.calcReliability);
+        }
+        console.log(probabilitySum)
+        return meat;
     }
 }

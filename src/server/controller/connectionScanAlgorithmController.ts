@@ -208,8 +208,7 @@ export class ConnectionScanAlgorithmController {
                 let dayDifference2 = (dayOfCurrentConnection - 1) * SECONDS_OF_A_DAY;
                 
                 //checks if the connection is available on this weekday
-                let serviceId = GoogleTransitData.TRIPS[currentConnection.trip].serviceId;
-                if(!GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday]){
+                if(!GoogleTransitData.isAvailable(currentWeekday, GoogleTransitData.TRIPS[currentConnection.trip].isAvailable)){
                     continue;
                 }
                 // sets departure time

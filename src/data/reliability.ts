@@ -65,4 +65,27 @@ export class Reliability {
         }
         return reliability;
     }
+
+    /**
+     * Returns a random delay.
+     * @param isLongDistance 
+     * @returns 
+     */
+    public static getRandomDelay(isLongDistance: boolean): number {
+        let probability = Math.random();
+        if(isLongDistance){
+            for(let i = 0; i < this.longDistanceValues.length; i++){
+                if(probability <= this.longDistanceValues[i]){
+                    return i * 60;
+                }
+            }
+        } else {
+            for(let i = 0; i < this.normalDistanceValues.length; i++){
+                if(probability <= this.normalDistanceValues[i]){
+                    return i * 60;
+                }
+            }
+        }
+        return Number.MAX_VALUE;
+    }
 }

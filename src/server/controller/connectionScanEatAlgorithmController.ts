@@ -9,12 +9,7 @@ import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmCont
 import { performance } from 'perf_hooks';
 import { Reliability } from "../../data/reliability";
 import FastPriorityQueue from 'fastpriorityqueue';
-import { Link } from "../../models/Link";
-import { DecisionGraph } from "../../models/DecisionGraph";
-import {Node} from "../../models/Node";
-import { Cluster } from "../../models/Cluster";
 import { MeatResponse } from "../../models/MeatResponse";
-import { TempNode } from "../../models/TempNode";
 import { TempEdge } from "../../models/TempEdge";
 import { DecisionGraphController } from "./decisionGraphController";
 
@@ -42,6 +37,7 @@ interface TEntry {
     arrivalDate?: Date,
     connectionArrivalTime?: number,
     connectionArrivalStop?: number,
+    stopSequence?: number,
     finalFootpath?: number,
 }
 
@@ -216,8 +212,7 @@ export class ConnectionScanEatAlgorithmController {
             // sets the last departure time
             lastDepartureTime = currentConnectionDepartureTime;
             // checks if the connection is available on this weekday
-            let serviceId = GoogleTransitData.TRIPS[currentConnection.trip].serviceId;
-            if(!GoogleTransitData.CALENDAR[serviceId].isAvailable[currentWeekday]){
+            if(!GoogleTransitData.isAvailable(currentWeekday, GoogleTransitData.TRIPS[currentConnection.trip].isAvailable)){
                 continue;
             }
             // checks if the connection arrives earlier than the maximum arrival time and can be reached from the source stop
@@ -253,8 +248,14 @@ export class ConnectionScanEatAlgorithmController {
                 expectedTime1 = Number.MAX_VALUE;
             }
             // expected arrival time when remaining seated
-            time2 = this.t[currentConnection.trip].arrivalTime;
-            expectedTime2 = this.t[currentConnection.trip].expectedArrivalTime;
+            let stopSequence = currentConnection.stopSequence;
+            if(stopSequence < this.t[currentConnection.trip].stopSequence){
+                time2 = this.t[currentConnection.trip].arrivalTime;
+                expectedTime2 = this.t[currentConnection.trip].expectedArrivalTime;
+            } else {
+                time2 = Number.MAX_VALUE;
+                expectedTime2 = Number.MAX_VALUE;
+            }
             time3 = Number.MAX_VALUE;
             let expectedArrivalTime = 0;
             let pLastDepartureTime: number = -1;
@@ -299,6 +300,7 @@ export class ConnectionScanEatAlgorithmController {
                     arrivalDate: currentArrivalDate,
                     connectionArrivalTime: currentConnectionArrivalTime,
                     connectionArrivalStop: currentConnection.arrivalStop,
+                    stopSequence: stopSequence,
                 };
             }
 
@@ -373,7 +375,8 @@ export class ConnectionScanEatAlgorithmController {
         for(let i = 0; i < this.t.length; i++) {
             this.t[i] = {
                 arrivalTime: Number.MAX_VALUE,
-                expectedArrivalTime: Number.MAX_VALUE
+                expectedArrivalTime: Number.MAX_VALUE,
+                stopSequence: Number.MAX_VALUE,
             };
         }
     }

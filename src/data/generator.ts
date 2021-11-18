@@ -6,10 +6,16 @@ import { Sorter } from "./sorter";
 import { Stop } from "../models/Stop";
 import { Calculator } from "./calculator";
 import { CHANGE_TIME } from "../constants";
+import { cloneDeep } from "lodash";
 
 interface newStopMapEntry {
     stopId: number,
     stopSequence: number,
+}
+
+interface TripDeparturePair {
+    tripId: number,
+    departureTime: number,
 }
 
 export class Generator {
@@ -36,6 +42,7 @@ export class Generator {
                     departureTime: lastStopTime.departureTime,
                     arrivalTime: stopTime.arrivalTime,
                     trip: tripId,
+                    stopSequence: stopTime.stopSequence,
                 }
                 connections.push(connection);
                 lastStopTime = stopTime;
@@ -256,6 +263,86 @@ export class Generator {
         }
     }
 
+    /**
+     * Uses the calendar entries to set the IsAvailable value of each trip.
+     */
+    public static setIsAvailableOfTrips(){
+        let serviceIdToBinaryNumberMap = new Map<number, number>();
+        for(let calendarEntry of GoogleTransitData.CALENDAR){
+            let bit = 1;
+            let binaryNumber = 0;
+            for(let i = 6; i >= 0; i--){
+                if(calendarEntry.isAvailable[i]){
+                    binaryNumber += bit;
+                }
+                bit *= 2;
+            }
+            serviceIdToBinaryNumberMap.set(calendarEntry.serviceId, binaryNumber);
+        }
+        for(let trip of GoogleTransitData.TRIPS){
+            trip.isAvailable = serviceIdToBinaryNumberMap.get(trip.serviceId);
+        }
+    }
+
+    /**
+     * Sorts the trips of a route by their departure time and makes trips unavailable for certain weekdays when they overtake or duplicate another trip.
+     */
+    public static clearAndSortTrips(){
+        for(let i = 0; i < GoogleTransitData.TRIPS_OF_A_ROUTE.length; i++){
+            let tripsOfARoute = cloneDeep(GoogleTransitData.TRIPS_OF_A_ROUTE[i]);
+            let sortedTripsOfARoute = [];
+            let tripDeparturePairs: TripDeparturePair[] = [];
+            for(let trip of tripsOfARoute){
+                let tripDeparturePair: TripDeparturePair = {
+                    tripId: trip,
+                    departureTime: GoogleTransitData.STOPTIMES[GoogleTransitData.STOPTIMES_OF_A_TRIP[trip]].departureTime,
+                }
+                tripDeparturePairs.push(tripDeparturePair);
+            }
+            // sorts the trip by departure time
+            tripDeparturePairs.sort((a, b) => {
+                return a.departureTime - b.departureTime;
+            })
+            let lastStopTimesPerDay: StopTime[][] = new Array(7);
+            let stopTimesOfCurrentTrip: StopTime[];
+            let isAvailableOfCurrentTrip: number;
+            for(let j = 0; j < tripDeparturePairs.length; j++){
+                stopTimesOfCurrentTrip = GoogleTransitData.getStopTimesByTrip(tripDeparturePairs[j].tripId);
+                isAvailableOfCurrentTrip = GoogleTransitData.TRIPS[tripDeparturePairs[j].tripId].isAvailable;
+                let bit = 1;
+                // checks the trips for each weekday
+                for(let l = 6; l >= 0; l--){
+                    let removeStopTimesOfWeekday = false;
+                    if(GoogleTransitData.isAvailable(l, isAvailableOfCurrentTrip)){
+                        if(lastStopTimesPerDay[l] !== undefined){
+                            for(let k = 0; k < lastStopTimesPerDay[l].length; k++){
+                                // checks if they overtake the last trip of the current weekday
+                                if(lastStopTimesPerDay[l][k].departureTime >= stopTimesOfCurrentTrip[k].departureTime){
+                                    removeStopTimesOfWeekday = true;
+                                    break;
+                                }
+                            }
+                        }
+                        // makes the trip unavailable for the current weekday if it overtakes the last trip
+                        if(removeStopTimesOfWeekday){
+                            isAvailableOfCurrentTrip = isAvailableOfCurrentTrip - bit;
+                        } else {
+                            lastStopTimesPerDay[l] = stopTimesOfCurrentTrip;
+                        }
+                    }
+                    bit *= 2;
+                }
+                // updates the IsAvailable value.
+                GoogleTransitData.TRIPS[tripDeparturePairs[j].tripId].isAvailable = isAvailableOfCurrentTrip;
+                sortedTripsOfARoute.push(tripDeparturePairs[j].tripId);
+            }
+            GoogleTransitData.TRIPS_OF_A_ROUTE[i] = sortedTripsOfARoute;
+        }
+    }
+
+    /**
+     * Combines stops with the same name but different id.
+     */
     public static combineStops() {
         const oldStops = GoogleTransitData.STOPS;
         const stopNameToNewIdMap = new Map<string, number>();

@@ -131,6 +131,28 @@ export class GoogleTransitData {
     }
 
     /**
+     * Gets the stop time of a given stop and trip. Returns null if no valid stop time exists.
+     * @param tripId 
+     * @param stopId 
+     * @returns 
+     */
+     public static getStopTimesByTrip(tripId: number): StopTime[] {
+        if(tripId == undefined){
+            return [];
+        }
+        let stopTimes = []
+        let firstStopTimeOfTrip = GoogleTransitData.STOPTIMES_OF_A_TRIP[tripId];
+        for(let i = firstStopTimeOfTrip; i < GoogleTransitData.STOPTIMES.length; i++) {
+            let stopTime = GoogleTransitData.STOPTIMES[i];
+            if(stopTime.tripId !== tripId){
+                break;
+            }
+            stopTimes.push(stopTime);
+        }
+        return stopTimes;
+    }
+
+    /**
      * Gets all stop times of a given stop and route.
      * @param stopId 
      * @param r 
@@ -157,5 +179,25 @@ export class GoogleTransitData {
             }
         }
         return stopTimes;
+    }
+
+    public static isAvailable(weekday: number, isAvailable: number): boolean{
+        if(weekday === 0){
+            return (64 & isAvailable) > 0;
+        } else if(weekday === 1){
+            return (32 & isAvailable) > 0;
+        } else if(weekday === 2){
+            return (16 & isAvailable) > 0;
+        } else if(weekday === 3){
+            return (8 & isAvailable) > 0;
+        } else if(weekday === 4){
+            return (4 & isAvailable) > 0;
+        } else if(weekday === 5){
+            return (2 & isAvailable) > 0;
+        } else if(weekday === 6){
+            return (1 & isAvailable) > 0;
+        } else {
+            return false;
+        }
     }
 }

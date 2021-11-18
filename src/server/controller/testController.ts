@@ -76,6 +76,9 @@ export class TestController {
         let raptorMeatCompleteTimes = 0;
         let raptorMeatInitTimes = 0;
         let raptorMeatAlgorithmTimes = 0;
+        let raptorMeatInitLoopTimes = 0;
+        let raptorMeatTraverseRoutesLoopTimes = 0;
+        let raptorMeatUpdateExpectedArrivalTimesLoopTimes = 0;
         let raptorMeatDecisionGraphTimes = 0;
         let numberOfSuccessfulRequestsRaptor = 0;
         let csaMeatCompleteTimes = 0;
@@ -107,6 +110,9 @@ export class TestController {
                 raptorMeatCompleteTimes += raptorResponse.completeDuration;
                 raptorMeatInitTimes += raptorResponse.initDuration;
                 raptorMeatAlgorithmTimes += raptorResponse.algorithmDuration;
+                raptorMeatInitLoopTimes += raptorResponse.initLoopDuration,
+                raptorMeatTraverseRoutesLoopTimes += raptorResponse.traverseRoutesLoopDuration,
+                raptorMeatUpdateExpectedArrivalTimesLoopTimes += raptorResponse.updateExpectedArrivalTimesLoopDuration,
                 raptorMeatDecisionGraphTimes += raptorResponse.decisionGraphDuration;
                 numberOfSuccessfulRequestsRaptor++;
             }
@@ -119,7 +125,8 @@ export class TestController {
             }
             if(raptorResponse && csaResponse){
                 if(raptorResponse.expectedArrivalTime !== csaResponse.expectedArrivalTime){
-                    // console.log('result: failed, ' + csaResponse.expectedArrivalTime + ', ' + raptorResponse.expectedArrivalTime);
+                    console.log('request: ' + requestString)
+                    console.log('result: failed, ' + csaResponse.expectedArrivalTime + ', ' + raptorResponse.expectedArrivalTime);
                     failedRequests.push(requestString)
                 } else {
                     // console.log('result: successful');
@@ -134,6 +141,9 @@ export class TestController {
         console.log('average raptor meat complete: ' + raptorMeatCompleteTimes/numberOfSuccessfulRequestsRaptor)
         console.log('average raptor meat init: ' + raptorMeatInitTimes/numberOfSuccessfulRequestsRaptor)
         console.log('average raptor meat algorithm: ' + raptorMeatAlgorithmTimes/numberOfSuccessfulRequestsRaptor)
+        console.log('average raptor meat init loop of algorithm: ' + raptorMeatInitLoopTimes/numberOfSuccessfulRequestsRaptor)
+        console.log('average raptor meat traverse routes loop of algorithm: ' + raptorMeatTraverseRoutesLoopTimes/numberOfSuccessfulRequestsRaptor)
+        console.log('average raptor meat update expected arrival times loop of algorithm: ' + raptorMeatUpdateExpectedArrivalTimesLoopTimes/numberOfSuccessfulRequestsRaptor)
         console.log('average raptor meat decision graph: ' + raptorMeatDecisionGraphTimes/numberOfSuccessfulRequestsRaptor)
         console.log('average csa meat complete: ' + csaMeatCompleteTimes/numberOfSuccessfulRequestsCSA)
         console.log('average csa meat init: ' + csaMeatInitTimes/numberOfSuccessfulRequestsCSA)
@@ -206,5 +216,5 @@ export class TestController {
      */
     private static getRandomInt(max: number) {
         return Math.floor(Math.random() * max);
-      }
+    }
 }
