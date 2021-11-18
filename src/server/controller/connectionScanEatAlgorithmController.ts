@@ -9,12 +9,7 @@ import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmCont
 import { performance } from 'perf_hooks';
 import { Reliability } from "../../data/reliability";
 import FastPriorityQueue from 'fastpriorityqueue';
-import { Link } from "../../models/Link";
-import { DecisionGraph } from "../../models/DecisionGraph";
-import {Node} from "../../models/Node";
-import { Cluster } from "../../models/Cluster";
 import { MeatResponse } from "../../models/MeatResponse";
-import { TempNode } from "../../models/TempNode";
 import { TempEdge } from "../../models/TempEdge";
 import { DecisionGraphController } from "./decisionGraphController";
 

@@ -7,6 +7,9 @@ import { RaptorMeatAlgorithmController } from "./raptorMeatAlgorithmController";
 
 export class ApproximationTestController{
 
+    /**
+     * Performs the CSA and Raptor MEAT approximation tests for randomly selected requests.
+     */
     public static performApproximationTests(){
         const numberOfStops = GoogleTransitData.STOPS.length;
         const numberOfSeconds = SECONDS_OF_A_DAY;
@@ -39,6 +42,15 @@ export class ApproximationTestController{
         }
     }
 
+    /**
+     * Performs the approximation test for the CSA MEAT algorithm.
+     * @param sourceStop 
+     * @param targetStop 
+     * @param sourceTime 
+     * @param sourceDate 
+     * @param iterationCounter 
+     * @returns 
+     */
     private static performApproximationTestForCsaMeatAlgorithm(sourceStop: number, targetStop: number, sourceTime: number, sourceDate: Date, iterationCounter: number){
         const s = ConnectionScanMeatAlgorithmController.getSArray(sourceStop, targetStop, sourceTime, sourceDate);
         if(s === null) {
@@ -69,6 +81,15 @@ export class ApproximationTestController{
         };
     }
 
+    /**
+     * Performs the approximation test for the Raptor MEAT algorithm.
+     * @param sourceStop 
+     * @param targetStop 
+     * @param sourceTime 
+     * @param sourceDate 
+     * @param iterationCounter 
+     * @returns 
+     */
     private static performApproximationTestForRaptorMeatAlgorithm(sourceStop: number, targetStop: number, sourceTime: number, sourceDate: Date, iterationCounter: number){
         const expectedArrivalTimes = RaptorMeatAlgorithmController.getExpectedArrivalTimesArray(sourceStop, targetStop, sourceTime, sourceDate);
         if(expectedArrivalTimes === null) {

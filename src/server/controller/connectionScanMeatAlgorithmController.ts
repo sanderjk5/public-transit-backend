@@ -96,11 +96,6 @@ export class ConnectionScanMeatAlgorithmController {
             console.time('connection scan meat algorithm')
             this.performAlgorithm();
             console.timeEnd('connection scan meat algorithm')
-            // console.log(this.s[6711])
-            // console.log(Converter.secondsToTime(this.s[6711][0].expectedArrivalTime))
-            // console.log(this.s[2124])
-            // console.log(Converter.secondsToTime(this.s[this.sourceStop][0].expectedArrivalTime))
-            // console.log(this.s[GoogleTransitData.getStopIdByName('Frankfurt(Main)Hbf')])
             // generates the http response which includes all information of the journey incl. the graphs
             const meatResponse = this.extractDecisionGraphs();
             res.send(meatResponse);
@@ -159,6 +154,14 @@ export class ConnectionScanMeatAlgorithmController {
         }
     }
 
+    /**
+     * Performs the CSA MEAT algorithm and returns the resulting S-Array.
+     * @param sourceStop 
+     * @param targetStop 
+     * @param sourceTime 
+     * @param sourceDate 
+     * @returns 
+     */
     public static getSArray(sourceStop: number, targetStop: number, sourceTime: number, sourceDate: Date){
         try {
             // gets the source and target stops
@@ -542,9 +545,6 @@ export class ConnectionScanMeatAlgorithmController {
             } else {
                 expectedDelay = Reliability.normalDistanceExpectedValue;
             }
-            // console.log(targetStopPair.exitTime)
-            // console.log(targetStopPair.calcReliability)
-            // console.log(targetStopPair)
             probabilitySum += targetStopPair.calcReliability;
             let arrivalTime = targetStopPair.exitTime + expectedDelay;
             meat += (arrivalTime * targetStopPair.calcReliability);

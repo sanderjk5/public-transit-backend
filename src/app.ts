@@ -22,26 +22,10 @@ Generator.generateSortedConnections();
 // generates footpaths which can be used by raptor and csa
 Generator.generateFootpaths();
 Reliability.initReliability();
-TestController.testAlgorithms();
-TestController.testEatAlgorithm();
-TestController.testMeatAlgorithms();
+// TestController.testAlgorithms();
+// TestController.testEatAlgorithm();
+// TestController.testMeatAlgorithms();
 // ApproximationTestController.performApproximationTests();
-// console.log(GoogleTransitData.TRIPS[23589])
-// console.log(GoogleTransitData.isAvailable(0, GoogleTransitData.TRIPS[23593].isAvailable))
-// console.log(GoogleTransitData.isAvailable(1, GoogleTransitData.TRIPS[23593].isAvailable))
-// console.log(GoogleTransitData.isAvailable(2, GoogleTransitData.TRIPS[23593].isAvailable))
-// console.log(GoogleTransitData.isAvailable(3, GoogleTransitData.TRIPS[23593].isAvailable))
-// console.log(GoogleTransitData.isAvailable(4, GoogleTransitData.TRIPS[23593].isAvailable))
-// console.log(GoogleTransitData.isAvailable(5, GoogleTransitData.TRIPS[23593].isAvailable))
-// console.log(GoogleTransitData.isAvailable(6, GoogleTransitData.TRIPS[23593].isAvailable))
-// for(let stops of GoogleTransitData.STOPS_OF_A_ROUTE[GoogleTransitData.TRIPS[23593].routeId]){
-//   console.log(GoogleTransitData.STOPS[stops].name)
-// }
-// for(let entry of GoogleTransitData.ROUTES_SERVING_STOPS[1887]){
-//   if(entry.routeId === 7296){
-//     console.log(entry)
-//   }
-// }
 
 const port = 1337;
 const corsOptions = {
