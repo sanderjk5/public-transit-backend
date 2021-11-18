@@ -25,7 +25,7 @@ Reliability.initReliability();
 // TestController.testAlgorithms();
 // TestController.testEatAlgorithm();
 // TestController.testMeatAlgorithms();
-// ApproximationTestController.performApproximationTests();
+ApproximationTestController.performApproximationTests();
 
 const port = 1337;
 const corsOptions = {
