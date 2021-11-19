@@ -1,5 +1,5 @@
 import express from "express";
-import { MAX_D_C_LONG, MAX_D_C_NORMAL, SECONDS_OF_A_DAY } from "../../constants";
+import { ALPHA, MAX_D_C_LONG, MAX_D_C_NORMAL, NUMBER_OF_DAYS, SECONDS_OF_A_DAY } from "../../constants";
 import { Calculator } from "../../data/calculator";
 import { Converter } from "../../data/converter";
 import { GoogleTransitData } from "../../data/google-transit-data";
@@ -196,8 +196,8 @@ export class ConnectionScanMeatAlgorithmController {
         this.earliestSafeArrivalTimeCSA = earliestSafeArrivalTimeCSA;
 
         // calculates the maximum arrival time of the alpha bounded version of the algorithm
-        let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-        this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
+        let difference = ALPHA * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+        this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
 
         this.earliestArrivalTimes = earliestArrivalTimes;
 
@@ -370,15 +370,14 @@ export class ConnectionScanMeatAlgorithmController {
      */
     private static init(calculateCSAValues: boolean){
         if(calculateCSAValues){
-            this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(this.sourceStop, this.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
+            this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(this.sourceStop, this.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + NUMBER_OF_DAYS * SECONDS_OF_A_DAY);
             if(this.earliestSafeArrivalTimeCSA === null) {
                 throw new Error("Couldn't find a connection.")
             }
 
             // calculates the maximum arrival time of the alpha bounded version of the algorithm
-            let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-            this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
-
+            let difference = ALPHA * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+            this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
             this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
         }
         
