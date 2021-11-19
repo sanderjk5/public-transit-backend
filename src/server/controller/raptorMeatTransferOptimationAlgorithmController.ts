@@ -41,7 +41,7 @@ interface Label {
     calcReliability?: number,
 }
 
-export class RaptorMeatAlgorithmController {
+export class RaptorMeatTransferOptimationAlgorithmController {
     // source stops
     private static sourceStop: number;
     // target stops
@@ -51,7 +51,6 @@ export class RaptorMeatAlgorithmController {
     private static minDepartureTime: number;
     // earliest safe arrival time of csa
     private static earliestSafeArrivalTimeCSA: number;
-    private static meatCSA: number;
     // the maximum arrival time of the journey
     private static maxArrivalTime: number;
     // the earliest possible arrival time of each stop
@@ -71,7 +70,7 @@ export class RaptorMeatAlgorithmController {
     // stores the labels of the current round for each stop
     private static expectedArrivalTimesOfCurrentRound: Label[][];
     // stores for each stop the expected arrival times sorted by departure time. A label dominates every label with a higher departure time.
-    private static expectedArrivalTimes: Label[][];
+    private static expectedArrivalTimes: Label[][][];
     // stores the marked stops of the current round
     private static markedStops: number[];
     // stores the route-stop pairs of the marked stops
@@ -88,7 +87,7 @@ export class RaptorMeatAlgorithmController {
      * @param res 
      * @returns 
      */
-    public static raptorMeatAlgorithm(req: express.Request, res: express.Response) {
+    public static raptorMeatTransferOptimationAlgorithm(req: express.Request, res: express.Response) {
         try {
             // checks the parameters of the http request
             if(!req.query || !req.query.sourceStop || !req.query.targetStop || !req.query.sourceTime ||  !req.query.date ||
@@ -131,7 +130,7 @@ export class RaptorMeatAlgorithmController {
      * @param sourceDate 
      * @returns 
      */
-    public static testRaptorMeatAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
+    public static testRaptorMeatTransferOptimationAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
         try{
             // gets the source and target stops
             this.sourceStop = GoogleTransitData.getStopIdByName(sourceStop);
@@ -163,7 +162,7 @@ export class RaptorMeatAlgorithmController {
             const completeDuration = performance.now() - completeStartTime;
 
             return {
-                expectedArrivalTime: this.expectedArrivalTimes[this.sourceStop][0].expectedArrivalTime, 
+                expectedArrivalTime: this.expectedArrivalTimes[this.sourceStop][0][this.expectedArrivalTimes.length-1].expectedArrivalTime, 
                 completeDuration: completeDuration,
                 initDuration: initDuration, 
                 algorithmDuration: algorithmDuration, 
@@ -173,37 +172,6 @@ export class RaptorMeatAlgorithmController {
                 decisionGraphDuration: decisionGraphDuration,
             };
         } catch(error){
-            return null;
-        }
-    }
-
-    /**
-     * Performs the Raptor MEAT Algorithm and returns the expected Arrival Times Array. 
-     * 
-     * @param sourceStop 
-     * @param targetStop 
-     * @param sourceTime 
-     * @param sourceDate 
-     * @returns 
-     */
-    public static getExpectedArrivalTimesArray(sourceStop: number, targetStop: number, sourceTime: number, sourceDate: Date){
-        try {
-            // gets the source and target stops
-            this.sourceStop = sourceStop;
-            this.targetStop = targetStop;
-            // converts the source time
-            this.minDepartureTime = sourceTime;
-            this.sourceDate = sourceDate;
-
-            this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
-
-            // initializes the raptor meat algorithm
-            this.init();
-
-            // calls the raptor meat algorithm
-            this.performAlgorithm();
-            return this.expectedArrivalTimes;
-        } catch (error){
             return null;
         }
     }
@@ -235,7 +203,6 @@ export class RaptorMeatAlgorithmController {
             startTime = performance.now();
             this.updateExpectedArrivalTimes();
             this.updateExpectedArrivalTimesTime += performance.now() - startTime;
-            
             // termination condition
             if(this.markedStops.length === 0){
                 break;
@@ -256,12 +223,13 @@ export class RaptorMeatAlgorithmController {
         // calculates the maximum arrival time
         let difference = ALPHA * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
         this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
+        
         this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime);
         
         // creates the arrays
         const numberOfStops = GoogleTransitData.STOPS.length;
         this.latestDepartureTimesOfLastRound = new Array(numberOfStops);
-        this.expectedArrivalTimes = new Array(numberOfStops);
+        this.expectedArrivalTimes = [new Array(numberOfStops)];
 
         // sets the default label of each stop
         const defaultLabel: Label = {
@@ -270,7 +238,7 @@ export class RaptorMeatAlgorithmController {
             transferRound: 0,
         }
         for(let i = 0; i < numberOfStops; i++) {
-            this.expectedArrivalTimes[i] = [defaultLabel];
+            this.expectedArrivalTimes[0][i] = [defaultLabel];
         }
 
         // initializes the marked stops array
@@ -392,8 +360,8 @@ export class RaptorMeatAlgorithmController {
                 // let relevantLabels: Label[] = [];
                 let label: Label;
                 // finds all labels at this stop which have a departure time between trip arrival time and trip arrival time + maxD_c (and the first departure after max delay) and calculates the expected arrival time
-                for(let j = 0; j < this.expectedArrivalTimes[pi].length; j++) {
-                    label = this.expectedArrivalTimes[pi][j];
+                for(let j = 0; j < this.expectedArrivalTimes[this.k-1][pi].length; j++) {
+                    label = this.expectedArrivalTimes[this.k-1][pi][j];
                     if(label.departureTime >= currentTripArrivalTime && label.departureTime < currentTripArrivalTime + currentMaxDelay){
                         newExpectedArrivalTime += (label.expectedArrivalTime * Reliability.getReliability(labelLastDepartureTime - currentTripArrivalTime, label.departureTime - currentTripArrivalTime, isLongDistanceTrip));
                         labelLastDepartureTime = label.departureTime;
@@ -593,16 +561,18 @@ export class RaptorMeatAlgorithmController {
      * The update is done by a merge operation.
      */
     private static updateExpectedArrivalTimes(){
+        this.expectedArrivalTimes.push([])
         // initializes the new array of departure times
         this.latestDepartureTimesOfLastRound = new Array(GoogleTransitData.STOPS.length);
         // updates the expected arrival times for each stop
         for(let i = 0; i < GoogleTransitData.STOPS.length; i++){
             // checks if new labels for this stop were created in the current round
             if(this.expectedArrivalTimesOfCurrentRound[i].length === 0){
+                this.expectedArrivalTimes[this.k][i] = cloneDeep(this.expectedArrivalTimes[this.k-1][i])
                 continue;
             }
             let newExpectedArrivalTimes: Label[] = [];
-            let expectedArrivalTimesIndex = this.expectedArrivalTimes[i].length-1;
+            let expectedArrivalTimesIndex = this.expectedArrivalTimes[this.k-1][i].length-1;
             let expectedArrivalTimesIndexCurrentRound = this.expectedArrivalTimesOfCurrentRound[i].length-1;
             // iterates over all labels of the two bags in the order of their departure times and checks the dominance rules
             while(expectedArrivalTimesIndex >= 0 || expectedArrivalTimesIndexCurrentRound >= 0){
@@ -610,7 +580,7 @@ export class RaptorMeatAlgorithmController {
                 let lastExpectedArrivalTimesCurrentRoundLabel: Label = undefined;
                 // selects the next labels of the two bags
                 if(expectedArrivalTimesIndex >= 0){
-                    lastExpectedArrivalTimesLabel = this.expectedArrivalTimes[i][expectedArrivalTimesIndex];
+                    lastExpectedArrivalTimesLabel = cloneDeep(this.expectedArrivalTimes[this.k-1][i][expectedArrivalTimesIndex]);
                 }
                 if(expectedArrivalTimesIndexCurrentRound >= 0){
                     lastExpectedArrivalTimesCurrentRoundLabel = this.expectedArrivalTimesOfCurrentRound[i][expectedArrivalTimesIndexCurrentRound];
@@ -659,7 +629,7 @@ export class RaptorMeatAlgorithmController {
                 }
             }
             // sets the new expected arrival times
-            this.expectedArrivalTimes[i] = newExpectedArrivalTimes;
+            this.expectedArrivalTimes[this.k][i] = newExpectedArrivalTimes;
         }
     }
 
@@ -716,17 +686,37 @@ export class RaptorMeatAlgorithmController {
         return earliestTripInfos;
     }
 
+    private static getTransferOptimalRound(){
+        const raptorResult = this.expectedArrivalTimes[this.k][this.sourceStop][0];
+        let optimalRound: number;
+        for(let i = 1; i < raptorResult.transferRound; i++){
+            if(raptorResult.expectedArrivalTime > (this.expectedArrivalTimes[i][this.sourceStop][0].expectedArrivalTime - ((raptorResult.transferRound - i) * 120))){
+                optimalRound = i;
+                break;
+            }
+        }
+        if(optimalRound === undefined){
+            optimalRound = raptorResult.transferRound;
+        }
+        return optimalRound;
+    }
+
      /**
      * Extracts the decision graph.
      * @returns 
      */
       private static extractDecisionGraphs() {
+        if(this.expectedArrivalTimes[this.k][this.sourceStop][0].departureTime === Number.MAX_VALUE){
+            throw new Error("Couldn't find a connection.")
+        }
+        let resultRound = this.getTransferOptimalRound();
+
         // the minimum expected arrival time and date
-        let meatTime = this.expectedArrivalTimes[this.sourceStop][0].expectedArrivalTime;
+        let meatTime = this.expectedArrivalTimes[resultRound][this.sourceStop][0].expectedArrivalTime;
         this.meatDate = new Date(this.sourceDate);
         this.meatDate.setDate(this.meatDate.getDate() + Converter.getDayDifference(meatTime));
         // sets the departure time and date
-        let departureTime = this.expectedArrivalTimes[this.sourceStop][0].departureTime;
+        let departureTime = this.expectedArrivalTimes[resultRound][this.sourceStop][0].departureTime;
         let departureDate = new Date(this.sourceDate);
         departureDate.setDate(departureDate.getDate() + Converter.getDayDifference(departureTime))
         
@@ -734,7 +724,7 @@ export class RaptorMeatAlgorithmController {
         let meatResponse: MeatResponse = {
             sourceStop: GoogleTransitData.STOPS[this.sourceStop].name,
             targetStop: GoogleTransitData.STOPS[this.targetStop].name,
-            departureTime: Converter.secondsToTime(this.expectedArrivalTimes[this.sourceStop][0].departureTime),
+            departureTime: Converter.secondsToTime(this.expectedArrivalTimes[resultRound][this.sourceStop][0].departureTime),
             departureDate: departureDate.toLocaleDateString('de-DE'),
             meatTime: Converter.secondsToTime(meatTime),
             meatDate: this.meatDate.toLocaleDateString('de-DE'),
@@ -757,13 +747,11 @@ export class RaptorMeatAlgorithmController {
         let priorityQueue = new FastPriorityQueue<Label>((a, b) => {
             return a.departureTime < b.departureTime
         });
-        if(this.expectedArrivalTimes[this.sourceStop][0].departureTime === Number.MAX_VALUE){
-            throw new Error("Couldn't find a connection.")
-        }
+        
         let targetStopLabels: Label[] = [];
         // adds the source stop
-        this.expectedArrivalTimes[this.sourceStop][0].calcReliability = 1;
-        priorityQueue.add(this.expectedArrivalTimes[this.sourceStop][0]);
+        this.expectedArrivalTimes[resultRound][this.sourceStop][0].calcReliability = 1;
+        priorityQueue.add(this.expectedArrivalTimes[resultRound][this.sourceStop][0]);
         while(!priorityQueue.isEmpty()){
             let p = priorityQueue.poll();
             let tripId = p.associatedTrip.tripId;
@@ -795,8 +783,8 @@ export class RaptorMeatAlgorithmController {
                 }
                 let pLastDepartureTime = -1;
                 // finds the next labels which can be added to the queue (every label between departure and departure + max Delay and the first one after the max Delay).
-                for(let i = 0; i < this.expectedArrivalTimes[p.exitTripAtStop].length; i++) {
-                    let nextP = this.expectedArrivalTimes[p.exitTripAtStop][i];
+                for(let i = 0; i < this.expectedArrivalTimes[p.transferRound-1][p.exitTripAtStop].length; i++) {
+                    let nextP = this.expectedArrivalTimes[p.transferRound-1][p.exitTripAtStop][i];
                     if(nextP.departureTime >= p.associatedTrip.tripArrival && nextP.departureTime < (p.associatedTrip.tripArrival + maxDelay) 
                     ){
                         let nextPCopy = cloneDeep(nextP)
