@@ -6,7 +6,7 @@ import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmCont
 import FastPriorityQueue from 'fastpriorityqueue';
 import { MeatResponse } from "../../models/MeatResponse";
 import { TempEdge } from "../../models/TempEdge";
-import { CHANGE_TIME, MAX_D_C_LONG, MAX_D_C_NORMAL, SECONDS_OF_A_DAY } from "../../constants";
+import { ALPHA, CHANGE_TIME, MAX_D_C_LONG, MAX_D_C_NORMAL, NUMBER_OF_DAYS, SECONDS_OF_A_DAY } from "../../constants";
 import { Reliability } from "../../data/reliability";
 import { RouteStopMapping } from "../../models/RouteStopMapping";
 import { StopTime } from "../../models/StopTime";
@@ -268,13 +268,13 @@ export class RaptorMeatAlgorithmController {
      * @param sourceTime 
      */
     private static init(){
-        this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(this.sourceStop, this.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + 3 * SECONDS_OF_A_DAY);
+        this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(this.sourceStop, this.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + NUMBER_OF_DAYS * SECONDS_OF_A_DAY);
         if(this.earliestSafeArrivalTimeCSA === null) {
             throw new Error("Couldn't find a connection.");
         }
         // calculates the maximum arrival time
-        let difference = 1 * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-        this.maxArrivalTime = this.earliestSafeArrivalTimeCSA + Math.min(difference, SECONDS_OF_A_DAY-1);
+        let difference = ALPHA * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+        this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
         this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime);
         if(this.useTransferOptitimization){
             this.meatCSA = ConnectionScanMeatAlgorithmController.getMeat(this.sourceStop, this.targetStop, this.minDepartureTime, this.sourceDate, this.earliestSafeArrivalTimeCSA, this.earliestArrivalTimes);
