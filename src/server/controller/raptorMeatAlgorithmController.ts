@@ -12,7 +12,6 @@ import { RouteStopMapping } from "../../models/RouteStopMapping";
 import { StopTime } from "../../models/StopTime";
 import { performance } from 'perf_hooks';
 import { DecisionGraphController } from "./decisionGraphController";
-import { ConnectionScanMeatAlgorithmController } from "./connectionScanMeatAlgorithmController";
 import { cloneDeep } from "lodash";
 
 // entries of the q array
@@ -51,7 +50,6 @@ export class RaptorMeatAlgorithmController {
     private static minDepartureTime: number;
     // earliest safe arrival time of csa
     private static earliestSafeArrivalTimeCSA: number;
-    private static meatCSA: number;
     // the maximum arrival time of the journey
     private static maxArrivalTime: number;
     // the earliest possible arrival time of each stop
@@ -109,6 +107,7 @@ export class RaptorMeatAlgorithmController {
 
             // initializes the raptor meat algorithm
             this.init();
+
             console.time('raptor meat algorithm')
             // calls the raptor meat algorithm
             this.performAlgorithm();
@@ -202,6 +201,7 @@ export class RaptorMeatAlgorithmController {
 
             // calls the raptor meat algorithm
             this.performAlgorithm();
+
             return this.expectedArrivalTimes;
         } catch (error){
             return null;
@@ -680,9 +680,9 @@ export class RaptorMeatAlgorithmController {
             return earliestTripInfos;
         }
 
-        if(this.k > 1){
-            latestDeparture -= CHANGE_TIME;
-        }
+        // if(this.k > 1){
+        //     latestDeparture -= CHANGE_TIME;
+        // }
 
         // sets the earliest possible arrival at this stop
         let earliestArrival = this.earliestArrivalTimes[pi];
