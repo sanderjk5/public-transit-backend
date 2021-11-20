@@ -86,7 +86,7 @@ export class ConnectionScanMeatAlgorithmController {
             this.sourceDate = new Date(req.query.date);
 
             // initializes the csa meat algorithm
-            this.init(true);
+            this.init();
             // calls the csa meat algorithm
             console.time('connection scan meat algorithm')
             this.performAlgorithm();
@@ -122,7 +122,7 @@ export class ConnectionScanMeatAlgorithmController {
 
             // initializes the csa meat algorithm
             const initStartTime = performance.now();
-            this.init(true);
+            this.init();
             const initDuration = performance.now() - initStartTime;
 
             // calls the csa meat algorithm
@@ -167,7 +167,7 @@ export class ConnectionScanMeatAlgorithmController {
             this.sourceDate = sourceDate;
 
             // initializes the csa meat algorithm
-            this.init(true);
+            this.init();
 
             // calls the csa meat algorithm
             this.performAlgorithm();
@@ -335,19 +335,16 @@ export class ConnectionScanMeatAlgorithmController {
     /**
      * Initializes the values of the algorithm.
      */
-    private static init(calculateCSAValues: boolean){
-        if(calculateCSAValues){
-            this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(this.sourceStop, this.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + NUMBER_OF_DAYS * SECONDS_OF_A_DAY);
-            if(this.earliestSafeArrivalTimeCSA === null) {
-                throw new Error("Couldn't find a connection.")
-            }
-
-            // calculates the maximum arrival time of the alpha bounded version of the algorithm
-            let difference = ALPHA * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-            this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
-            this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
+    private static init(){
+        this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(this.sourceStop, this.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + NUMBER_OF_DAYS * SECONDS_OF_A_DAY);
+        if(this.earliestSafeArrivalTimeCSA === null) {
+            throw new Error("Couldn't find a connection.")
         }
-        
+
+        // calculates the maximum arrival time of the alpha bounded version of the algorithm
+        let difference = ALPHA * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+        this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
+        this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
         
         // sets the relevant dates
         this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
