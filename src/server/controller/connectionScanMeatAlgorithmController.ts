@@ -177,7 +177,7 @@ export class ConnectionScanMeatAlgorithmController {
             return null;
         }
     }
-
+  
     /**
      * Performs the modified version of the profile algorithm to solve the minimum expected arrival time problem.
      */
