@@ -348,7 +348,7 @@ export class ConnectionScanEatAlgorithmController {
         // calculates the maximum arrival time of the alpha bounded version of the algorithm
         let difference = ALPHA * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
         this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
-        
+
         // sets the relevant dates
         this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
         this.currentDate = new Date(this.sourceDate);

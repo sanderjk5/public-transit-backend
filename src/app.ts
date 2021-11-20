@@ -7,7 +7,6 @@ import { TestController } from './server/controller/testController';
 import { Reliability } from './data/reliability';
 import { GoogleTransitData } from './data/google-transit-data';
 import { ApproximationTestController } from './server/controller/approximationTestController';
-
 const app = express();
 
 // imports the gtfs files
@@ -22,9 +21,10 @@ Generator.generateSortedConnections();
 // generates footpaths which can be used by raptor and csa
 Generator.generateFootpaths();
 Reliability.initReliability();
+// TestController.testMeatAlgorithms();
 // TestController.testAlgorithms();
 // TestController.testEatAlgorithm();
-// TestController.testMeatAlgorithms();
+
 // ApproximationTestController.performApproximationTests();
 
 const port = 1337;

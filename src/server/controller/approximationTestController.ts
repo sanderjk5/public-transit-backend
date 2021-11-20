@@ -21,7 +21,11 @@ export class ApproximationTestController{
             newDate.setDate(initialDate.getDate() + i);
             dates.push(newDate);
         }
-        for(let i = 0; i < 20; i++){
+        let raptorAbsoluteDifference = 0;
+        let csaAbsoluteDifference = 0;
+        let raptorProportionalDifference = 0;
+        let csaProportionalDifference = 0;
+        for(let i = 0; i < 1000; i++){
             const randomSourceStop = this.getRandomInt(numberOfStops);
             const randomTargetStop = this.getRandomInt(numberOfStops);
             const randomSourceTime = this.getRandomInt(numberOfSeconds);
@@ -29,17 +33,19 @@ export class ApproximationTestController{
             try {
                 let csaResult = this.performApproximationTestForCsaMeatAlgorithm(randomSourceStop, randomTargetStop, randomSourceTime, randomSourceDate, 10000000);
                 let raptorResult = this.performApproximationTestForRaptorMeatAlgorithm(randomSourceStop, randomTargetStop, randomSourceTime, randomSourceDate, 10000000);
-                let requestString = GoogleTransitData.STOPS[randomSourceStop].name + ', ' + GoogleTransitData.STOPS[randomTargetStop].name + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime);
-                console.log('Request: ' + requestString);
-                console.log('CSA Meat Result:')
-                console.log(csaResult);
-                console.log('Raptor Meat Result:')
-                console.log(raptorResult);
+                csaAbsoluteDifference += Math.abs(csaResult.csaExpectedArrivalTime - csaResult.approximatedExpectedArrivalTime)
+                raptorAbsoluteDifference += Math.abs(raptorResult.raptorExpectedArrivalTime - raptorResult.approximatedExpectedArrivalTime)
+                csaProportionalDifference += Math.abs((csaResult.csaExpectedArrivalTime - csaResult.approximatedExpectedArrivalTime)/(csaResult.csaExpectedArrivalTime - randomSourceTime));
+                raptorProportionalDifference += Math.abs((raptorResult.raptorExpectedArrivalTime - raptorResult.approximatedExpectedArrivalTime)/(raptorResult.raptorExpectedArrivalTime - randomSourceTime));
             } catch {
                 i--;
                 continue;
             }
         }
+        console.log('Average absolute difference csa (in s): ' + csaAbsoluteDifference/1000)
+        console.log('Average absolute difference raptor (in s): ' + raptorAbsoluteDifference/1000)
+        console.log('Average proportional difference csa (in s): ' + csaProportionalDifference/1000)
+        console.log('Average proportional difference raptor (in s): ' + raptorProportionalDifference/1000)
     }
 
     /**
@@ -76,8 +82,8 @@ export class ApproximationTestController{
             expectedArrivalTime += arrivalTime;
         }
         return {
-            csaExpectedArrivalTime: Converter.secondsToTime(s[sourceStop][0].expectedArrivalTime),
-            approximatedExpectedArrivalTime: Converter.secondsToTime(expectedArrivalTime/iterationCounter)
+            csaExpectedArrivalTime: s[sourceStop][0].expectedArrivalTime,
+            approximatedExpectedArrivalTime: expectedArrivalTime/iterationCounter
         };
     }
 
@@ -118,8 +124,8 @@ export class ApproximationTestController{
             expectedArrivalTime += arrivalTime;
         }
         return {
-            raptorExpectedArrivalTime: Converter.secondsToTime(expectedArrivalTimes[sourceStop][0].expectedArrivalTime),
-            approximatedExpectedArrivalTime: Converter.secondsToTime(expectedArrivalTime/iterationCounter)
+            raptorExpectedArrivalTime: expectedArrivalTimes[sourceStop][0].expectedArrivalTime,
+            approximatedExpectedArrivalTime: expectedArrivalTime/iterationCounter
         };
     }
 

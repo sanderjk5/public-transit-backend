@@ -9,12 +9,7 @@ import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmCont
 import { performance } from 'perf_hooks';
 import { Reliability } from "../../data/reliability";
 import FastPriorityQueue from 'fastpriorityqueue';
-import { Link } from "../../models/Link";
-import { DecisionGraph } from "../../models/DecisionGraph";
-import {Node} from "../../models/Node";
-import { Cluster } from "../../models/Cluster";
 import { MeatResponse } from "../../models/MeatResponse";
-import { TempNode } from "../../models/TempNode";
 import { TempEdge } from "../../models/TempEdge";
 import { DecisionGraphController } from "./decisionGraphController";
 import { cloneDeep } from "lodash";
@@ -182,34 +177,7 @@ export class ConnectionScanMeatAlgorithmController {
             return null;
         }
     }
-
-    public static getMeat(sourceStop: number, targetStop: number, sourceTime: number, sourceDate: Date, earliestSafeArrivalTimeCSA: number, earliestArrivalTimes: number[]){
-        // gets the source and target stops
-        this.sourceStop = sourceStop;
-        this.targetStop = targetStop;
-        // converts the source time
-        this.minDepartureTime = sourceTime;
-
-        this.minDepartureTime = sourceTime;
-        this.sourceDate = sourceDate;
-
-        this.earliestSafeArrivalTimeCSA = earliestSafeArrivalTimeCSA;
-
-        // calculates the maximum arrival time of the alpha bounded version of the algorithm
-        let difference = ALPHA * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-        this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
-
-        this.earliestArrivalTimes = earliestArrivalTimes;
-
-        this.init(false);
-
-        this.performAlgorithm();
-
-        return this.s[this.sourceStop][0].expectedArrivalTime;
-    }
-
-    
-
+  
     /**
      * Performs the modified version of the profile algorithm to solve the minimum expected arrival time problem.
      */
@@ -304,7 +272,6 @@ export class ConnectionScanMeatAlgorithmController {
             }
             let expectedArrivalTime = 0;
             let pLastDepartureTime: number = -1;
-            // let relevantPairs: SEntry[] = [];
             // finds all outgoing trips which have a departure time between c_arr and c_arr + maxD_c (and the departure after max delay)
             for(let j = 0; j < this.s[currentConnection.arrivalStop].length; j++) {
                 p = this.s[currentConnection.arrivalStop][j];
@@ -378,7 +345,6 @@ export class ConnectionScanMeatAlgorithmController {
             // calculates the maximum arrival time of the alpha bounded version of the algorithm
             let difference = ALPHA * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
             this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
-
             this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
         }
         
