@@ -5,4 +5,5 @@ export interface Trip {
     directionId: number,
     isLongDistance: boolean,
     isAvailable?: number,
+    givenDelay?: number,
 }

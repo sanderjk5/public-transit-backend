@@ -21,12 +21,10 @@ Generator.generateSortedConnections();
 // generates footpaths which can be used by raptor and csa
 Generator.generateFootpaths();
 Reliability.initReliability();
-// TestController.testMeatAlgorithms();
+// TestController.testMeatAlgorithms(1);
 // TestController.testAlgorithms();
 // TestController.testEatAlgorithm();
-
-// ApproximationTestController.performApproximationTests();
-
+TestController.performAllTests();
 const port = 1337;
 const corsOptions = {
   origin: 'http://localhost:4200',

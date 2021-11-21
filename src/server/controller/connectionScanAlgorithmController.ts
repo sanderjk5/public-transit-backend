@@ -126,7 +126,7 @@ export class ConnectionScanAlgorithmController {
         }
     }
 
-    public static getEarliestArrivalTime(sourceStop: number, targetStop: number, sourceDate: Date, sourceTimeInSeconds: number, safeVariant: boolean, maxArrivalTime: number){
+    public static getEarliestArrivalTime(sourceStop: number, targetStop: number, sourceDate: Date, sourceTimeInSeconds: number, safeVariant: boolean, maxArrivalTime: number, givenDelay: boolean = false){
         // gets the source and target stops
         this.sourceStop = sourceStop;
         this.targetStop = targetStop;
@@ -138,7 +138,7 @@ export class ConnectionScanAlgorithmController {
             // initializes the csa algorithm
             this.init();
             // calls the csa
-            this.performAlgorithm(safeVariant, maxArrivalTime);
+            this.performAlgorithm(safeVariant, maxArrivalTime, givenDelay);
             // gets the earliest arrival time at the target stops
             let earliestTargetStopArrival = this.s[this.targetStop];
             if(earliestTargetStopArrival === Number.MAX_VALUE){
@@ -176,7 +176,7 @@ export class ConnectionScanAlgorithmController {
      * @param safeVariant 
      * @param maxArrivalTime 
      */
-    private static performAlgorithm(safeVariant?: boolean, maxArrivalTime?: number){
+    private static performAlgorithm(safeVariant?: boolean, maxArrivalTime?: number, givenTripDelays?: boolean){
         let reachedTargetStop = false;
         let reachedMaxArrivalTime = false;
         // gets the first connection id
@@ -243,21 +243,23 @@ export class ConnectionScanAlgorithmController {
                 const departureStop = currentConnection.departureStop;
                 let tripIdOfEnterConnectionAtDepartureStop: number;
                 let isLastConnectionLongDistance: boolean;
-                let currentMaxDelay: number;
+                let currentDelay: number;
                 if(this.j[departureStop].enterConnection !== null){
                     tripIdOfEnterConnectionAtDepartureStop = GoogleTransitData.CONNECTIONS[this.j[departureStop].enterConnection].trip;
                     isLastConnectionLongDistance = GoogleTransitData.TRIPS[tripIdOfEnterConnectionAtDepartureStop].isLongDistance;
                 } 
                 if(safeVariant && isLastConnectionLongDistance && this.j[departureStop].enterConnection !== null){
-                    currentMaxDelay = MAX_D_C_LONG;
+                    currentDelay = MAX_D_C_LONG;
                 } else if (safeVariant && this.j[departureStop].enterConnection !== null) {
-                    currentMaxDelay = MAX_D_C_NORMAL;
+                    currentDelay = MAX_D_C_NORMAL;
+                } else if(givenTripDelays && tripIdOfEnterConnectionAtDepartureStop !== undefined){
+                    currentDelay = GoogleTransitData.TRIPS[tripIdOfEnterConnectionAtDepartureStop].givenDelay;
                 } else {
-                    currentMaxDelay = 0;
+                    currentDelay = 0;
                 }
                 
                 // checks if the trip is already used or if the trip can be reached at stop s
-                if(this.t[dayOfCurrentConnection][currentConnection.trip] !== undefined || this.s[departureStop] + currentMaxDelay <= currentConnectionDepartureTime){
+                if(this.t[dayOfCurrentConnection][currentConnection.trip] !== undefined || this.s[departureStop] + currentDelay <= currentConnectionDepartureTime){
                     // sets enter connection of a trip
                     if(this.t[dayOfCurrentConnection][currentConnection.trip] === undefined){
                         let reliability = 1;
@@ -280,6 +282,9 @@ export class ConnectionScanAlgorithmController {
                             if(currentConnectionArrivalTime + footpaths[j].duration < this.s[footpaths[j].arrivalStop]){
                                 // sets the earliest arrival time
                                 this.s[footpaths[j].arrivalStop] = currentConnectionArrivalTime + footpaths[j].duration;
+                                if(givenTripDelays && footpaths[j].arrivalStop === this.targetStop){
+                                    this.s[footpaths[j].arrivalStop] += GoogleTransitData.TRIPS[currentConnection.trip].givenDelay;
+                                }
                                 // sets the journey pointer
                                 this.j[footpaths[j].arrivalStop] = {
                                     enterConnection: this.t[dayOfCurrentConnection][currentConnection.trip].connectionId,

@@ -106,7 +106,7 @@ export class RaptorMeatAlgorithmController {
             this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
 
             // initializes the raptor meat algorithm
-            this.init();
+            this.init(ALPHA);
 
             console.time('raptor meat algorithm')
             // calls the raptor meat algorithm
@@ -130,7 +130,7 @@ export class RaptorMeatAlgorithmController {
      * @param sourceDate 
      * @returns 
      */
-    public static testRaptorMeatAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
+    public static testRaptorMeatAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date, alpha: number){
         try{
             // gets the source and target stops
             this.sourceStop = GoogleTransitData.getStopIdByName(sourceStop);
@@ -146,7 +146,7 @@ export class RaptorMeatAlgorithmController {
 
             // initializes the csa meat algorithm
             const initStartTime = performance.now();
-            this.init();
+            this.init(alpha);
             const initDuration = performance.now() - initStartTime;
 
             // calls the csa meat algorithm
@@ -156,12 +156,13 @@ export class RaptorMeatAlgorithmController {
 
             // extracts decision graph
             const decisionGraphStartTime = performance.now();
-            this.extractDecisionGraphs();
+            let meatResponse = this.extractDecisionGraphs();
             const decisionGraphDuration = performance.now() - decisionGraphStartTime;
 
             const completeDuration = performance.now() - completeStartTime;
 
             return {
+                earliestArrivalTime: this.earliestArrivalTimes[this.targetStop],
                 expectedArrivalTime: this.expectedArrivalTimes[this.sourceStop][0].expectedArrivalTime, 
                 completeDuration: completeDuration,
                 initDuration: initDuration, 
@@ -170,6 +171,12 @@ export class RaptorMeatAlgorithmController {
                 traverseRoutesLoopDuration: this.traverseRoutesTime,
                 updateExpectedArrivalTimesLoopDuration: this.updateExpectedArrivalTimesTime,
                 decisionGraphDuration: decisionGraphDuration,
+                expectedArrivalTimes: this.expectedArrivalTimes,
+                computedRounds: this.k,
+                transferCountOfResult: this.expectedArrivalTimes[this.sourceStop][0].transferRound,
+                numberOfStops: meatResponse.expandedDecisionGraph.clusters.length,
+                numberOfLegs: meatResponse.expandedDecisionGraph.links.length,
+                numberOfEdgesInCompactGraph: meatResponse.compactDecisionGraph.links.length,
             };
         } catch(error){
             return null;
@@ -185,7 +192,7 @@ export class RaptorMeatAlgorithmController {
      * @param sourceDate 
      * @returns 
      */
-    public static getExpectedArrivalTimesArray(sourceStop: number, targetStop: number, sourceTime: number, sourceDate: Date){
+    public static getExpectedArrivalTimesArray(sourceStop: number, targetStop: number, sourceTime: number, sourceDate: Date, alpha){
         try {
             // gets the source and target stops
             this.sourceStop = sourceStop;
@@ -197,7 +204,7 @@ export class RaptorMeatAlgorithmController {
             this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
 
             // initializes the raptor meat algorithm
-            this.init();
+            this.init(alpha);
 
             // calls the raptor meat algorithm
             this.performAlgorithm();
@@ -248,13 +255,13 @@ export class RaptorMeatAlgorithmController {
      * @param sourceStops 
      * @param sourceTime 
      */
-    private static init(){
-        this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(this.sourceStop, this.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + NUMBER_OF_DAYS * SECONDS_OF_A_DAY);
+    private static init(alpha: number){
+        this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(this.sourceStop, this.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + (NUMBER_OF_DAYS * SECONDS_OF_A_DAY));
         if(this.earliestSafeArrivalTimeCSA === null) {
             throw new Error("Couldn't find a connection.");
         }
         // calculates the maximum arrival time
-        let difference = ALPHA * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+        let difference = alpha * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
         this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
         this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime);
         

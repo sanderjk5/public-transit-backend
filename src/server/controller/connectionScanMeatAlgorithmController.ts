@@ -86,7 +86,7 @@ export class ConnectionScanMeatAlgorithmController {
             this.sourceDate = new Date(req.query.date);
 
             // initializes the csa meat algorithm
-            this.init();
+            this.init(ALPHA);
             // calls the csa meat algorithm
             console.time('connection scan meat algorithm')
             this.performAlgorithm();
@@ -109,7 +109,7 @@ export class ConnectionScanMeatAlgorithmController {
      * @param sourceDate 
      * @returns 
      */
-    public static testConnectionScanMeatAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date){
+    public static testConnectionScanMeatAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date, alpha: number){
         try {
             // gets the source and target stops
             this.sourceStop = GoogleTransitData.getStopIdByName(sourceStop);
@@ -122,7 +122,7 @@ export class ConnectionScanMeatAlgorithmController {
 
             // initializes the csa meat algorithm
             const initStartTime = performance.now();
-            this.init();
+            this.init(alpha);
             const initDuration = performance.now() - initStartTime;
 
             // calls the csa meat algorithm
@@ -143,6 +143,7 @@ export class ConnectionScanMeatAlgorithmController {
                 initDuration: initDuration, 
                 algorithmDuration: algorithmDuration, 
                 decisionGraphDuration: decisionGraphDuration,
+                sArrary: this.s,
             };
         } catch (error){
             return null;
@@ -157,7 +158,7 @@ export class ConnectionScanMeatAlgorithmController {
      * @param sourceDate 
      * @returns 
      */
-    public static getSArray(sourceStop: number, targetStop: number, sourceTime: number, sourceDate: Date){
+    public static getSArray(sourceStop: number, targetStop: number, sourceTime: number, sourceDate: Date, alpha: number){
         try {
             // gets the source and target stops
             this.sourceStop = sourceStop;
@@ -167,7 +168,7 @@ export class ConnectionScanMeatAlgorithmController {
             this.sourceDate = sourceDate;
 
             // initializes the csa meat algorithm
-            this.init();
+            this.init(alpha);
 
             // calls the csa meat algorithm
             this.performAlgorithm();
@@ -335,14 +336,14 @@ export class ConnectionScanMeatAlgorithmController {
     /**
      * Initializes the values of the algorithm.
      */
-    private static init(){
-        this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(this.sourceStop, this.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + NUMBER_OF_DAYS * SECONDS_OF_A_DAY);
+    private static init(alpha: number){
+        this.earliestSafeArrivalTimeCSA = ConnectionScanAlgorithmController.getEarliestArrivalTime(this.sourceStop, this.targetStop, this.sourceDate, this.minDepartureTime, true, this.minDepartureTime + (NUMBER_OF_DAYS * SECONDS_OF_A_DAY));
         if(this.earliestSafeArrivalTimeCSA === null) {
             throw new Error("Couldn't find a connection.")
         }
 
         // calculates the maximum arrival time of the alpha bounded version of the algorithm
-        let difference = ALPHA * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
+        let difference = alpha * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
         this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
         this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
         
