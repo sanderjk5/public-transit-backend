@@ -96,10 +96,12 @@ export class ConnectionScanEatAlgorithmController {
             // generates the http response which includes all information of the journey incl. the graphs
             const meatResponse = this.extractDecisionGraphs();
             res.send(meatResponse);
+            this.clearArrays();
         } catch(error) {
             // console.log(error);
             console.timeEnd('connection scan algorithm')
             res.status(500).send(error);
+            this.clearArrays();
         }
     }
 
@@ -134,9 +136,12 @@ export class ConnectionScanEatAlgorithmController {
             this.performAlgorithm();
             const algorithmDuration = performance.now() - algorithmStartTime;
 
+
             // extracts decision graph
             const decisionGraphStartTime = performance.now();
-            this.extractDecisionGraphs();
+            if(this.s[this.sourceStop][0].expectedArrivalTime !== Number.MAX_VALUE){
+                this.extractDecisionGraphs();
+            }
             const decisionGraphDuration = performance.now() - decisionGraphStartTime;
 
             const completeDuration = performance.now() - completeStartTime;
@@ -144,7 +149,7 @@ export class ConnectionScanEatAlgorithmController {
             if(this.s[this.sourceStop][0].arrivalTime !== this.earliestArrivalTimes[this.targetStop]){
                 result = false;
             }
-            return {
+            let returnedResult = {
                 result: result, 
                 completeDuration: completeDuration,
                 initDuration: initDuration, 
@@ -152,7 +157,10 @@ export class ConnectionScanEatAlgorithmController {
                 decisionGraphDuration: decisionGraphDuration,
                 expectedArrivalTime: this.s[this.sourceStop][0].expectedArrivalTime,
             };
+            this.clearArrays();
+            return returnedResult;
         } catch (error){
+            this.clearArrays();
             return null;
         }
     }
@@ -263,6 +271,10 @@ export class ConnectionScanEatAlgorithmController {
             // finds all outgoing trips which have a departure time between c_arr and c_arr + maxD_c (and the departure after max delay)
             for(let j = 0; j < this.s[currentConnection.arrivalStop].length; j++) {
                 p = this.s[currentConnection.arrivalStop][j];
+                if(p.expectedArrivalTime === Number.MAX_VALUE){
+                    expectedArrivalTime = Number.MAX_VALUE;
+                    break;
+                }
                 if(p.departureTime >= currentConnectionArrivalTime && p.departureTime <= currentConnectionArrivalTime + currentMaxDelay){
                     if(time3 === Number.MAX_VALUE){
                         time3 = p.arrivalTime;
@@ -348,7 +360,8 @@ export class ConnectionScanEatAlgorithmController {
 
         // calculates the maximum arrival time of the alpha bounded version of the algorithm
         let difference = alpha * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-        this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
+        // this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
+        this.maxArrivalTime = this.minDepartureTime + difference;
 
         // sets the relevant dates
         this.dayOffset = Converter.getDayOffset(this.maxArrivalTime);
@@ -403,6 +416,9 @@ export class ConnectionScanEatAlgorithmController {
      * @returns 
      */
     private static extractDecisionGraphs() {
+        if(this.s[this.sourceStop][0].expectedArrivalTime === Number.MAX_VALUE){
+            throw new Error("Couldn't find a connection.")
+        }
         // the minimum expected arrival time
         let meatTime = this.s[this.sourceStop][0].expectedArrivalTime;
         this.meatDate = new Date(this.sourceDate);
@@ -439,6 +455,7 @@ export class ConnectionScanEatAlgorithmController {
         if(this.s[this.sourceStop][0].departureTime === Number.MAX_VALUE){
             throw new Error("Couldn't find a connection.")
         }
+        let stopDepartureCheck = new Map<number, number[]>();
         // adds the source stop
         this.s[this.sourceStop][0].calcReliability = 1;
         priorityQueue.add(this.s[this.sourceStop][0]);
@@ -475,10 +492,26 @@ export class ConnectionScanEatAlgorithmController {
                 for(let i = 0; i < this.s[p.exitStop].length; i++) {
                     let nextP = this.s[p.exitStop][i];
                     if(nextP.departureTime >= p.exitTime && nextP.departureTime <= (p.exitTime + maxDelay)){
-                        priorityQueue.add(nextP);
+                        let knownDepartureTimesOfNextStop = stopDepartureCheck.get(nextP.enterStop);
+                        if(knownDepartureTimesOfNextStop === undefined){
+                            knownDepartureTimesOfNextStop = [];
+                        }
+                        if(!knownDepartureTimesOfNextStop.includes(nextP.departureTime)){
+                            knownDepartureTimesOfNextStop.push(nextP.departureTime);
+                            stopDepartureCheck.set(nextP.enterStop, knownDepartureTimesOfNextStop)
+                            priorityQueue.add(nextP);
+                        }
                     }
                     if(nextP.departureTime > (p.exitTime + maxDelay) && nextP.departureTime !== Number.MAX_VALUE){
-                        priorityQueue.add(nextP);
+                        let knownDepartureTimesOfNextStop = stopDepartureCheck.get(nextP.enterStop);
+                        if(knownDepartureTimesOfNextStop === undefined){
+                            knownDepartureTimesOfNextStop = [];
+                        }
+                        if(!knownDepartureTimesOfNextStop.includes(nextP.departureTime)){
+                            knownDepartureTimesOfNextStop.push(nextP.departureTime);
+                            stopDepartureCheck.set(nextP.enterStop, knownDepartureTimesOfNextStop)
+                            priorityQueue.add(nextP);
+                        }
                         break;
                     }
                 }
@@ -488,5 +521,11 @@ export class ConnectionScanEatAlgorithmController {
         meatResponse.expandedDecisionGraph = decisionGraphs.expandedDecisionGraph;
         meatResponse.compactDecisionGraph = decisionGraphs.compactDecisionGraph;
         return meatResponse;
+    }
+
+    private static clearArrays(){
+        this.s = undefined;
+        this.t = undefined;
+        this.earliestArrivalTimes = undefined;
     }
 }

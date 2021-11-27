@@ -107,15 +107,17 @@ export class TestController {
             dates.push(newDate);
         }
         const failedRequests = [];
-        for(let i = 0; i < 1000; i++){
+        for(let i = 0; i < 100; i++){
             const randomSourceStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
             const randomTargetStop = GoogleTransitData.STOPS[this.getRandomInt(numberOfStops)].name;
             const randomSourceTime = this.getRandomInt(numberOfSeconds);
             const randomSourceDate = dates[this.getRandomInt(numberOfDates)];
             let requestString = randomSourceStop + ', ' + randomTargetStop + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime);
             // console.log('request: ' + requestString)
-            const raptorResponse = RaptorMeatAlgorithmController.testRaptorMeatAlgorithm(randomSourceStop, randomTargetStop, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
-            const csaResponse = ConnectionScanMeatAlgorithmController.testConnectionScanMeatAlgorithm(randomSourceStop, randomTargetStop, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
+            let raptorResponse = undefined;
+            let csaResponse = undefined;
+            csaResponse = ConnectionScanMeatAlgorithmController.testConnectionScanMeatAlgorithm(randomSourceStop, randomTargetStop, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
+            raptorResponse = RaptorMeatAlgorithmController.testRaptorMeatAlgorithm(randomSourceStop, randomTargetStop, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
             if(raptorResponse){
                 raptorMeatCompleteTimes += raptorResponse.completeDuration;
                 raptorMeatInitTimes += raptorResponse.initDuration;
@@ -177,9 +179,13 @@ export class TestController {
 
         DelayTestController.addDelaysToTrips();
 
-        for(let alpha = 1; alpha < 4; alpha++){
+        let alphas = [1, 2, 3];
+
+        for(let alpha of alphas){
             console.log('Alpha = ' + alpha + ':')
             let numberOfSuccessfulRequests = 0;
+
+            let raptorMeatRelativeJourneyTime = 0;
 
             let raptorMeatCompleteTimes = 0;
             let raptorMeatInitTimes = 0;
@@ -314,15 +320,15 @@ export class TestController {
                 randomSourceStopName = GoogleTransitData.STOPS[randomSourceStop].name;
                 randomTargetStopName = GoogleTransitData.STOPS[randomTargetStop].name;
                 
-                let raptorMeatResponse;
-                let raptorMeatTOResponse;
-                let csaMeatResponse;
-                let csaExpAtResponse;
+                let raptorMeatResponse = undefined;
+                let raptorMeatTOResponse = undefined;
+                let csaMeatResponse = undefined;
+                let csaExpAtResponse = undefined;
                 try{
                     raptorMeatResponse = RaptorMeatAlgorithmController.testRaptorMeatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
                     raptorMeatTOResponse = RaptorMeatTransferOptimationAlgorithmController.testRaptorMeatTransferOptimationAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha)
-                    csaMeatResponse = ConnectionScanMeatAlgorithmController.testConnectionScanMeatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
                     csaExpAtResponse = ConnectionScanEatAlgorithmController.testConnectionScanEatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
+                    csaMeatResponse = ConnectionScanMeatAlgorithmController.testConnectionScanMeatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
                 } catch(error){
                     if(alpha === 1){
                         i--;
@@ -365,6 +371,9 @@ export class TestController {
                     
                     numberOfSuccessfulRequests++;
     
+                    relDiff = (raptorMeatResponse.expectedArrivalTime - randomSourceTime)/(raptorMeatResponse.earliestArrivalTime - randomSourceTime);
+                    raptorMeatRelativeJourneyTime += relDiff;
+
                     raptorMeatCompleteTimes += raptorMeatResponse.completeDuration;
                     if(raptorMeatCompleteTimesMax < raptorMeatResponse.completeDuration){
                         raptorMeatCompleteTimesMax = raptorMeatResponse.completeDuration
@@ -507,7 +516,7 @@ export class TestController {
                     }
                     csaEatDecisionGraphTimes += csaExpAtResponse.decisionGraphDuration;
     
-                    if(csaExpAtResponse.expectedArrivalTime < 3 * SECONDS_OF_A_DAY){
+                    if(csaExpAtResponse.expectedArrivalTime !== Number.MAX_VALUE){
                         diff = csaExpAtResponse.expectedArrivalTime - raptorMeatResponse.expectedArrivalTime;
                         expATAndRaptorMeatAbsoluteDifference += diff;
                         if(expATAndRaptorMeatAbsoluteDifferenceMax < diff){
@@ -545,6 +554,7 @@ export class TestController {
             }
             console.log('Raptor MEAT Results:')
             console.log('Times:')
+            console.log('average raptor meat relative journey time: ' + raptorMeatRelativeJourneyTime/numberOfSuccessfulRequests)
             console.log('average raptor meat complete: ' + raptorMeatCompleteTimes/numberOfSuccessfulRequests)
             console.log('maximum raptor meat complete: ' + raptorMeatCompleteTimesMax)
             console.log('average raptor meat init: ' + raptorMeatInitTimes/numberOfSuccessfulRequests)
@@ -595,7 +605,7 @@ export class TestController {
             console.log('average csa eat init: ' + csaEatInitTimes/numberOfSuccessfulRequests)
             console.log('average csa eat algorithm: ' + csaEatAlgorithmTimes/numberOfSuccessfulRequests)
             console.log('maximum csa eat algorithm: ' + csaEatAlgorithmTimesMax)
-            console.log('average csa eat decision graph: ' + csaEatDecisionGraphTimes/numberOfSuccessfulRequests)
+            console.log('average csa eat decision graph: ' + csaEatDecisionGraphTimes/(numberOfSuccessfulRequests-numberOfExpAtGraphsWithoutBackup))
             console.log('ExpAT vs. Raptor MEAT test:')
             console.log('average absolute difference: ' + expATAndRaptorMeatAbsoluteDifference/(numberOfSuccessfulRequests-numberOfExpAtGraphsWithoutBackup))
             console.log('maximum absolute difference: ' + expATAndRaptorMeatAbsoluteDifferenceMax)

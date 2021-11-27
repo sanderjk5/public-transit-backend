@@ -94,10 +94,12 @@ export class ConnectionScanMeatAlgorithmController {
             // generates the http response which includes all information of the journey incl. the graphs
             const meatResponse = this.extractDecisionGraphs();
             res.send(meatResponse);
+            this.clearArrays();
         } catch(error) {
             // console.log(error);
             console.timeEnd('connection scan algorithm')
             res.status(500).send(error);
+            this.clearArrays();
         }
     }
 
@@ -136,16 +138,18 @@ export class ConnectionScanMeatAlgorithmController {
             const decisionGraphDuration = performance.now() - decisionGraphStartTime;
 
             const completeDuration = performance.now() - completeStartTime;
-
-            return {
+            let result = {
                 expectedArrivalTime: this.s[this.sourceStop][0].expectedArrivalTime, 
                 completeDuration: completeDuration,
                 initDuration: initDuration, 
                 algorithmDuration: algorithmDuration, 
                 decisionGraphDuration: decisionGraphDuration,
                 sArrary: this.s,
-            };
+            }
+            this.clearArrays();
+            return result;
         } catch (error){
+            this.clearArrays();
             return null;
         }
     }
@@ -172,9 +176,11 @@ export class ConnectionScanMeatAlgorithmController {
 
             // calls the csa meat algorithm
             this.performAlgorithm();
-
-            return this.s;
+            let sClone = cloneDeep(this.s);
+            this.clearArrays();
+            return sClone;
         } catch (error){
+            this.clearArrays();
             return null;
         }
     }
@@ -276,6 +282,10 @@ export class ConnectionScanMeatAlgorithmController {
             // finds all outgoing trips which have a departure time between c_arr and c_arr + maxD_c (and the departure after max delay)
             for(let j = 0; j < this.s[currentConnection.arrivalStop].length; j++) {
                 p = this.s[currentConnection.arrivalStop][j];
+                if(p.expectedArrivalTime === Number.MAX_VALUE){
+                    expectedArrivalTime = Number.MAX_VALUE;
+                    break;
+                }
                 if(p.departureTime >= currentConnectionArrivalTime && p.departureTime < currentConnectionArrivalTime + currentMaxDelay){
                     expectedArrivalTime += (p.expectedArrivalTime * Reliability.getReliability(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
                     pLastDepartureTime = p.departureTime;
@@ -344,7 +354,8 @@ export class ConnectionScanMeatAlgorithmController {
 
         // calculates the maximum arrival time of the alpha bounded version of the algorithm
         let difference = alpha * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-        this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
+        // this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
+        this.maxArrivalTime = this.minDepartureTime + difference;
         this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
         
         // sets the relevant dates
@@ -396,6 +407,9 @@ export class ConnectionScanMeatAlgorithmController {
      * @returns 
      */
     private static extractDecisionGraphs() {
+        if(this.s[this.sourceStop][0].expectedArrivalTime === Number.MAX_VALUE){
+            throw new Error("Couldn't find a connection.")
+        }
         // the minimum expected arrival time
         let meatTime = this.s[this.sourceStop][0].expectedArrivalTime;
         this.meatDate = new Date(this.sourceDate);
@@ -429,12 +443,10 @@ export class ConnectionScanMeatAlgorithmController {
         let priorityQueue = new FastPriorityQueue<SEntry>((a, b) => {
             return a.departureTime < b.departureTime
         });
-        if(this.s[this.sourceStop][0].departureTime === Number.MAX_VALUE){
-            throw new Error("Couldn't find a connection.")
-        }
         // adds the source stop
         let targetStopLabels: SEntry[] = [];
         this.s[this.sourceStop][0].calcReliability = 1;
+        let stopDepartureCheck = new Map<number, number[]>();
         priorityQueue.add(this.s[this.sourceStop][0]);
         while(!priorityQueue.isEmpty()){
             let p = priorityQueue.poll();
@@ -473,14 +485,30 @@ export class ConnectionScanMeatAlgorithmController {
                         let nextPCopy = cloneDeep(nextP)
                         let probabilityToTakeJourney = Reliability.getReliability(pLastDepartureTime - p.exitTime, nextP.departureTime - p.exitTime, isLongDistanceTrip);
                         nextPCopy.calcReliability = p.calcReliability * probabilityToTakeJourney;
-                        priorityQueue.add(nextPCopy);
+                        let knownDepartureTimesOfNextStop = stopDepartureCheck.get(nextPCopy.enterStop);
+                        if(knownDepartureTimesOfNextStop === undefined){
+                            knownDepartureTimesOfNextStop = [];
+                        }
+                        if(!knownDepartureTimesOfNextStop.includes(nextPCopy.departureTime)){
+                            knownDepartureTimesOfNextStop.push(nextPCopy.departureTime);
+                            stopDepartureCheck.set(nextPCopy.enterStop, knownDepartureTimesOfNextStop)
+                            priorityQueue.add(nextPCopy);
+                        }
                         pLastDepartureTime = nextPCopy.departureTime;
                     }
                     if(nextP.departureTime >= (p.exitTime + maxDelay) && nextP.departureTime !== Number.MAX_VALUE){
                         let nextPCopy = cloneDeep(nextP)
                         let probabilityToTakeJourney = Reliability.getReliability(pLastDepartureTime - p.exitTime, nextP.departureTime - p.exitTime, isLongDistanceTrip);
                         nextPCopy.calcReliability = p.calcReliability * probabilityToTakeJourney;
-                        priorityQueue.add(nextPCopy);
+                        let knownDepartureTimesOfNextStop = stopDepartureCheck.get(nextPCopy.enterStop);
+                        if(knownDepartureTimesOfNextStop === undefined){
+                            knownDepartureTimesOfNextStop = [];
+                        }
+                        if(!knownDepartureTimesOfNextStop.includes(nextPCopy.departureTime)){
+                            knownDepartureTimesOfNextStop.push(nextPCopy.departureTime);
+                            stopDepartureCheck.set(nextPCopy.enterStop, knownDepartureTimesOfNextStop)
+                            priorityQueue.add(nextPCopy);
+                        }
                         pLastDepartureTime = nextPCopy.departureTime;
                         break;
                     }
@@ -515,5 +543,11 @@ export class ConnectionScanMeatAlgorithmController {
         }
         console.log(probabilitySum)
         return meat;
+    }
+
+    private static clearArrays(){
+        this.s = undefined;
+        this.t = undefined;
+        this.earliestArrivalTimes = undefined;
     }
 }
