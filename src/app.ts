@@ -24,7 +24,9 @@ Reliability.initReliability();
 // TestController.testMeatAlgorithms(1);
 // TestController.testAlgorithms();
 // TestController.testEatAlgorithm();
-// TestController.performAllTests();
+console.time('tests')
+TestController.performAllTests();
+console.timeEnd('tests')
 const port = 1337;
 const corsOptions = {
   origin: 'http://localhost:4200',
