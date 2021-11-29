@@ -287,10 +287,10 @@ export class ConnectionScanMeatAlgorithmController {
                     break;
                 }
                 if(p.departureTime >= currentConnectionArrivalTime && p.departureTime < currentConnectionArrivalTime + currentMaxDelay){
-                    expectedArrivalTime += (p.expectedArrivalTime * Reliability.getReliability(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
+                    expectedArrivalTime += (p.expectedArrivalTime * Reliability.getProbabilityOfArrivalTime(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
                     pLastDepartureTime = p.departureTime;
                 } else if(p.departureTime >= currentConnectionArrivalTime + currentMaxDelay) {
-                    expectedArrivalTime += (p.expectedArrivalTime * Reliability.getReliability(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
+                    expectedArrivalTime += (p.expectedArrivalTime * Reliability.getProbabilityOfArrivalTime(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
                     break;
                 }
             }
@@ -483,7 +483,7 @@ export class ConnectionScanMeatAlgorithmController {
                     let nextP = this.s[p.exitStop][i];
                     if(nextP.departureTime >= p.exitTime && nextP.departureTime < (p.exitTime + maxDelay)){
                         let nextPCopy = cloneDeep(nextP)
-                        let probabilityToTakeJourney = Reliability.getReliability(pLastDepartureTime - p.exitTime, nextP.departureTime - p.exitTime, isLongDistanceTrip);
+                        let probabilityToTakeJourney = Reliability.getProbabilityOfArrivalTime(pLastDepartureTime - p.exitTime, nextP.departureTime - p.exitTime, isLongDistanceTrip);
                         nextPCopy.calcReliability = p.calcReliability * probabilityToTakeJourney;
                         let knownDepartureTimesOfNextStop = stopDepartureCheck.get(nextPCopy.enterStop);
                         if(knownDepartureTimesOfNextStop === undefined){
@@ -498,7 +498,7 @@ export class ConnectionScanMeatAlgorithmController {
                     }
                     if(nextP.departureTime >= (p.exitTime + maxDelay) && nextP.departureTime !== Number.MAX_VALUE){
                         let nextPCopy = cloneDeep(nextP)
-                        let probabilityToTakeJourney = Reliability.getReliability(pLastDepartureTime - p.exitTime, nextP.departureTime - p.exitTime, isLongDistanceTrip);
+                        let probabilityToTakeJourney = Reliability.getProbabilityOfArrivalTime(pLastDepartureTime - p.exitTime, nextP.departureTime - p.exitTime, isLongDistanceTrip);
                         nextPCopy.calcReliability = p.calcReliability * probabilityToTakeJourney;
                         let knownDepartureTimesOfNextStop = stopDepartureCheck.get(nextPCopy.enterStop);
                         if(knownDepartureTimesOfNextStop === undefined){
@@ -545,6 +545,9 @@ export class ConnectionScanMeatAlgorithmController {
         return meat;
     }
 
+    /**
+     * Clears all arrays to remove unused storage usage.
+     */
     private static clearArrays(){
         this.s = undefined;
         this.t = undefined;

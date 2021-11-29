@@ -181,6 +181,12 @@ export class GoogleTransitData {
         return stopTimes;
     }
 
+    /**
+     * Checks if a trip is available at a given weekday.
+     * @param weekday 
+     * @param isAvailable 
+     * @returns 
+     */
     public static isAvailable(weekday: number, isAvailable: number): boolean{
         if(weekday === 0){
             return (64 & isAvailable) > 0;

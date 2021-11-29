@@ -279,13 +279,13 @@ export class ConnectionScanEatAlgorithmController {
                     if(time3 === Number.MAX_VALUE){
                         time3 = p.arrivalTime;
                     }
-                    expectedArrivalTime += (p.expectedArrivalTime * Reliability.getReliability(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
+                    expectedArrivalTime += (p.expectedArrivalTime * Reliability.getProbabilityOfArrivalTime(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
                     pLastDepartureTime = p.departureTime;
                 } else if(p.departureTime > currentConnectionArrivalTime + currentMaxDelay) {
                     if(time3 === Number.MAX_VALUE){
                         time3 = p.arrivalTime;
                     }
-                    expectedArrivalTime += (p.expectedArrivalTime * Reliability.getReliability(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
+                    expectedArrivalTime += (p.expectedArrivalTime * Reliability.getProbabilityOfArrivalTime(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
                     break;
                 }
             }
@@ -523,6 +523,9 @@ export class ConnectionScanEatAlgorithmController {
         return meatResponse;
     }
 
+    /**
+     * Clears all arrays to remove unused storage usage.
+     */
     private static clearArrays(){
         this.s = undefined;
         this.t = undefined;

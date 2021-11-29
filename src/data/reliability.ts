@@ -5,6 +5,9 @@ export class Reliability {
     public static longDistanceExpectedValue: number;
     public static normalDistanceExpectedValue: number;
 
+    /**
+     * Initializes the probability values of trip delays.
+     */
     public static initReliability() {
         this.longDistanceValues = [];
         this.normalDistanceValues = [];
@@ -39,7 +42,14 @@ export class Reliability {
         this.normalDistanceExpectedValue *= 60;
     }
 
-    public static getReliability(minValue: number, maxValue: number, isLongDistance: boolean): number {
+    /**
+     * Gets the probability of a given arrival time interval.
+     * @param minValue 
+     * @param maxValue 
+     * @param isLongDistance 
+     * @returns 
+     */
+    public static getProbabilityOfArrivalTime(minValue: number, maxValue: number, isLongDistance: boolean): number {
         let reliability = 1;
         let roundedMaxValue = Math.ceil(maxValue/60);
         if(isLongDistance){

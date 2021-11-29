@@ -23,7 +23,7 @@ export class Converter {
      * @returns 
      */
     public static secondsToTime(timeInSeconds: number): string {
-        //Would give a invalid time.
+        // Would return a invalid time.
         if(timeInSeconds > 10 * SECONDS_OF_A_DAY){
             return timeInSeconds.toString();
         }

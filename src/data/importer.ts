@@ -241,6 +241,11 @@ export class Importer {
         console.timeEnd('import stop times table');
     }
 
+    /**
+     * Imports the trip table.
+     * @param filename 
+     * @param isLongDistance 
+     */
     private static importTrips(filename: string, isLongDistance: boolean): void {
         console.time('import trips table');
         const importedTrips = GoogleTransitData.TRIPS;

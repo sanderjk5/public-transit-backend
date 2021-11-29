@@ -387,10 +387,10 @@ export class RaptorMeatTransferOptimationAlgorithmController {
                         break;
                     }
                     if(label.departureTime >= currentTripArrivalTime && label.departureTime < currentTripArrivalTime + currentMaxDelay){
-                        newExpectedArrivalTime += (label.expectedArrivalTime * Reliability.getReliability(labelLastDepartureTime - currentTripArrivalTime, label.departureTime - currentTripArrivalTime, isLongDistanceTrip));
+                        newExpectedArrivalTime += (label.expectedArrivalTime * Reliability.getProbabilityOfArrivalTime(labelLastDepartureTime - currentTripArrivalTime, label.departureTime - currentTripArrivalTime, isLongDistanceTrip));
                         labelLastDepartureTime = label.departureTime;
                     } else if(label.departureTime >= currentTripArrivalTime + currentMaxDelay) {
-                        newExpectedArrivalTime += (label.expectedArrivalTime * Reliability.getReliability(labelLastDepartureTime - currentTripArrivalTime, label.departureTime - currentTripArrivalTime, isLongDistanceTrip));
+                        newExpectedArrivalTime += (label.expectedArrivalTime * Reliability.getProbabilityOfArrivalTime(labelLastDepartureTime - currentTripArrivalTime, label.departureTime - currentTripArrivalTime, isLongDistanceTrip));
                         break;
                     }
                 }
@@ -831,7 +831,7 @@ export class RaptorMeatTransferOptimationAlgorithmController {
                     if(nextP.departureTime >= p.associatedTrip.tripArrival && nextP.departureTime < (p.associatedTrip.tripArrival + maxDelay) 
                     ){
                         let nextPCopy = cloneDeep(nextP)
-                        let probabilityToTakeJourney = Reliability.getReliability(pLastDepartureTime - p.associatedTrip.tripArrival, nextP.departureTime - p.associatedTrip.tripArrival, isLongDistanceTrip);
+                        let probabilityToTakeJourney = Reliability.getProbabilityOfArrivalTime(pLastDepartureTime - p.associatedTrip.tripArrival, nextP.departureTime - p.associatedTrip.tripArrival, isLongDistanceTrip);
                         nextPCopy.calcReliability = p.calcReliability * probabilityToTakeJourney;
                         let knownDepartureTimesOfNextStop = stopDepartureCheck.get(nextPCopy.enterTripAtStop);
                         if(knownDepartureTimesOfNextStop === undefined){
@@ -847,7 +847,7 @@ export class RaptorMeatTransferOptimationAlgorithmController {
                     if(nextP.departureTime >= (p.associatedTrip.tripArrival + maxDelay) && nextP.departureTime !== Number.MAX_VALUE 
                     ){
                         let nextPCopy = cloneDeep(nextP)
-                        let probabilityToTakeJourney = Reliability.getReliability(pLastDepartureTime - p.associatedTrip.tripArrival, nextP.departureTime - p.associatedTrip.tripArrival, isLongDistanceTrip);
+                        let probabilityToTakeJourney = Reliability.getProbabilityOfArrivalTime(pLastDepartureTime - p.associatedTrip.tripArrival, nextP.departureTime - p.associatedTrip.tripArrival, isLongDistanceTrip);
                         nextPCopy.calcReliability = p.calcReliability * probabilityToTakeJourney;
                         let knownDepartureTimesOfNextStop = stopDepartureCheck.get(nextPCopy.enterTripAtStop);
                         if(knownDepartureTimesOfNextStop === undefined){

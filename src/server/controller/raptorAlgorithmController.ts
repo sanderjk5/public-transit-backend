@@ -494,7 +494,7 @@ export class RaptorAlgorithmController {
                 type = 'Footpath'
             } else {
                 if(lastArrivalTime !== null && lastTripId !== null) {
-                    reliability *= Reliability.getReliability(-1, departureTime - lastArrivalTime, GoogleTransitData.TRIPS[lastTripId].isLongDistance);
+                    reliability *= Reliability.getProbabilityOfArrivalTime(-1, departureTime - lastArrivalTime, GoogleTransitData.TRIPS[lastTripId].isLongDistance);
                 }
                 lastTripId = journeyPointers[i].tripId;
                 numberOfLegs++;
