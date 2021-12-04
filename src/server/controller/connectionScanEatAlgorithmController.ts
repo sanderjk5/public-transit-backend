@@ -139,8 +139,11 @@ export class ConnectionScanEatAlgorithmController {
 
             // extracts decision graph
             const decisionGraphStartTime = performance.now();
-            if(this.s[this.sourceStop][0].expectedArrivalTime !== Number.MAX_VALUE){
+            let expectedArrivalTime = this.s[this.sourceStop][0].expectedArrivalTime;
+            if(expectedArrivalTime !== Number.MAX_VALUE){
                 this.extractDecisionGraphs();
+            } else {
+                expectedArrivalTime = 0;
             }
             const decisionGraphDuration = performance.now() - decisionGraphStartTime;
 

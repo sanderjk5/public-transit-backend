@@ -164,7 +164,8 @@ export class RaptorMeatAlgorithmController {
             const completeDuration = performance.now() - completeStartTime;
 
             let result = {
-                earliestArrivalTime: this.earliestSafeArrivalTimeCSA,
+                earliestArrivalTime: this.earliestArrivalTimes[this.targetStop],
+                earliestSafeArrivalTime: this.earliestSafeArrivalTimeCSA,
                 expectedArrivalTime: this.expectedArrivalTimes[this.sourceStop][0].expectedArrivalTime, 
                 completeDuration: completeDuration,
                 initDuration: initDuration, 

@@ -81,6 +81,9 @@ export class RaptorMeatTransferOptimationAlgorithmController {
     private static traverseRoutesTime: number;
     private static updateExpectedArrivalTimesTime: number;
 
+    private static meatResults: number[];
+    private static algorithmDurations: number[];
+
     /**
      * Initializes and calls the raptor meat algorithm.
      * @param req 
@@ -187,6 +190,8 @@ export class RaptorMeatTransferOptimationAlgorithmController {
                 numberOfStops: meatResponse.expandedDecisionGraph.clusters.length,
                 numberOfLegs: meatResponse.expandedDecisionGraph.links.length,
                 numberOfEdgesInCompactGraph: meatResponse.compactDecisionGraph.links.length,
+                meatResults: cloneDeep(this.meatResults),
+                algorithmDurations: cloneDeep(this.algorithmDurations),
             };
             this.clearArrays();
             return result;
@@ -203,6 +208,7 @@ export class RaptorMeatTransferOptimationAlgorithmController {
      */
      private static performAlgorithm(){
         this.k = 0;
+        const startTimeAlgorithmDurations = performance.now();
         while(true){
             // increases round counter
             this.k++;
@@ -223,6 +229,20 @@ export class RaptorMeatTransferOptimationAlgorithmController {
             startTime = performance.now();
             this.updateExpectedArrivalTimes();
             this.updateExpectedArrivalTimesTime += performance.now() - startTime;
+
+            if(this.k < 11){
+                let expectedArrivalTimeAfterCurrentRound: number;
+                if(this.expectedArrivalTimes[this.k][this.sourceStop][0]){
+                    expectedArrivalTimeAfterCurrentRound = this.expectedArrivalTimes[this.k][this.sourceStop][0].expectedArrivalTime;
+                } else {
+                    expectedArrivalTimeAfterCurrentRound = this.meatResults[this.k-1];
+                }
+                this.meatResults[this.k] = expectedArrivalTimeAfterCurrentRound;
+                const algorithmDurationUntilThisRound = performance.now() - startTimeAlgorithmDurations;
+                this.algorithmDurations[this.k] = algorithmDurationUntilThisRound;
+            }
+            
+
             // termination condition
             if(this.markedStops.length === 0){
                 break;
@@ -272,6 +292,9 @@ export class RaptorMeatTransferOptimationAlgorithmController {
         this.initTime = 0;
         this.traverseRoutesTime = 0;
         this.updateExpectedArrivalTimesTime = 0;
+
+        this.meatResults = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        this.algorithmDurations = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     }
 
     /**
@@ -615,7 +638,7 @@ export class RaptorMeatTransferOptimationAlgorithmController {
                 let lastExpectedArrivalTimesCurrentRoundLabel: Label = undefined;
                 // selects the next labels of the two bags
                 if(expectedArrivalTimesIndex >= 0){
-                    lastExpectedArrivalTimesLabel = cloneDeep(this.expectedArrivalTimes[lastRoundWithEntries][i][expectedArrivalTimesIndex]);
+                    lastExpectedArrivalTimesLabel = this.expectedArrivalTimes[lastRoundWithEntries][i][expectedArrivalTimesIndex];
                 }
                 if(expectedArrivalTimesIndexCurrentRound >= 0){
                     lastExpectedArrivalTimesCurrentRoundLabel = this.expectedArrivalTimesOfCurrentRound[i][expectedArrivalTimesIndexCurrentRound];
@@ -902,5 +925,7 @@ export class RaptorMeatTransferOptimationAlgorithmController {
         this.Q = undefined;
         this.markedStops = undefined;
         this.latestDepartureTimesOfLastRound = undefined;
+        this.meatResults = undefined;
+        this.algorithmDurations = undefined;
     }
 }

@@ -9,6 +9,7 @@ import { DelayTestController } from "./delayTestController";
 import { RaptorAlgorithmController } from "./raptorAlgorithmController";
 import { RaptorMeatAlgorithmController } from "./raptorMeatAlgorithmController";
 import { RaptorMeatTransferOptimationAlgorithmController } from "./raptorMeatTransferOptimationAlgorithmController";
+const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 
 interface RequestInfo{
     sourceStop: number,
@@ -305,7 +306,7 @@ export class TestController {
             let randomTargetStopName: string;
             let randomSourceTime: number;
             let randomSourceDate: Date;
-            for(let i = 0; i < 1000; i++){
+            for(let i = 0; i < 20; i++){
                 if(alpha === 1){
                     randomSourceStop = this.getRandomInt(numberOfStops);
                     randomTargetStop = this.getRandomInt(numberOfStops);
@@ -371,7 +372,7 @@ export class TestController {
                     
                     numberOfSuccessfulRequests++;
     
-                    relDiff = (raptorMeatResponse.expectedArrivalTime - randomSourceTime)/(raptorMeatResponse.earliestArrivalTime - randomSourceTime);
+                    relDiff = (raptorMeatResponse.expectedArrivalTime - randomSourceTime)/(raptorMeatResponse.earliestSafeArrivalTime - randomSourceTime);
                     raptorMeatRelativeJourneyTime += relDiff;
 
                     raptorMeatCompleteTimes += raptorMeatResponse.completeDuration;
@@ -443,7 +444,7 @@ export class TestController {
                     if(raptorMEATAndTOAbsoluteTimeDifferenceMax < diff){
                         raptorMEATAndTOAbsoluteTimeDifferenceMax = diff
                     }
-                    relDiff = (diff)/(raptorMeatResponse.earliestArrivalTime - randomSourceTime);
+                    relDiff = (diff)/(raptorMeatResponse.earliestSafeArrivalTime - randomSourceTime);
                     raptorMEATAndTORelativeTimeDifference += relDiff;
                     if(raptorMEATAndTORelativeTimeDifferenceMax < relDiff){
                         raptorMEATAndTORelativeTimeDifferenceMax = relDiff
@@ -465,7 +466,7 @@ export class TestController {
                         if(alpha1Alpha2AbsoluteDifferenceMax < diff){
                             alpha1Alpha2AbsoluteDifferenceMax = diff
                         }
-                        relDiff = Math.abs(diff/(raptorMeatResponse.earliestArrivalTime - randomSourceTime))
+                        relDiff = Math.abs(diff/(raptorMeatResponse.earliestSafeArrivalTime - randomSourceTime))
                         alpha1Alpha2RelativeDifference += relDiff
                         if(alpha1Alpha2RelativeDifferenceMax < relDiff){
                             alpha1Alpha2RelativeDifferenceMax = relDiff
@@ -477,7 +478,7 @@ export class TestController {
                         if(alpha1Alpha3AbsoluteDifferenceMax < diff){
                             alpha1Alpha3AbsoluteDifferenceMax = diff
                         }
-                        relDiff = Math.abs(diff/(raptorMeatResponse.earliestArrivalTime - randomSourceTime))
+                        relDiff = Math.abs(diff/(raptorMeatResponse.earliestSafeArrivalTime - randomSourceTime))
                         alpha1Alpha3RelativeDifference += relDiff;
                         if(alpha1Alpha3RelativeDifferenceMax < relDiff){
                             alpha1Alpha3RelativeDifferenceMax = relDiff
@@ -487,7 +488,7 @@ export class TestController {
                         if(alpha2Alpha3AbsoluteDifferenceMax < diff){
                             alpha2Alpha3AbsoluteDifferenceMax = diff
                         }
-                        relDiff = Math.abs(diff/(raptorMeatResponse.earliestArrivalTime - randomSourceTime));
+                        relDiff = Math.abs(diff/(raptorMeatResponse.earliestSafeArrivalTime - randomSourceTime));
                         alpha2Alpha3RelativeDifference += relDiff;
                         if(alpha2Alpha3RelativeDifferenceMax < relDiff){
                             alpha2Alpha3RelativeDifferenceMax = relDiff
@@ -522,7 +523,7 @@ export class TestController {
                         if(expATAndRaptorMeatAbsoluteDifferenceMax < diff){
                             expATAndRaptorMeatAbsoluteDifferenceMax = diff
                         }
-                        relDiff = diff/(raptorMeatResponse.earliestArrivalTime - randomSourceTime);
+                        relDiff = diff/(raptorMeatResponse.earliestSafeArrivalTime - randomSourceTime);
                         expATAndRaptorMeatRelativeDifference += relDiff;
                         if(expATAndRaptorMeatRelativeDifferenceMax < relDiff){
                             expATAndRaptorMeatRelativeDifferenceMax = relDiff
@@ -533,11 +534,11 @@ export class TestController {
     
                     // diff = Math.abs(csaMeatResponse.expectedArrivalTime - approximatedResultCSA);
                     // approximationTestsCsaAbsoluteDifference += diff;
-                    // relDiff = Math.abs(diff/(raptorMeatResponse.earliestArrivalTime - randomSourceTime));
+                    // relDiff = Math.abs(diff/(raptorMeatResponse.earliestSafeArrivalTime - randomSourceTime));
                     // approximationTestsCsaRelativeDifference += relDiff;
                     // diff = Math.abs(raptorMeatResponse.expectedArrivalTime - approximatedResultRaptor);
                     // approximationTestsRaptorAbsoluteDifference += diff;
-                    // relDiff = Math.abs(diff/(raptorMeatResponse.earliestArrivalTime - randomSourceTime));
+                    // relDiff = Math.abs(diff/(raptorMeatResponse.earliestSafeArrivalTime - randomSourceTime));
                     // approximationTestsRaptorRelativeDifference += relDiff;
                 
                     diff = (knownDelayResultRaptorMEAT - knownDelayResultCSA);
@@ -545,7 +546,7 @@ export class TestController {
                     if(knownDelaysAbsoluteDifferenceMax < diff){
                         knownDelaysAbsoluteDifferenceMax = diff
                     }
-                    relDiff = diff/(raptorMeatResponse.earliestArrivalTime - randomSourceTime);
+                    relDiff = diff/(raptorMeatResponse.earliestSafeArrivalTime - randomSourceTime);
                     knownDelaysRelativeDifference += relDiff;
                     if(knownDelaysRelativeDifferenceMax < relDiff){
                         knownDelaysRelativeDifferenceMax = relDiff
@@ -653,6 +654,234 @@ export class TestController {
             console.log('average round relative difference: ' + raptorMEATAndTORelativeRoundDifference/numberOfSuccessfulRequests)
             console.log('maximum round relative difference: ' + raptorMEATAndTORelativeRoundDifferenceMax)
         }
+    }
+
+    public static async performAllTestsAndSafeInCSVInit(){
+        console.time('tests')
+        await TestController.performAllTestsAndSafeInCSV();
+        console.timeEnd('tests')
+    }
+
+    /**
+     * Creates random requests and compares the results of Raptor Meat and CSA Meat. Calculates the average time of both algorithms.
+     */
+     private static async performAllTestsAndSafeInCSV() {
+        let requests: RequestInfo[] = [];
+
+        DelayTestController.addDelaysToTrips();
+
+        let alphas = [1, 2, 3];
+
+        for(let alpha of alphas){
+            console.log('Alpha = ' + alpha + ':')
+            for(let j = 0; j < 20; j++){
+                const csvWriter = createCsvWriter({
+                    path: 'test_data\\dm1_alpha' + alpha + 'v' + j + '.csv',
+                    header: [
+                        {id: 'sourceStop', title: 'Source Stop'},
+                        {id: 'targetStop', title: 'Target Stop'},
+                        {id: 'sourceTime', title: 'Source Time'},
+                        {id: 'sourceDate', title: 'Source Date'},
+                        {id: 'eat', title: 'EAT'},
+                        {id: 'esat', title: 'ESAT'},
+                        {id: 'meat', title: 'MEAT'},
+                        {id: 'raptorMeatComplete', title: 'Raptor MEAT Complete'},
+                        {id: 'raptorMeatInit', title: 'Raptor MEAT Init'},
+                        {id: 'raptorMeatAlgorithm', title: 'Raptor MEAT Algorithm'},
+                        {id: 'raptorMeatInitLoop', title: 'Raptor MEAT Init Loop'},
+                        {id: 'raptorMeatTraverseRoutesLoop', title: 'Raptor MEAT Traverse Routes Loop'},
+                        {id: 'raptorMeatUpdateLoop', title: 'Raptor MEAT Update Loop'},
+                        {id: 'raptorMeatDecisionGraph', title: 'Raptor MEAT Decision Graph'},
+                        {id: 'raptorMeatComputedRounds', title: 'Raptor MEAT Computed Rounds'},
+                        {id: 'raptorMeatRoundsOfResult', title: 'Raptor MEAT Rounds Of Result'},
+                        {id: 'raptorMeatGraphStops', title: 'Raptor MEAT Stops in Graph'},
+                        {id: 'raptorMeatGraphLegs', title: 'Raptor MEAT Legs in Graph'},
+                        {id: 'raptorMeatGraphEdges', title: 'Raptor MEAT Edges in Graph'},
+                        {id: 'raptorMeatTOExpAT', title: 'Raptor MEAT TO ExpAT'},
+                        {id: 'raptorMeatTOComplete', title: 'Raptor MEAT TO Complete'},
+                        {id: 'raptorMeatTOInit', title: 'Raptor MEAT TO Init'},
+                        {id: 'raptorMeatTOAlgorithm', title: 'Raptor MEAT TO Algorithm'},
+                        {id: 'raptorMeatTOInitLoop', title: 'Raptor MEAT TO Init Loop'},
+                        {id: 'raptorMeatTOTraverseRoutesLoop', title: 'Raptor MEAT TO Traverse Routes Loop'},
+                        {id: 'raptorMeatTOUpdateLoop', title: 'Raptor MEAT TO Update Loop'},
+                        {id: 'raptorMeatTODecisionGraph', title: 'Raptor MEAT TO Decision Graph'},
+                        {id: 'raptorMeatTORoundsOfResult', title: 'Raptor MEAT TO Rounds Of Result'},
+                        {id: 'raptorMeatTOGraphStops', title: 'Raptor MEAT TO Stops in Graph'},
+                        {id: 'raptorMeatTOGraphLegs', title: 'Raptor MEAT TO Legs in Graph'},
+                        {id: 'raptorMeatTOGraphEdges', title: 'Raptor MEAT TO Edges in Graph'},
+                        {id: 'csaExpATExpAT', title: 'CSA ExpAT'},
+                        {id: 'csaExpATComplete', title: 'CSA ExpAT Complete'},
+                        {id: 'csaExpATInit', title: 'CSA ExpAT Init'},
+                        {id: 'csaExpATAlgorithm', title: 'CSA ExpAT Algorithm'},
+                        {id: 'csaExpATDecisionGraph', title: 'CSA ExpAT Decision Graph'},
+                        {id: 'csaMEATComplete', title: 'CSA MEAT Complete'},
+                        {id: 'csaMEATInit', title: 'CSA MEAT Init'},
+                        {id: 'csaMEATAlgorithm', title: 'CSA MEAT Algorithm'},
+                        {id: 'csaMEATDecisionGraph', title: 'CSA MEAT Decision Graph'},
+                        {id: 'csaATKnownDelay', title: 'CSA AT Known Delay'},
+                        {id: 'raptorMEATKnownDelay', title: 'Raptor MEAT AT Known Delay'},
+                        {id: 'raptorMeatTBExpAT1', title: 'Raptor MEAT TB ExpAT 1'},
+                        {id: 'raptorMeatTBExpAT2', title: 'Raptor MEAT TB ExpAT 2'},
+                        {id: 'raptorMeatTBExpAT3', title: 'Raptor MEAT TB ExpAT 3'},
+                        {id: 'raptorMeatTBExpAT4', title: 'Raptor MEAT TB ExpAT 4'},
+                        {id: 'raptorMeatTBExpAT5', title: 'Raptor MEAT TB ExpAT 5'},
+                        {id: 'raptorMeatTBExpAT6', title: 'Raptor MEAT TB ExpAT 6'},
+                        {id: 'raptorMeatTBExpAT7', title: 'Raptor MEAT TB ExpAT 7'},
+                        {id: 'raptorMeatTBExpAT8', title: 'Raptor MEAT TB ExpAT 8'},
+                        {id: 'raptorMeatTBExpAT9', title: 'Raptor MEAT TB ExpAT 9'},
+                        {id: 'raptorMeatTBExpAT10', title: 'Raptor MEAT TB ExpAT 10'},
+                        {id: 'raptorMeatTBAlgorithm1', title: 'Raptor MEAT TB Algorithm 1'},
+                        {id: 'raptorMeatTBAlgorithm2', title: 'Raptor MEAT TB Algorithm 2'},
+                        {id: 'raptorMeatTBAlgorithm3', title: 'Raptor MEAT TB Algorithm 3'},
+                        {id: 'raptorMeatTBAlgorithm4', title: 'Raptor MEAT TB Algorithm 4'},
+                        {id: 'raptorMeatTBAlgorithm5', title: 'Raptor MEAT TB Algorithm 5'},
+                        {id: 'raptorMeatTBAlgorithm6', title: 'Raptor MEAT TB Algorithm 6'},
+                        {id: 'raptorMeatTBAlgorithm7', title: 'Raptor MEAT TB Algorithm 7'},
+                        {id: 'raptorMeatTBAlgorithm8', title: 'Raptor MEAT TB Algorithm 8'},
+                        {id: 'raptorMeatTBAlgorithm9', title: 'Raptor MEAT TB Algorithm 9'},
+                        {id: 'raptorMeatTBAlgorithm10', title: 'Raptor MEAT TB Algorithm 10'},
+                    ]
+                })
+                const csvData = [];
+    
+                const numberOfStops = GoogleTransitData.STOPS.length;
+                const numberOfSeconds = SECONDS_OF_A_DAY;
+                const numberOfDates = 7;
+                const dates = [];
+                const initialDate = new Date(Date.now());
+                for(let i = 0; i < numberOfDates; i++){
+                    let newDate = new Date(initialDate);
+                    newDate.setDate(initialDate.getDate() + i);
+                    dates.push(newDate);
+                }
+        
+                let randomSourceStop: number;
+                let randomSourceStopName: string;
+                let randomTargetStop: number;
+                let randomTargetStopName: string;
+                let randomSourceTime: number;
+                let randomSourceDate: Date;
+                for(let i = 0; i < 50; i++){
+                    if(alpha === 1){
+                        randomSourceStop = this.getRandomInt(numberOfStops);
+                        randomTargetStop = this.getRandomInt(numberOfStops);
+                        randomSourceTime = this.getRandomInt(numberOfSeconds);
+                        randomSourceDate = dates[this.getRandomInt(numberOfDates)];
+                    } else {
+                        randomSourceStop = requests[i].sourceStop;
+                        randomTargetStop = requests[i].targetStop;
+                        randomSourceTime = requests[i].sourceTime;
+                        randomSourceDate = requests[i].sourceDate;
+                    }
+                    randomSourceStopName = GoogleTransitData.STOPS[randomSourceStop].name;
+                    randomTargetStopName = GoogleTransitData.STOPS[randomTargetStop].name;
+                    
+                    let raptorMeatResponse = undefined;
+                    let raptorMeatTOResponse = undefined;
+                    let csaMeatResponse = undefined;
+                    let csaExpAtResponse = undefined;
+                    let knownDelayResultCSA = undefined;
+                    let knownDelayResultRaptorMEAT = undefined;
+                    try{
+                        raptorMeatResponse = RaptorMeatAlgorithmController.testRaptorMeatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
+                        raptorMeatTOResponse = RaptorMeatTransferOptimationAlgorithmController.testRaptorMeatTransferOptimationAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha)
+                        csaExpAtResponse = ConnectionScanEatAlgorithmController.testConnectionScanEatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
+                        csaMeatResponse = ConnectionScanMeatAlgorithmController.testConnectionScanMeatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
+                        // approximatedResultCSA = ApproximationTestController.performApproximationTestForCsaMeatAlgorithmWithGivenSArray(randomSourceStop, randomTargetStop, csaMeatResponse.sArrary, 10000000);
+                        // approximatedResultRaptor = ApproximationTestController.performApproximationTestForRaptorMeatAlgorithmWithGivenExpectedArrivalTimes(randomSourceStop, randomTargetStop, raptorMeatResponse.expectedArrivalTimes, 10000000);
+                        knownDelayResultCSA = DelayTestController.getEarliestArrivalTimeCSA(randomSourceStop, randomTargetStop, randomSourceTime, randomSourceDate);
+                        knownDelayResultRaptorMEAT = DelayTestController.getEarliestArrivalTimeRaptorMeat(randomSourceStop, randomTargetStop, raptorMeatResponse.expectedArrivalTimes);
+                    } catch(error){
+                        if(alpha === 1){
+                            i--;
+                        }
+                        continue;
+                    }
+                    if(!raptorMeatResponse || !raptorMeatTOResponse || !csaMeatResponse || !csaExpAtResponse || !knownDelayResultCSA || !knownDelayResultRaptorMEAT){
+                        if(alpha === 1){
+                            i--;
+                        }
+                        continue;
+                    } else {
+                        if(alpha === 1){
+                            const request: RequestInfo = {
+                                sourceStop: randomSourceStop,
+                                targetStop: randomTargetStop,
+                                sourceTime: randomSourceTime,
+                                sourceDate: randomSourceDate,
+                            }
+                            requests.push(request);
+                        }
+                        const data = {
+                            sourceStop: randomSourceStopName,
+                            targetStop: randomTargetStopName,
+                            sourceTime: randomSourceTime,
+                            sourceDate: randomSourceDate.toLocaleDateString('de-DE'),
+                            eat: raptorMeatResponse.earliestArrivalTime,
+                            esat: raptorMeatResponse.earliestSafeArrivalTime,
+                            meat: raptorMeatResponse.expectedArrivalTime,
+                            raptorMeatComplete: raptorMeatResponse.completeDuration,
+                            raptorMeatInit: raptorMeatResponse.initDuration,
+                            raptorMeatAlgorithm: raptorMeatResponse.algorithmDuration,
+                            raptorMeatInitLoop: raptorMeatResponse.initLoopDuration,
+                            raptorMeatTraverseRoutesLoop: raptorMeatResponse.traverseRoutesLoopDuration,
+                            raptorMeatUpdateLoop: raptorMeatResponse.updateExpectedArrivalTimesLoopDuration,
+                            raptorMeatDecisionGraph: raptorMeatResponse.decisionGraphDuration,
+                            raptorMeatComputedRounds: raptorMeatResponse.computedRounds,
+                            raptorMeatRoundsOfResult: raptorMeatResponse.transferCountOfResult,
+                            raptorMeatGraphStops: raptorMeatResponse.numberOfStops,
+                            raptorMeatGraphLegs: raptorMeatResponse.numberOfLegs,
+                            raptorMeatGraphEdges: raptorMeatResponse.numberOfEdgesInCompactGraph,
+                            raptorMeatTOExpAT: raptorMeatTOResponse.expectedArrivalTime,
+                            raptorMeatTOComplete: raptorMeatTOResponse.completeDuration,
+                            raptorMeatTOInit: raptorMeatTOResponse.initDuration,
+                            raptorMeatTOAlgorithm: raptorMeatTOResponse.algorithmDuration,
+                            raptorMeatTOInitLoop: raptorMeatTOResponse.initLoopDuration,
+                            raptorMeatTOTraverseRoutesLoop: raptorMeatTOResponse.traverseRoutesLoopDuration,
+                            raptorMeatTOUpdateLoop: raptorMeatTOResponse.updateExpectedArrivalTimesLoopDuration,
+                            raptorMeatTODecisionGraph: raptorMeatTOResponse.decisionGraphDuration,
+                            raptorMeatTORoundsOfResult: raptorMeatTOResponse.optimalRound,
+                            raptorMeatTOGraphStops: raptorMeatTOResponse.numberOfStops,
+                            raptorMeatTOGraphLegs: raptorMeatTOResponse.numberOfLegs,
+                            raptorMeatTOGraphEdges: raptorMeatTOResponse.numberOfEdgesInCompactGraph,
+                            csaExpATExpAT: csaExpAtResponse.expectedArrivalTime,
+                            csaExpATComplete: csaExpAtResponse.completeDuration,
+                            csaExpATInit: csaExpAtResponse.initDuration,
+                            csaExpATAlgorithm: csaExpAtResponse.algorithmDuration,
+                            csaExpATDecisionGraph: csaExpAtResponse.decisionGraphDuration,
+                            csaMEATComplete: csaMeatResponse.completeDuration,
+                            csaMEATInit: csaMeatResponse.initDuration,
+                            csaMEATAlgorithm: csaMeatResponse.algorithmDuration,
+                            csaMEATDecisionGraph: csaMeatResponse.decisionGraphDuration,
+                            csaATKnownDelay: knownDelayResultCSA,
+                            raptorMEATKnownDelay: knownDelayResultRaptorMEAT,
+                            raptorMeatTBExpAT1: raptorMeatTOResponse.meatResults[1],
+                            raptorMeatTBExpAT2: raptorMeatTOResponse.meatResults[2],
+                            raptorMeatTBExpAT3: raptorMeatTOResponse.meatResults[3],
+                            raptorMeatTBExpAT4: raptorMeatTOResponse.meatResults[4],
+                            raptorMeatTBExpAT5: raptorMeatTOResponse.meatResults[5],
+                            raptorMeatTBExpAT6: raptorMeatTOResponse.meatResults[6],
+                            raptorMeatTBExpAT7: raptorMeatTOResponse.meatResults[7],
+                            raptorMeatTBExpAT8: raptorMeatTOResponse.meatResults[8],
+                            raptorMeatTBExpAT9: raptorMeatTOResponse.meatResults[9],
+                            raptorMeatTBExpAT10: raptorMeatTOResponse.meatResults[10],
+                            raptorMeatTBAlgorithm1: raptorMeatTOResponse.algorithmDurations[1],
+                            raptorMeatTBAlgorithm2: raptorMeatTOResponse.algorithmDurations[2],
+                            raptorMeatTBAlgorithm3: raptorMeatTOResponse.algorithmDurations[3],
+                            raptorMeatTBAlgorithm4: raptorMeatTOResponse.algorithmDurations[4],
+                            raptorMeatTBAlgorithm5: raptorMeatTOResponse.algorithmDurations[5],
+                            raptorMeatTBAlgorithm6: raptorMeatTOResponse.algorithmDurations[6],
+                            raptorMeatTBAlgorithm7: raptorMeatTOResponse.algorithmDurations[7],
+                            raptorMeatTBAlgorithm8: raptorMeatTOResponse.algorithmDurations[8],
+                            raptorMeatTBAlgorithm9: raptorMeatTOResponse.algorithmDurations[9],
+                            raptorMeatTBAlgorithm10: raptorMeatTOResponse.algorithmDurations[10],
+                        }
+                        csvData.push(data);
+                    }
+                }
+                await csvWriter.writeRecords(csvData).then(() => console.log('The csv file was written successfully'));
+            }
+        }    
     }
 
     /**

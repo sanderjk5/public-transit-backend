@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "csv-writer": "^1.6.0",
     "express": "^4.16.4",
     "fastpriorityqueue": "^0.7.1",
     "lodash": "^4.17.21"
