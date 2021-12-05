@@ -9,6 +9,8 @@ import { DelayTestController } from "./delayTestController";
 import { RaptorAlgorithmController } from "./raptorAlgorithmController";
 import { RaptorMeatAlgorithmController } from "./raptorMeatAlgorithmController";
 import { RaptorMeatTransferOptimationAlgorithmController } from "./raptorMeatTransferOptimationAlgorithmController";
+import csv from 'csv-parser';
+import fs from 'fs';
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 
 interface RequestInfo{
@@ -662,6 +664,32 @@ export class TestController {
         console.timeEnd('tests')
     }
 
+    private static async importRequests(numberOfFilesPerAlpha: number){
+        let requests: RequestInfo[] = [];
+        for(let i = 0; i < numberOfFilesPerAlpha; i++){
+            let path = 'test_data\\dm2_alpha1v' + i + '.csv';
+            await new Promise<void>((resolve) => {
+                fs.createReadStream(path)
+                    .pipe(csv())
+                    .on('data', (row) => {
+                        const dateParts = row['Source Date'].split('.');
+                        let request: RequestInfo = {
+                            sourceStop: GoogleTransitData.getStopIdByName(row['Source Stop']),
+                            targetStop: GoogleTransitData.getStopIdByName(row['Target Stop']),
+                            sourceTime: Number(row['Source Time']),
+                            sourceDate: new Date(Number(dateParts[2]), Number(dateParts[1])-1, Number(dateParts[0])),
+                        }
+                        requests.push(request)
+                    })
+                    .on('finish', () => {
+                        console.log('CSV file successfully processed');
+                        resolve();
+                    })
+            })
+        }
+        return requests;
+    }
+
     /**
      * Creates random requests and compares the results of Raptor Meat and CSA Meat. Calculates the average time of both algorithms.
      */
@@ -671,6 +699,11 @@ export class TestController {
         DelayTestController.addDelaysToTrips();
 
         let alphas = [1, 2, 3];
+
+        let numberOfFilesPerAlpha = 20;
+        let numberOfRequestsPerFile = 50;
+
+        requests = await this.importRequests(numberOfFilesPerAlpha);
 
         const numberOfStops = GoogleTransitData.STOPS.length;
         const numberOfSeconds = SECONDS_OF_A_DAY;
@@ -683,8 +716,7 @@ export class TestController {
             dates.push(newDate);
         }
 
-        let numberOfFilesPerAlpha = 20;
-        let numberOfRequestsPerFile = 50;
+        
 
         for(let alpha of alphas){
             console.log('Alpha = ' + alpha + ':')
@@ -767,7 +799,7 @@ export class TestController {
                 let randomSourceTime: number;
                 let randomSourceDate: Date;
                 for(let i = 0; i < numberOfRequestsPerFile; i++){
-                    if(alpha === 1){
+                    if(requests.length < numberOfFilesPerAlpha * numberOfRequestsPerFile){
                         randomSourceStop = this.getRandomInt(numberOfStops);
                         randomTargetStop = this.getRandomInt(numberOfStops);
                         randomSourceTime = this.getRandomInt(numberOfSeconds);
@@ -815,12 +847,12 @@ export class TestController {
                             throw new Error();
                         }
                     } catch(error){
-                        if(alpha === 1){
+                        if(requests.length < numberOfFilesPerAlpha * numberOfRequestsPerFile){
                             i--;
                         }
                         continue;
                     }
-                    if(alpha === 1){
+                    if(requests.length < numberOfFilesPerAlpha * numberOfRequestsPerFile){
                         const request: RequestInfo = {
                             sourceStop: randomSourceStop,
                             targetStop: randomTargetStop,
