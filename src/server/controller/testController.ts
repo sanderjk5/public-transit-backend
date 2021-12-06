@@ -667,7 +667,7 @@ export class TestController {
     private static async importRequests(numberOfFilesPerAlpha: number){
         let requests: RequestInfo[] = [];
         for(let i = 0; i < numberOfFilesPerAlpha; i++){
-            let path = 'test_data\\dm2_alpha1v' + i + '.csv';
+            let path = 'test_data\\dm1_alpha1v' + i + '.csv';
             await new Promise<void>((resolve) => {
                 fs.createReadStream(path)
                     .pipe(csv())
