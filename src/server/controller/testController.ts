@@ -11,6 +11,7 @@ import { RaptorMeatAlgorithmController } from "./raptorMeatAlgorithmController";
 import { RaptorMeatTransferOptimationAlgorithmController } from "./raptorMeatTransferOptimationAlgorithmController";
 import csv from 'csv-parser';
 import fs from 'fs';
+import path from 'path';
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 
 interface RequestInfo{
@@ -667,9 +668,9 @@ export class TestController {
     private static async importRequests(numberOfFilesPerAlpha: number){
         let requests: RequestInfo[] = [];
         for(let i = 0; i < numberOfFilesPerAlpha; i++){
-            let path = 'test_data\\dm2_alpha1v' + i + '.csv';
+            let importPath = path.join('test_data', 'dm2_alpha1v' + i + '.csv');
             await new Promise<void>((resolve) => {
-                fs.createReadStream(path)
+                fs.createReadStream(importPath)
                     .pipe(csv())
                     .on('data', (row) => {
                         const dateParts = row['Source Date'].split('.');
@@ -722,7 +723,7 @@ export class TestController {
             console.log('Alpha = ' + alpha + ':')
             for(let j = 0; j < numberOfFilesPerAlpha; j++){
                 const csvWriter = createCsvWriter({
-                    path: 'test_data\\dm1_alpha' + alpha + 'v' + j + '.csv',
+                    path: path.join('test_data', 'dm1_alpha' + alpha + 'v' + j + '.csv'),
                     header: [
                         {id: 'sourceStop', title: 'Source Stop'},
                         {id: 'targetStop', title: 'Target Stop'},
