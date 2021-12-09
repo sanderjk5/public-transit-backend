@@ -700,10 +700,10 @@ export class TestController {
 
         let alphas = [1, 2, 3];
 
-        let numberOfFilesPerAlpha = 20;
-        let numberOfRequestsPerFile = 50;
+        let numberOfFilesPerAlpha = 1;
+        let numberOfRequestsPerFile = 2;
 
-        requests = await this.importRequests(numberOfFilesPerAlpha);
+        requests = await this.importRequests(20);
 
         const numberOfStops = GoogleTransitData.STOPS.length;
         const numberOfSeconds = SECONDS_OF_A_DAY;
