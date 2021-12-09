@@ -24,19 +24,19 @@ Reliability.initReliability();
 // console.time('tests')
 // TestController.performAllTests();
 // console.timeEnd('tests')
-TestController.performAllTestsAndSafeInCSVInit();
+// TestController.performAllTestsAndSafeInCSVInit();
 
-// const port = 1337;
-// const corsOptions = {
-//   origin: 'http://localhost:4200',
-//   optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204 
-// }
-// app.use(cors(corsOptions));
+const port = 1337;
+const corsOptions = {
+  origin: 'http://localhost:4200',
+  optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204 
+}
+app.use(cors(corsOptions));
 
-// // uses the defined routes
-// app.use(routes);
+// uses the defined routes
+app.use(routes);
 
-// // initializes the http port of the backend
-// app.listen(port, () => {
-//   return console.log(`server is listening on ${port}`);
-// });
+// initializes the http port of the backend
+app.listen(port, () => {
+  return console.log(`server is listening on ${port}`);
+});
