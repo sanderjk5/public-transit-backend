@@ -60,6 +60,11 @@ for alpha in range(1, 4):
     sumAlpha2RelDiff = 0
     maxAlpha2RelDiff = 0
     
+    sumExpATMeatAbsDiff = 0
+    maxExpATMeatAbsDiff = 0
+    sumExpATMeatRelDiff = 0
+    maxExpATMeatRelDiff = 0
+    
     resultcounter = 0
     successfulCsaExpAtCounter = 0
     
@@ -71,6 +76,7 @@ for alpha in range(1, 4):
                 currentSourceTime = float(row['Source Time'])
                 currentMeatDuration = float(row['MEAT']) - currentSourceTime
                 currentExpAt = float(row['CSA ExpAT'])
+                currentExpAtDuration = float(row['CSA ExpAT']) - currentSourceTime
                 
                 sumEat += float(row['EAT']) - currentSourceTime
                 sumEsat += float(row['ESAT']) - currentSourceTime
@@ -120,6 +126,16 @@ for alpha in range(1, 4):
                     if float(row['CSA ExpAT Decision Graph']) > maxCSAEatGraphDuration:
                         maxCSAEatGraphDuration = float(row['CSA ExpAT Decision Graph'])
                     successfulCsaExpAtCounter += 1
+                    
+                    expATMeatAbsDiff = currentExpAtDuration - currentMeatDuration
+                    sumExpATMeatAbsDiff += expATMeatAbsDiff
+                    if expATMeatAbsDiff > maxExpATMeatAbsDiff:
+                        maxExpATMeatAbsDiff = expATMeatAbsDiff
+                    expATMeatRelDiff = expATMeatAbsDiff/currentMeatDuration
+                    sumExpATMeatRelDiff += expATMeatRelDiff
+                    if expATMeatRelDiff > maxExpATMeatRelDiff:
+                        maxExpATMeatRelDiff = expATMeatRelDiff
+                    
                     
                 if alpha == 1:
                     alpha1Values.append(currentMeatDuration)
@@ -179,6 +195,11 @@ for alpha in range(1, 4):
     if alpha == 3:
         averageAlpha2AbsDiff = sumAlpha2AbsDiff/resultcounter
         averageAlpha2RelDiff = sumAlpha2RelDiff/resultcounter
+        
+    averageExpATMeatAbsDiff = sumExpATMeatAbsDiff/successfulCsaExpAtCounter
+    averageExpATMeatRelDiff = sumExpATMeatRelDiff/successfulCsaExpAtCounter
+    unsuccessfulCsaExpAt = resultcounter - successfulCsaExpAtCounter
+    relativeUnsuccessfulCsaExpAt = unsuccessfulCsaExpAt/resultcounter
     
     print('average eat:', averageEat)
     print('average esat:', averageEsat)
@@ -226,3 +247,10 @@ for alpha in range(1, 4):
         print('max alpha 2 absolute difference', maxAlpha2AbsDiff)
         print('average alpha 2 relative difference', averageAlpha2RelDiff)
         print('max alpha 2 relative difference', maxAlpha2RelDiff)
+    print('')
+    print('average expat meat absolute difference', averageExpATMeatAbsDiff)
+    print('max expat meat absolute difference', maxExpATMeatAbsDiff)
+    print('average expat meat relative difference', averageExpATMeatRelDiff)
+    print('max expat meat relative difference', maxExpATMeatRelDiff)
+    print('absolute unsuccessful expat', unsuccessfulCsaExpAt)
+    print('relative unsuccessful expat', relativeUnsuccessfulCsaExpAt)
