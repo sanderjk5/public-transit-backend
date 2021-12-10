@@ -699,7 +699,7 @@ export class TestController {
 
         DelayTestController.addDelaysToTrips();
 
-        let alphas = [2];
+        let alphas = [3];
 
         let numberOfFilesPerAlpha = 20;
         let numberOfRequestsPerFile = 50;
