@@ -94,11 +94,18 @@ for alpha in range(1, 4):
     sumRaptorMeatTORelTransfersDiff = 0
     maxRaptorMeatTORelTransfersDiff = 0
     
-    sumRaptorTBAbsTimeDiffs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    sumRaptorTBAbsDurationDiffs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    sumRaptorTBRelTimeDiffs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    sumRaptorTBRelDurationDiffs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    sumRaptorTBResultCounter = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    sumRaptorTBAbsExpATDiffs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    maxRaptorTBAbsExpATDiffs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    sumRaptorTBAbsDuration = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    maxRaptorTBAbsDuration = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    
+    sumRaptorTBRelExpATDiffs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    maxRaptorTBRelExpATDiffs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    sumRaptorTBRelDuration = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    maxRaptorTBRelDuration = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    
+    raptorTBResultCounter = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    raptorTBComputedRoundCounter = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     
     resultcounter = 0
     successfulCsaExpAtCounter = 0
@@ -256,7 +263,32 @@ for alpha in range(1, 4):
                 sumRaptorMeatTORelTransfersDiff += raptorMeatTORelTransfersDiff
                 if raptorMeatTORelTransfersDiff > maxRaptorMeatTORelTransfersDiff:
                     maxRaptorMeatTORelTransfersDiff = raptorMeatTORelTransfersDiff
-                    
+                
+                for j in range(1, 11):
+                    raptorTBDuration = float(row['Raptor MEAT TB Algorithm ' + str(j)])
+                    if raptorTBDuration != 0:
+                        raptorTBComputedRoundCounter[j-1] += 1
+                        sumRaptorTBAbsDuration[j-1] += raptorTBDuration
+                        if raptorTBDuration > maxRaptorTBAbsDuration[j-1]:
+                            maxRaptorTBAbsDuration[j-1] = raptorTBDuration
+                        raptorTBDurationRel = raptorTBDuration/float(row['Raptor MEAT Algorithm'])
+                        sumRaptorTBRelDuration[j-1] += raptorTBDurationRel
+                        if raptorTBDurationRel > maxRaptorTBRelDuration[j-1]:
+                            maxRaptorTBRelDuration[j-1] = raptorTBDurationRel
+                        
+                        raptorTBMeat = float(row['Raptor MEAT TB ExpAT ' + str(j)])
+                        if raptorTBMeat != 0:
+                            raptorTBMeat = float(row['Raptor MEAT TB ExpAT ' + str(j)]) - currentSourceTime
+                            raptorTBResultCounter[j-1] += 1
+                            raptorTBMeatDiff = raptorTBMeat - currentMeatDuration
+                            sumRaptorTBAbsExpATDiffs[j-1] += raptorTBMeatDiff
+                            if raptorTBMeatDiff > maxRaptorTBAbsExpATDiffs[j-1]:
+                                maxRaptorTBAbsExpATDiffs[j-1] = raptorTBMeatDiff
+                            raptorTBMeatRel = raptorTBMeatDiff/currentMeatDuration
+                            sumRaptorTBRelExpATDiffs[j-1] += raptorTBMeatRel
+                            if raptorTBMeatRel > maxRaptorTBRelExpATDiffs[j-1]:
+                                maxRaptorTBRelExpATDiffs[j-1] = raptorTBMeatRel
+                            
                 resultcounter += 1
     
     
@@ -313,6 +345,12 @@ for alpha in range(1, 4):
     
     averageRaptorMeatTORelTimeDiff = sumRaptorMeatTORelTimeDiff/resultcounter
     averageRaptorMeatTORelTransfersDiff = sumRaptorMeatTORelTransfersDiff/resultcounter
+    
+    averageRaptorTBAbsExpATDiffs = [sumRaptorTBAbsExpATDiffs[i]/raptorTBResultCounter[i] for i in range(0, 10)]
+    averageRaptorTBRelExpATDiffs = [sumRaptorTBRelExpATDiffs[i]/raptorTBResultCounter[i] for i in range(0, 10)]
+    
+    averageRaptorTBAbsDuration = [sumRaptorTBAbsDuration[i]/raptorTBComputedRoundCounter[i] for i in range(0, 10)]
+    averageRaptorTBRelDuration = [sumRaptorTBRelDuration[i]/raptorTBComputedRoundCounter[i] for i in range(0, 10)]
     
     print('average eat:', averageEat)
     print('average esat:', averageEsat)
@@ -398,3 +436,25 @@ for alpha in range(1, 4):
     print('max raptor meat - to relative time difference', maxRaptorMeatTORelTimeDiff)
     print('average raptor meat - to relative transfers difference', averageRaptorMeatTORelTransfersDiff)
     print('max raptor meat - to relative transfers difference', maxRaptorMeatTORelTransfersDiff)
+    print('')
+    print('number of raptor tb computed rounds:')
+    print(raptorTBComputedRoundCounter)
+    print('average raptor tb algorithm absolute durations:')
+    print(averageRaptorTBAbsDuration)
+    print('max raptor tb algorithm absolute durations:')
+    print(maxRaptorTBAbsDuration)
+    print('average raptor tb algorithm relative durations:')
+    print(averageRaptorTBRelDuration)
+    print('max raptor tb algorithm relative durations:')
+    print(maxRaptorTBRelDuration)
+    print('')
+    print('number of raptor tb results:')
+    print(raptorTBResultCounter)
+    print('average raptor tb expat absolute difference:')
+    print(averageRaptorTBAbsExpATDiffs)
+    print('max raptor tb expat absolute difference:')
+    print(maxRaptorTBAbsExpATDiffs)
+    print('average raptor tb expat relative difference:')
+    print(averageRaptorTBRelExpATDiffs)
+    print('max raptor tb expat relative difference:')
+    print(maxRaptorTBRelExpATDiffs)
