@@ -65,8 +65,44 @@ for alpha in range(1, 4):
     sumExpATMeatRelDiff = 0
     maxExpATMeatRelDiff = 0
     
+    sumKnownDelayAbsDiff = 0
+    maxKnownDelayAbsDiff = 0
+    sumKnownDelayRelDiff = 0
+    maxKnownDelayRelDiff = 0
+    
+    sumRaptorMeatStops = 0
+    maxRaptorMeatStops = 0
+    sumRaptorMeatLegs = 0
+    maxRaptorMeatLegs = 0
+    sumRaptorMeatEdges = 0
+    maxRaptorMeatEdges = 0
+    
+    sumRaptorMeatTOStops = 0
+    maxRaptorMeatTOStops = 0
+    sumRaptorMeatTOLegs = 0
+    maxRaptorMeatTOLegs = 0
+    sumRaptorMeatTOEdges = 0
+    maxRaptorMeatTOEdges = 0
+    
+    sumRaptorMeatTOAbsTimeDiff = 0
+    maxRaptorMeatTOAbsTimeDiff = 0
+    sumRaptorMeatTOAbsTransfersDiff = 0
+    maxRaptorMeatTOAbsTransfersDiff = 0
+    
+    sumRaptorMeatTORelTimeDiff = 0
+    maxRaptorMeatTORelTimeDiff = 0
+    sumRaptorMeatTORelTransfersDiff = 0
+    maxRaptorMeatTORelTransfersDiff = 0
+    
+    sumRaptorTBAbsTimeDiffs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    sumRaptorTBAbsDurationDiffs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    sumRaptorTBRelTimeDiffs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    sumRaptorTBRelDurationDiffs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    sumRaptorTBResultCounter = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    
     resultcounter = 0
     successfulCsaExpAtCounter = 0
+    knownDelaySameResultCounter = 0
     
     for i in range(0, 20):
         path = 'dm1_alpha' + str(alpha) + 'v' + str(i) + '.csv'
@@ -75,8 +111,10 @@ for alpha in range(1, 4):
             for row in csv_reader_object:
                 currentSourceTime = float(row['Source Time'])
                 currentMeatDuration = float(row['MEAT']) - currentSourceTime
+                currentMeatTODuration = float(row['Raptor MEAT TO ExpAT']) - currentSourceTime
                 currentExpAt = float(row['CSA ExpAT'])
                 currentExpAtDuration = float(row['CSA ExpAT']) - currentSourceTime
+                
                 
                 sumEat += float(row['EAT']) - currentSourceTime
                 sumEsat += float(row['ESAT']) - currentSourceTime
@@ -161,6 +199,63 @@ for alpha in range(1, 4):
                     sumAlpha2RelDiff += alpha2RelDiff
                     if alpha2RelDiff > maxAlpha2RelDiff:
                         maxAlpha2RelDiff = alpha2RelDiff
+                
+                csaKnownDelayDuration = float(row['CSA AT Known Delay']) - currentSourceTime
+                raptorKnownDelayDuration = float(row['Raptor MEAT AT Known Delay']) - currentSourceTime
+                knownDelayAbsDiff = raptorKnownDelayDuration - csaKnownDelayDuration
+                sumKnownDelayAbsDiff += knownDelayAbsDiff
+                if knownDelayAbsDiff > maxKnownDelayAbsDiff:
+                    maxKnownDelayAbsDiff = knownDelayAbsDiff
+                knownDelayRelDiff = knownDelayAbsDiff/csaKnownDelayDuration
+                sumKnownDelayRelDiff += knownDelayRelDiff
+                if knownDelayRelDiff > maxKnownDelayRelDiff:
+                    maxKnownDelayRelDiff = knownDelayRelDiff
+                if csaKnownDelayDuration == raptorKnownDelayDuration:
+                    knownDelaySameResultCounter += 1
+                    
+                raptorMeatStops = float(row['Raptor MEAT Stops in Graph'])
+                sumRaptorMeatStops += raptorMeatStops
+                if raptorMeatStops > maxRaptorMeatStops:
+                    maxRaptorMeatStops = raptorMeatStops
+                raptorMeatLegs = float(row['Raptor MEAT Legs in Graph'])
+                sumRaptorMeatLegs += raptorMeatLegs
+                if raptorMeatLegs > maxRaptorMeatLegs:
+                    maxRaptorMeatLegs = raptorMeatLegs
+                raptorMeatEdges = float(row['Raptor MEAT Edges in Graph'])
+                sumRaptorMeatEdges += raptorMeatEdges
+                if raptorMeatEdges > maxRaptorMeatEdges:
+                    maxRaptorMeatEdges = raptorMeatEdges
+                    
+                raptorMeatTOStops = float(row['Raptor MEAT TO Stops in Graph'])
+                sumRaptorMeatTOStops += raptorMeatTOStops
+                if raptorMeatTOStops > maxRaptorMeatTOStops:
+                    maxRaptorMeatTOStops = raptorMeatTOStops
+                raptorMeatTOLegs = float(row['Raptor MEAT TO Legs in Graph'])
+                sumRaptorMeatTOLegs += raptorMeatTOLegs
+                if raptorMeatTOLegs > maxRaptorMeatTOLegs:
+                    maxRaptorMeatTOLegs = raptorMeatTOLegs
+                raptorMeatTOEdges = float(row['Raptor MEAT TO Edges in Graph'])
+                sumRaptorMeatTOEdges += raptorMeatTOEdges
+                if raptorMeatTOEdges > maxRaptorMeatTOEdges:
+                    maxRaptorMeatTOEdges = raptorMeatTOEdges
+                
+                raptorMeatTOAbsTimeDiff = currentMeatTODuration - currentMeatDuration
+                sumRaptorMeatTOAbsTimeDiff += raptorMeatTOAbsTimeDiff
+                if raptorMeatTOAbsTimeDiff > maxRaptorMeatTOAbsTimeDiff:
+                    maxRaptorMeatTOAbsTimeDiff = raptorMeatTOAbsTimeDiff
+                raptorMeatTOAbsTransfersDiff = float(row['Raptor MEAT Rounds Of Result']) - float(row['Raptor MEAT TO Rounds Of Result'])
+                sumRaptorMeatTOAbsTransfersDiff += raptorMeatTOAbsTransfersDiff
+                if raptorMeatTOAbsTransfersDiff > maxRaptorMeatTOAbsTransfersDiff:
+                    maxRaptorMeatTOAbsTransfersDiff = raptorMeatTOAbsTransfersDiff
+                    
+                raptorMeatTORelTimeDiff = raptorMeatTOAbsTimeDiff/currentMeatDuration
+                sumRaptorMeatTORelTimeDiff += raptorMeatTORelTimeDiff
+                if raptorMeatTORelTimeDiff > maxRaptorMeatTORelTimeDiff:
+                    maxRaptorMeatTORelTimeDiff = raptorMeatTORelTimeDiff
+                raptorMeatTORelTransfersDiff = raptorMeatTOAbsTransfersDiff/float(row['Raptor MEAT Rounds Of Result'])
+                sumRaptorMeatTORelTransfersDiff += raptorMeatTORelTransfersDiff
+                if raptorMeatTORelTransfersDiff > maxRaptorMeatTORelTransfersDiff:
+                    maxRaptorMeatTORelTransfersDiff = raptorMeatTORelTransfersDiff
                     
                 resultcounter += 1
     
@@ -200,6 +295,24 @@ for alpha in range(1, 4):
     averageExpATMeatRelDiff = sumExpATMeatRelDiff/successfulCsaExpAtCounter
     unsuccessfulCsaExpAt = resultcounter - successfulCsaExpAtCounter
     relativeUnsuccessfulCsaExpAt = unsuccessfulCsaExpAt/resultcounter
+    
+    averageKnownDelayAbsDiff = sumKnownDelayAbsDiff/resultcounter
+    averageKnownDelayRelDiff = sumKnownDelayRelDiff/resultcounter
+    relativeSameResultKnownDelay = knownDelaySameResultCounter/resultcounter
+    
+    averageRaptorMeatStops = sumRaptorMeatStops/resultcounter
+    averageRaptorMeatLegs = sumRaptorMeatLegs/resultcounter
+    averageRaptorMeatEdges = sumRaptorMeatEdges/resultcounter
+    
+    averageRaptorMeatTOStops = sumRaptorMeatTOStops/resultcounter
+    averageRaptorMeatTOLegs = sumRaptorMeatTOLegs/resultcounter
+    averageRaptorMeatTOEdges = sumRaptorMeatTOEdges/resultcounter
+    
+    averageRaptorMeatTOAbsTimeDiff = sumRaptorMeatTOAbsTimeDiff/resultcounter
+    averageRaptorMeatTOAbsTransfersDiff = sumRaptorMeatTOAbsTransfersDiff/resultcounter
+    
+    averageRaptorMeatTORelTimeDiff = sumRaptorMeatTORelTimeDiff/resultcounter
+    averageRaptorMeatTORelTransfersDiff = sumRaptorMeatTORelTransfersDiff/resultcounter
     
     print('average eat:', averageEat)
     print('average esat:', averageEsat)
@@ -252,5 +365,36 @@ for alpha in range(1, 4):
     print('max expat meat absolute difference', maxExpATMeatAbsDiff)
     print('average expat meat relative difference', averageExpATMeatRelDiff)
     print('max expat meat relative difference', maxExpATMeatRelDiff)
-    print('absolute unsuccessful expat', unsuccessfulCsaExpAt)
+    print('absolute number of unsuccessful expat', unsuccessfulCsaExpAt)
     print('relative unsuccessful expat', relativeUnsuccessfulCsaExpAt)
+    print('')
+    print('average known delay absolute difference', averageKnownDelayAbsDiff)
+    print('max known delay absolute difference', maxKnownDelayAbsDiff)
+    print('average known delay relative difference', averageKnownDelayRelDiff)
+    print('max known delay relative difference', maxKnownDelayRelDiff)
+    print('absolute number of same known delay results', knownDelaySameResultCounter)
+    print('relative number of same known delay results', relativeSameResultKnownDelay)
+    print('')
+    print('raptor meat average number of stops', averageRaptorMeatStops)
+    print('raptor meat max number of stops', maxRaptorMeatStops)
+    print('raptor meat average number of legs', averageRaptorMeatLegs)
+    print('raptor meat max number of legs', maxRaptorMeatLegs)
+    print('raptor meat average number of edges', averageRaptorMeatEdges)
+    print('raptor meat max number of edges', maxRaptorMeatEdges)
+    print('')
+    print('raptor meat to average number of stops', averageRaptorMeatTOStops)
+    print('raptor meat to max number of stops', maxRaptorMeatTOStops)
+    print('raptor meat to average number of legs', averageRaptorMeatTOLegs)
+    print('raptor meat to max number of legs', maxRaptorMeatTOLegs)
+    print('raptor meat to average number of edges', averageRaptorMeatTOEdges)
+    print('raptor meat to max number of edges', maxRaptorMeatTOEdges)
+    print('')
+    print('average raptor meat - to absolute time difference', averageRaptorMeatTOAbsTimeDiff)
+    print('max raptor meat - to absolute time difference', maxRaptorMeatTOAbsTimeDiff)
+    print('average raptor meat - to absolute transfers difference', averageRaptorMeatTOAbsTransfersDiff)
+    print('max raptor meat - to absolute transfers difference', maxRaptorMeatTOAbsTransfersDiff)
+    print('')
+    print('average raptor meat - to relative time difference', averageRaptorMeatTORelTimeDiff)
+    print('max raptor meat - to relative time difference', maxRaptorMeatTORelTimeDiff)
+    print('average raptor meat - to relative transfers difference', averageRaptorMeatTORelTransfersDiff)
+    print('max raptor meat - to relative transfers difference', maxRaptorMeatTORelTransfersDiff)
