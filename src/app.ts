@@ -24,7 +24,7 @@ Reliability.initReliability();
 // console.time('tests')
 // TestController.performAllTests();
 // console.timeEnd('tests')
-TestController.performAllTestsAndSafeInCSVInit();
+TestController.performApproximationTestsAndSafeInCSVInit();
 
 // const port = 1337;
 // const corsOptions = {
