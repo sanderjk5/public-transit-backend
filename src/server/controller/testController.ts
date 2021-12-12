@@ -665,6 +665,12 @@ export class TestController {
         console.timeEnd('tests')
     }
 
+    public static async performApproximationTestsAndSafeInCSVInit(){
+        console.time('tests')
+        await TestController.performApproximationTestsAndSafeInCSV();
+        console.timeEnd('tests')
+    }
+
     private static async importRequests(numberOfFilesPerAlpha: number){
         let requests: RequestInfo[] = [];
         for(let i = 0; i < numberOfFilesPerAlpha; i++){
@@ -932,6 +938,79 @@ export class TestController {
             }
         }    
     }
+
+    /**
+     * Creates random requests and compares the results of Raptor Meat and CSA Meat. Calculates the average time of both algorithms.
+     */
+     private static async performApproximationTestsAndSafeInCSV() {
+        let requests: RequestInfo[] = [];
+
+        let alphas = [1, 2, 3];
+
+        let numberOfFilesPerAlpha = 20;
+        let numberOfRequestsPerFile = 50;
+
+        requests = await this.importRequests(numberOfFilesPerAlpha);
+
+        for(let alpha of alphas){
+            console.log('Alpha = ' + alpha + ':')
+            for(let j = 0; j < numberOfFilesPerAlpha; j++){
+                const csvWriter = createCsvWriter({
+                    path: path.join('test_data', 'approx_dm2_alpha' + alpha + 'v' + j + '.csv'),
+                    header: [
+                        {id: 'sourceStop', title: 'Source Stop'},
+                        {id: 'targetStop', title: 'Target Stop'},
+                        {id: 'sourceTime', title: 'Source Time'},
+                        {id: 'sourceDate', title: 'Source Date'},
+                        {id: 'meat', title: 'MEAT'},
+                        {id: 'approxMeat', title: 'Approximated MEAT'}
+                    ]
+                })
+                const csvData = [];
+    
+                let randomSourceStop: number;
+                let randomSourceStopName: string;
+                let randomTargetStop: number;
+                let randomTargetStopName: string;
+                let randomSourceTime: number;
+                let randomSourceDate: Date;
+                for(let i = 0; i < numberOfRequestsPerFile; i++){
+                    randomSourceStop = requests[i + j*numberOfRequestsPerFile].sourceStop;
+                    randomTargetStop = requests[i + j*numberOfRequestsPerFile].targetStop;
+                    randomSourceTime = requests[i + j*numberOfRequestsPerFile].sourceTime;
+                    randomSourceDate = requests[i + j*numberOfRequestsPerFile].sourceDate;
+                    randomSourceStopName = GoogleTransitData.STOPS[randomSourceStop].name;
+                    randomTargetStopName = GoogleTransitData.STOPS[randomTargetStop].name;
+                    
+                    let raptorMeatResponse = undefined;
+                    let approximatedResultRaptor = undefined;
+                    try{
+                        raptorMeatResponse = RaptorMeatAlgorithmController.testRaptorMeatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
+                        if(!raptorMeatResponse){
+                            throw new Error();
+                        }
+                        approximatedResultRaptor = ApproximationTestController.performApproximationTestForRaptorMeatAlgorithmWithGivenExpectedArrivalTimes(randomSourceStop, randomTargetStop, raptorMeatResponse.expectedArrivalTimes, 10000000);
+                        if(!approximatedResultRaptor){
+                            throw new Error();
+                        }
+                    } catch(error){
+                        continue;
+                    }
+                    const data = {
+                        sourceStop: randomSourceStopName,
+                        targetStop: randomTargetStopName,
+                        sourceTime: randomSourceTime,
+                        sourceDate: randomSourceDate.toLocaleDateString('de-DE'),
+                        meat: raptorMeatResponse.expectedArrivalTime,
+                        approxMeat: approximatedResultRaptor
+                    }
+                    csvData.push(data);
+                }
+                await csvWriter.writeRecords(csvData).then(() => console.log('The csv file was written successfully'));
+            }
+        }    
+    }
+
 
     /**
      * Creates random requests and checks the result of the csa eat algorithm. Calculates the average time of the algorithm.
