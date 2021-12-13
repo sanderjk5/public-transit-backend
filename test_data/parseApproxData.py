@@ -7,7 +7,7 @@ Created on Sun Dec 12 13:06:40 2021
 
 import csv
 
-for dm in range(1, 2):
+for dm in range(1, 3):
     print('')
     print('dm: ', dm)
     
