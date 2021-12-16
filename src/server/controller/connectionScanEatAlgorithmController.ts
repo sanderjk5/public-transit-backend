@@ -277,12 +277,12 @@ export class ConnectionScanEatAlgorithmController {
                 if(p.departureTime < currentConnectionArrivalTime){
                     continue;
                 } else{
+                    if(time3 === Number.MAX_VALUE){
+                        time3 = p.arrivalTime;
+                    }
                     if(p.expectedArrivalTime === Number.MAX_VALUE){
                         expectedArrivalTime = Number.MAX_VALUE;
                         break;
-                    }
-                    if(time3 === Number.MAX_VALUE){
-                        time3 = p.arrivalTime;
                     }
                     expectedArrivalTime += (p.expectedArrivalTime * Reliability.getProbabilityOfArrivalTime(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
                     pLastDepartureTime = p.departureTime;
