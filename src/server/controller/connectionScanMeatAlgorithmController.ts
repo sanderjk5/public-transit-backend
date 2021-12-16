@@ -282,16 +282,18 @@ export class ConnectionScanMeatAlgorithmController {
             // finds all outgoing trips which have a departure time between c_arr and c_arr + maxD_c (and the departure after max delay)
             for(let j = 0; j < this.s[currentConnection.arrivalStop].length; j++) {
                 p = this.s[currentConnection.arrivalStop][j];
-                if(p.expectedArrivalTime === Number.MAX_VALUE){
-                    expectedArrivalTime = Number.MAX_VALUE;
-                    break;
-                }
-                if(p.departureTime >= currentConnectionArrivalTime && p.departureTime < currentConnectionArrivalTime + currentMaxDelay){
+                if(p.departureTime < currentConnectionArrivalTime){
+                    continue;
+                } else{
+                    if(p.expectedArrivalTime === Number.MAX_VALUE){
+                        expectedArrivalTime = Number.MAX_VALUE;
+                        break;
+                    }
                     expectedArrivalTime += (p.expectedArrivalTime * Reliability.getProbabilityOfArrivalTime(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
                     pLastDepartureTime = p.departureTime;
-                } else if(p.departureTime >= currentConnectionArrivalTime + currentMaxDelay) {
-                    expectedArrivalTime += (p.expectedArrivalTime * Reliability.getProbabilityOfArrivalTime(pLastDepartureTime - currentConnectionArrivalTime, p.departureTime - currentConnectionArrivalTime, currentConnectionIsLongDistanceTrip));
-                    break;
+                    if(p.departureTime >= currentConnectionArrivalTime + currentMaxDelay){
+                        break;
+                    }
                 }
             }
             if(expectedArrivalTime === 0){
