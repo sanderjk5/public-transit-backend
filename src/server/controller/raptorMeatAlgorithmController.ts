@@ -410,16 +410,18 @@ export class RaptorMeatAlgorithmController {
                 // finds all labels at this stop which have a departure time between trip arrival time and trip arrival time + maxD_c (and the first departure after max delay) and calculates the expected arrival time
                 for(let j = 0; j < this.expectedArrivalTimes[pi].length; j++) {
                     label = this.expectedArrivalTimes[pi][j];
-                    if(label.expectedArrivalTime === Number.MAX_VALUE){
-                        newExpectedArrivalTime = Number.MAX_VALUE;
-                        break;
-                    }
-                    if(label.departureTime >= currentTripArrivalTime && label.departureTime < currentTripArrivalTime + currentMaxDelay){
+                    if(label.departureTime < currentTripArrivalTime){
+                        continue;
+                    } else {
+                        if(label.expectedArrivalTime === Number.MAX_VALUE){
+                            newExpectedArrivalTime = Number.MAX_VALUE;
+                            break;
+                        }
                         newExpectedArrivalTime += (label.expectedArrivalTime * Reliability.getProbabilityOfArrivalTime(labelLastDepartureTime - currentTripArrivalTime, label.departureTime - currentTripArrivalTime, isLongDistanceTrip));
                         labelLastDepartureTime = label.departureTime;
-                    } else if(label.departureTime >= currentTripArrivalTime + currentMaxDelay) {
-                        newExpectedArrivalTime += (label.expectedArrivalTime * Reliability.getProbabilityOfArrivalTime(labelLastDepartureTime - currentTripArrivalTime, label.departureTime - currentTripArrivalTime, isLongDistanceTrip));
-                        break;
+                        if(label.departureTime >= currentTripArrivalTime + currentMaxDelay) {
+                            break;
+                        }
                     }
                 }
             }
