@@ -118,7 +118,7 @@ export class RaptorMeatAlgorithmController {
             res.status(200).send(meatResponse);
             this.clearArrays();
         } catch (err) {
-            // console.log(err);
+            console.log(err);
             res.status(500).send(err);
             this.clearArrays();
         }
@@ -356,6 +356,7 @@ export class RaptorMeatAlgorithmController {
         for(let i= 0; i < this.Q.length; i++){
             let r = this.Q[i].r;
             let routeBag: Label[] = [];
+            let tripToExpATMap: Map<number, number> = new Map<number, number>();
             // loop over all stops of r beggining with p (from last to first stop)
             for(let j = this.Q[i].stopSequence; j >= 0; j--){     
                 let pi = GoogleTransitData.STOPS_OF_A_ROUTE[r][j];
@@ -366,7 +367,7 @@ export class RaptorMeatAlgorithmController {
                 
                 // adds the labels of the last round of this stop to the route bag
                 if(this.latestDepartureTimesOfLastRound[pi] !== undefined){
-                    routeBag = this.mergeLastRoundLabelsInRouteBag(r, pi, routeBag);
+                    routeBag = this.mergeLastRoundLabelsInRouteBag(r, pi, routeBag, tripToExpATMap);
                 }
             }
         }
@@ -380,7 +381,7 @@ export class RaptorMeatAlgorithmController {
      * @param routeBag 
      * @returns 
      */
-    private static mergeLastRoundLabelsInRouteBag(r: number, pi: number, routeBag: Label[]){
+    private static mergeLastRoundLabelsInRouteBag(r: number, pi: number, routeBag: Label[], tripToExpATMap: Map<number, number>){
         // gets all trips between the minimum arrival time and the last departure of last round at this stop
         let newTripInfos: EarliestTripInfo[] = this.getTripsOfInterval(r, pi, this.latestDepartureTimesOfLastRound[pi]);
         let newLabels: Label[] = []
@@ -434,9 +435,16 @@ export class RaptorMeatAlgorithmController {
                     exitTripAtStop: pi,
                     transferRound: this.k,
                 }
-                newLabels.push(newLabel);
+                let addLabel = false;
+                let expAtOfTrip = tripToExpATMap.get(newTripInfo.tripId);
+                if(expAtOfTrip === undefined || expAtOfTrip > newExpectedArrivalTime){
+                    tripToExpATMap.set(newTripInfo.tripId , newExpectedArrivalTime);
+                    addLabel = true;
+                }
+                if(addLabel){
+                    newLabels.push(newLabel);
+                }
             }
-            
         }
         // merges the new labels into the route bag
         if(newLabels.length > 0){
