@@ -435,15 +435,7 @@ export class RaptorMeatAlgorithmController {
                     exitTripAtStop: pi,
                     transferRound: this.k,
                 }
-                let addLabel = false;
-                let expAtOfTrip = tripToExpATMap.get(newTripInfo.tripId);
-                if(expAtOfTrip === undefined || expAtOfTrip > newExpectedArrivalTime){
-                    tripToExpATMap.set(newTripInfo.tripId , newExpectedArrivalTime);
-                    addLabel = true;
-                }
-                if(addLabel){
-                    newLabels.push(newLabel);
-                }
+                newLabels.push(newLabel);
             }
         }
         // merges the new labels into the route bag
