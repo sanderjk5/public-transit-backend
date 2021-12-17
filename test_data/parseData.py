@@ -16,7 +16,7 @@ dm2Alpha2RaptorMeatTBRelDurations = []
 dm2Alpha2RaptorMeatTBRelNumberOfResults = []
 dm2Alpha2RaptorMeatTBRelExpATDiff = []
 
-for dm in range(1, 2):
+for dm in range(1, 3):
     print('')
     print('dm: ', dm)
     
