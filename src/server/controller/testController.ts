@@ -932,6 +932,109 @@ export class TestController {
         }    
     }
 
+    public static getTestRequestsExpAT(){
+        const numberOfStops = GoogleTransitData.STOPS.length;
+        const numberOfSeconds = SECONDS_OF_A_DAY;
+        const numberOfDates = 7;
+        const dates = [];
+        const initialDate = new Date(Date.now());
+        for(let i = 0; i < numberOfDates; i++){
+            let newDate = new Date(initialDate);
+            newDate.setDate(initialDate.getDate() + i);
+            dates.push(newDate);
+        }
+        let randomSourceStop: number;
+        let randomSourceStopName: string;
+        let randomTargetStop: number;
+        let randomTargetStopName: string;
+        let randomSourceTime: number;
+        let randomSourceDate: Date;
+        for(let i = 0; i < 500; i++){  
+            randomSourceStop = this.getRandomInt(numberOfStops);
+            randomTargetStop = this.getRandomInt(numberOfStops);
+            randomSourceTime = this.getRandomInt(numberOfSeconds);
+            randomSourceDate = dates[this.getRandomInt(numberOfDates)];
+            randomSourceStopName = GoogleTransitData.STOPS[randomSourceStop].name;
+            randomTargetStopName = GoogleTransitData.STOPS[randomTargetStop].name;
+            let raptorMeatResponse = undefined;
+            let raptorMeatTOResponse = undefined;
+            let csaExpAtResponse = undefined;
+            try{
+                raptorMeatResponse = RaptorMeatAlgorithmController.testRaptorMeatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, 2);
+                if(!raptorMeatResponse){
+                    throw new Error();
+                }
+                // raptorMeatTOResponse = RaptorMeatTransferOptimationAlgorithmController.testRaptorMeatTransferOptimationAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha)
+                // if(!raptorMeatTOResponse){
+                //     throw new Error();
+                // }
+                csaExpAtResponse = ConnectionScanEatAlgorithmController.testConnectionScanEatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, 2);
+                if(!csaExpAtResponse){
+                    throw new Error();
+                }
+            } catch(error){
+                continue;
+            }
+            let diff = csaExpAtResponse.expectedArrivalTime - raptorMeatResponse.expectedArrivalTime;
+            let requestString = randomSourceStopName + ', ' + randomTargetStopName + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime) + ', ' + diff/60;
+            if(diff > 1800 && csaExpAtResponse.expectedArrivalTime !== Number.MAX_VALUE){
+                console.log(requestString);
+            }
+        }
+    }
+
+    public static getTestRequestsMEATTO(){
+        const numberOfStops = GoogleTransitData.STOPS.length;
+        const numberOfSeconds = SECONDS_OF_A_DAY;
+        const numberOfDates = 7;
+        const dates = [];
+        const initialDate = new Date(Date.now());
+        for(let i = 0; i < numberOfDates; i++){
+            let newDate = new Date(initialDate);
+            newDate.setDate(initialDate.getDate() + i);
+            dates.push(newDate);
+        }
+        let randomSourceStop: number;
+        let randomSourceStopName: string;
+        let randomTargetStop: number;
+        let randomTargetStopName: string;
+        let randomSourceTime: number;
+        let randomSourceDate: Date;
+        for(let i = 0; i < 100; i++){  
+            // randomTargetStop = this.getRandomInt(numberOfStops);
+            // randomSourceTime = this.getRandomInt(numberOfSeconds);
+            // randomSourceDate = dates[this.getRandomInt(numberOfDates)];
+            // randomSourceStopName = 'Stuttgart Hbf';
+            // randomSourceStop = GoogleTransitData.getStopIdByName(randomSourceStopName);
+            // randomTargetStopName = GoogleTransitData.STOPS[randomTargetStop].name;
+
+            randomSourceStop = this.getRandomInt(numberOfStops);
+            randomTargetStop = this.getRandomInt(numberOfStops);
+            randomSourceTime = this.getRandomInt(numberOfSeconds);
+            randomSourceDate = dates[this.getRandomInt(numberOfDates)];
+            randomSourceStopName = GoogleTransitData.STOPS[randomSourceStop].name;
+            randomTargetStopName = GoogleTransitData.STOPS[randomTargetStop].name;
+            let raptorMeatResponse = undefined;
+            let raptorMeatTOResponse = undefined;
+            try{
+                raptorMeatResponse = RaptorMeatAlgorithmController.testRaptorMeatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, 2);
+                if(!raptorMeatResponse){
+                    throw new Error();
+                }
+                raptorMeatTOResponse = RaptorMeatTransferOptimationAlgorithmController.testRaptorMeatTransferOptimationAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, 2)
+                if(!raptorMeatTOResponse){
+                    throw new Error();
+                }
+            } catch(error){
+                continue;
+            }
+            let diff = raptorMeatResponse.transferCountOfResult - raptorMeatTOResponse.optimalRound;
+            let requestString = randomSourceStopName + ', ' + randomTargetStopName + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime) + ', ' + diff;
+            if(diff > 7){
+                console.log(requestString);
+            }
+        }
+    }
     /**
      * Creates random requests and checks the result of the csa eat algorithm. Calculates the average time of the algorithm.
      */

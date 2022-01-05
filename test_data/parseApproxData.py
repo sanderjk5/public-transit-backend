@@ -17,7 +17,8 @@ for dm in range(1, 3):
         print('')
         
         sumApproxMeatAbsDiff = 0
-        sumApproxMeatRelDiff = 0
+        
+        sumMeat = 0
         
         resultCounter = 0
         
@@ -28,16 +29,15 @@ for dm in range(1, 3):
                 for row in csv_reader_object:
                     currentSourceTime = float(row['Source Time'])
                     currentMeatDuration = float(row['MEAT']) - currentSourceTime
+                    sumMeat += currentMeatDuration
                     
                     absDiff = abs(float(row['MEAT']) - float(row['Approximated MEAT']))
                     sumApproxMeatAbsDiff += absDiff
-                    relDiff = absDiff/currentMeatDuration
-                    sumApproxMeatRelDiff += relDiff
                     
                     resultCounter += 1
         
         averageApproxMeatAbsDiff = sumApproxMeatAbsDiff/resultCounter
-        averageApproxMeatRelDiff = sumApproxMeatRelDiff/resultCounter
+        averageApproxMeatRelDiff = sumApproxMeatAbsDiff/sumMeat
         
         print('average approx meat absolute difference:', averageApproxMeatAbsDiff)
         print('average approx meat relative difference:', averageApproxMeatRelDiff)

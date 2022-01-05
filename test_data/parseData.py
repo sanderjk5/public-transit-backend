@@ -21,7 +21,9 @@ for dm in range(1, 3):
     print('dm: ', dm)
     
     alpha1Values = []
+    alpha1MeatSum = 0
     alpha2Values = []
+    alpha2MeatSum = 0
     
     for alpha in range(1, 4):
         print('')
@@ -31,6 +33,9 @@ for dm in range(1, 3):
         sumEat = 0
         sumEsat = 0
         sumMeat = 0
+        
+        sumMeatForExpATResults = 0
+        sumCSAKnownDelay = 0
         
         sumRaptorMeatComputedRounds = 0
         maxRaptorMeatComputedRounds = 0
@@ -73,19 +78,15 @@ for dm in range(1, 3):
         sumAlpha2AbsDiff = 0
         maxAlpha2AbsDiff = 0
         
-        sumAlpha1RelDiff = 0
         maxAlpha1RelDiff = 0
-        sumAlpha2RelDiff = 0
         maxAlpha2RelDiff = 0
         
         sumExpATMeatAbsDiff = 0
         maxExpATMeatAbsDiff = 0
-        sumExpATMeatRelDiff = 0
         maxExpATMeatRelDiff = 0
         
         sumKnownDelayAbsDiff = 0
         maxKnownDelayAbsDiff = 0
-        sumKnownDelayRelDiff = 0
         maxKnownDelayRelDiff = 0
         
         sumRaptorMeatStops = 0
@@ -107,9 +108,7 @@ for dm in range(1, 3):
         sumRaptorMeatTOAbsTransfersDiff = 0
         maxRaptorMeatTOAbsTransfersDiff = 0
         
-        sumRaptorMeatTORelTimeDiff = 0
         maxRaptorMeatTORelTimeDiff = 0
-        sumRaptorMeatTORelTransfersDiff = 0
         maxRaptorMeatTORelTransfersDiff = 0
         
         sumRaptorTBAbsExpATDiffs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -202,9 +201,9 @@ for dm in range(1, 3):
                         if expATMeatAbsDiff > maxExpATMeatAbsDiff:
                             maxExpATMeatAbsDiff = expATMeatAbsDiff
                         expATMeatRelDiff = expATMeatAbsDiff/currentMeatDuration
-                        sumExpATMeatRelDiff += expATMeatRelDiff
                         if expATMeatRelDiff > maxExpATMeatRelDiff:
                             maxExpATMeatRelDiff = expATMeatRelDiff
+                        sumMeatForExpATResults += currentMeatDuration
                         
                         
                     if alpha == 1:
@@ -218,7 +217,6 @@ for dm in range(1, 3):
                         if alpha1AbsDiff > maxAlpha1AbsDiff:
                             maxAlpha1AbsDiff = alpha1AbsDiff
                         alpha1RelDiff = alpha1AbsDiff/alpha1Values[resultcounter]
-                        sumAlpha1RelDiff += alpha1RelDiff
                         if alpha1RelDiff > maxAlpha1RelDiff:
                             maxAlpha1RelDiff = alpha1RelDiff
                             
@@ -228,7 +226,6 @@ for dm in range(1, 3):
                         if alpha2AbsDiff > maxAlpha2AbsDiff:
                             maxAlpha2AbsDiff = alpha2AbsDiff
                         alpha2RelDiff = alpha2AbsDiff/alpha2Values[resultcounter]
-                        sumAlpha2RelDiff += alpha2RelDiff
                         if alpha2RelDiff > maxAlpha2RelDiff:
                             maxAlpha2RelDiff = alpha2RelDiff
                     
@@ -239,8 +236,12 @@ for dm in range(1, 3):
                     if knownDelayAbsDiff > maxKnownDelayAbsDiff:
                         maxKnownDelayAbsDiff = knownDelayAbsDiff
                     knownDelayRelDiff = knownDelayAbsDiff/csaKnownDelayDuration
-                    sumKnownDelayRelDiff += knownDelayRelDiff
+                    sumCSAKnownDelay += csaKnownDelayDuration
                     if knownDelayRelDiff > maxKnownDelayRelDiff:
+                        if knownDelayRelDiff > 4:
+                            print(knownDelayAbsDiff)
+                            print(csaKnownDelayDuration)
+                            print(knownDelayRelDiff)
                         maxKnownDelayRelDiff = knownDelayRelDiff
                     if csaKnownDelayDuration == raptorKnownDelayDuration:
                         knownDelaySameResultCounter += 1
@@ -281,13 +282,12 @@ for dm in range(1, 3):
                         maxRaptorMeatTOAbsTransfersDiff = raptorMeatTOAbsTransfersDiff
                         
                     raptorMeatTORelTimeDiff = raptorMeatTOAbsTimeDiff/currentMeatDuration
-                    sumRaptorMeatTORelTimeDiff += raptorMeatTORelTimeDiff
                     if raptorMeatTORelTimeDiff > maxRaptorMeatTORelTimeDiff:
                         maxRaptorMeatTORelTimeDiff = raptorMeatTORelTimeDiff
-                    raptorMeatTORelTransfersDiff = raptorMeatTOAbsTransfersDiff/float(row['Raptor MEAT Rounds Of Result'])
-                    sumRaptorMeatTORelTransfersDiff += raptorMeatTORelTransfersDiff
-                    if raptorMeatTORelTransfersDiff > maxRaptorMeatTORelTransfersDiff:
-                        maxRaptorMeatTORelTransfersDiff = raptorMeatTORelTransfersDiff
+                    if float(row['Raptor MEAT Rounds Of Result']) > 1:
+                        raptorMeatTORelTransfersDiff = raptorMeatTOAbsTransfersDiff/(float(row['Raptor MEAT Rounds Of Result']) - 1)
+                        if raptorMeatTORelTransfersDiff > maxRaptorMeatTORelTransfersDiff:
+                            maxRaptorMeatTORelTransfersDiff = raptorMeatTORelTransfersDiff
                     
                     for j in range(1, 11):
                         raptorTBDuration = float(row['Raptor MEAT TB Algorithm ' + str(j)])
@@ -340,21 +340,26 @@ for dm in range(1, 3):
         averageCSAEatAlgorithmDuration = sumCSAEatAlgorithmDuration/resultcounter
         averageCSAEatGraphDuration = sumCSAEatGraphDuration/successfulCsaExpAtCounter
         
+        if alpha == 1:
+            alpha1MeatSum = sumMeat
+        elif alpha == 2:
+            alpha2MeatSum = sumMeat
+        
         if alpha == 2 or alpha == 3:
             averageAlpha1AbsDiff = sumAlpha1AbsDiff/resultcounter
-            averageAlpha1RelDiff = sumAlpha1RelDiff/resultcounter
+            averageAlpha1RelDiff = sumAlpha1AbsDiff/alpha1MeatSum
         
         if alpha == 3:
             averageAlpha2AbsDiff = sumAlpha2AbsDiff/resultcounter
-            averageAlpha2RelDiff = sumAlpha2RelDiff/resultcounter
+            averageAlpha2RelDiff = sumAlpha2AbsDiff/alpha2MeatSum
             
         averageExpATMeatAbsDiff = sumExpATMeatAbsDiff/successfulCsaExpAtCounter
-        averageExpATMeatRelDiff = sumExpATMeatRelDiff/successfulCsaExpAtCounter
+        averageExpATMeatRelDiff = sumExpATMeatAbsDiff/sumMeatForExpATResults
         unsuccessfulCsaExpAt = resultcounter - successfulCsaExpAtCounter
         relativeUnsuccessfulCsaExpAt = unsuccessfulCsaExpAt/resultcounter
         
         averageKnownDelayAbsDiff = sumKnownDelayAbsDiff/resultcounter
-        averageKnownDelayRelDiff = sumKnownDelayRelDiff/resultcounter
+        averageKnownDelayRelDiff = sumKnownDelayAbsDiff/sumCSAKnownDelay
         relativeSameResultKnownDelay = knownDelaySameResultCounter/resultcounter
         
         averageRaptorMeatStops = sumRaptorMeatStops/resultcounter
@@ -368,8 +373,8 @@ for dm in range(1, 3):
         averageRaptorMeatTOAbsTimeDiff = sumRaptorMeatTOAbsTimeDiff/resultcounter
         averageRaptorMeatTOAbsTransfersDiff = sumRaptorMeatTOAbsTransfersDiff/resultcounter
         
-        averageRaptorMeatTORelTimeDiff = sumRaptorMeatTORelTimeDiff/resultcounter
-        averageRaptorMeatTORelTransfersDiff = sumRaptorMeatTORelTransfersDiff/resultcounter
+        averageRaptorMeatTORelTimeDiff = sumRaptorMeatTOAbsTimeDiff/sumMeat
+        averageRaptorMeatTORelTransfersDiff = sumRaptorMeatTOAbsTransfersDiff/(sumRaptorMeatResultRound - resultcounter)
         
         averageRaptorTBAbsExpATDiffs = [sumRaptorTBAbsExpATDiffs[i]/raptorTBResultCounter[i] for i in range(0, 10)]
         averageRaptorTBRelExpATDiffs = [sumRaptorTBRelExpATDiffs[i]/raptorTBResultCounter[i] for i in range(0, 10)]
