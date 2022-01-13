@@ -344,9 +344,40 @@ export class Generator {
      * Combines stops with the same name but different id.
      */
     public static combineStops() {
-        const oldStops = GoogleTransitData.STOPS;
+        let oldStops = GoogleTransitData.STOPS;
+        const stopCoordsToNewIdMap = new Map<string, number>();
+        let oldStopIdToNewStopIdMap = new Map<number, number>();
+        GoogleTransitData.STOPS = [];
+
+        for(let stop of oldStops){
+            let coords = stop.lat + '_' + stop.lon;
+            let newId = stopCoordsToNewIdMap.get(coords);
+            if(newId === undefined){
+                const newId = GoogleTransitData.STOPS.length;
+                stopCoordsToNewIdMap.set(coords, newId);
+                const newStop: Stop = {
+                    id: newId,
+                    name: stop.name,
+                    lat: stop.lat,
+                    lon: stop.lon,
+                }
+                GoogleTransitData.STOPS.push(newStop);
+                oldStopIdToNewStopIdMap.set(stop.id, newId);
+            } else {
+                if(GoogleTransitData.STOPS[newId].name.length > stop.name.length){
+                    GoogleTransitData.STOPS[newId].name = stop.name;
+                }
+                oldStopIdToNewStopIdMap.set(stop.id, newId)
+            }
+        }
+
+        for(let stopTime of GoogleTransitData.STOPTIMES){
+            stopTime.stopId = oldStopIdToNewStopIdMap.get(stopTime.stopId);
+        }
+
+        oldStops = GoogleTransitData.STOPS;
         const stopNameToNewIdMap = new Map<string, number>();
-        const oldStopIdToNewStopIdMap = new Map<number, number>();
+        oldStopIdToNewStopIdMap = new Map<number, number>();
         GoogleTransitData.STOPS = [];
 
         for(let stop of oldStops){
