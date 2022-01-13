@@ -515,36 +515,34 @@ x1 = [i for i in range(1, 11)]
 
 
 #create plot
-# =============================================================================
-# plt.plot(x0,dm1Alpha2RaptorMeatTBRelDurations)
-# plt.plot(x1,dm2Alpha2RaptorMeatTBRelDurations)
-# plt.xticks([i for i in range(1, 11)])
-# plt.xlabel("Runde")
-# plt.ylabel("Relative Laufzeit")
-# plt.legend(["DM1", "DM2"], title="Verspätungsmodell")
-# plt.savefig("raptorMeatTBRelDurations.png", format = 'png', dpi = 1200, bbox_inches= 'tight')
-# plt.show()
-# plt.close()
-# 
-# #create plot
-# plt.plot(x0,dm1Alpha2RaptorMeatTBRelNumberOfResults)
-# plt.plot(x1,dm2Alpha2RaptorMeatTBRelNumberOfResults)
-# plt.xticks([i for i in range(1, 11)])
-# plt.xlabel("Runde")
-# plt.ylabel("Relative Anzahl an ExpATs")
-# plt.legend(["DM1", "DM2"], title="Verspätungsmodell")
-# plt.savefig("raptorMeatTBRelNumberOfResults.png", format = 'png', dpi = 1200, bbox_inches= 'tight')
-# plt.show()
-# plt.close()
-# 
-# #create plot
-# plt.plot(x0,dm1Alpha2RaptorMeatTBRelExpATDiff)
-# plt.plot(x1,dm2Alpha2RaptorMeatTBRelExpATDiff)
-# plt.xticks([i for i in range(1, 11)])
-# plt.xlabel("Runde")
-# plt.ylabel("Relative Differenz der ExpAT")
-# plt.legend(["DM1", "DM2"], title="Verspätungsmodell")
-# plt.savefig("raptorMeatTBRelExpATDiff.png", format = 'png', dpi = 1200, bbox_inches= 'tight')
-# plt.show()
-# plt.close()
-# =============================================================================
+plt.plot(x0,dm1Alpha2RaptorMeatTBRelDurations)
+plt.plot(x1,dm2Alpha2RaptorMeatTBRelDurations)
+plt.xticks([i for i in range(1, 11)])
+plt.xlabel("Runde")
+plt.ylabel("Relative Laufzeit")
+plt.legend(["DM1", "DM2"], title="Verspätungsmodell")
+plt.savefig("raptorMeatTBRelDurations.png", format = 'png', dpi = 1200, bbox_inches= 'tight')
+plt.show()
+plt.close()
+
+#create plot
+plt.plot(x0,dm1Alpha2RaptorMeatTBRelNumberOfResults)
+plt.plot(x1,dm2Alpha2RaptorMeatTBRelNumberOfResults)
+plt.xticks([i for i in range(1, 11)])
+plt.xlabel("Runde")
+plt.ylabel("Relative Anzahl an MEATs")
+plt.legend(["DM1", "DM2"], title="Verspätungsmodell")
+plt.savefig("raptorMeatTBRelNumberOfResults.png", format = 'png', dpi = 1200, bbox_inches= 'tight')
+plt.show()
+plt.close()
+
+#create plot
+plt.plot(x0,dm1Alpha2RaptorMeatTBRelExpATDiff)
+plt.plot(x1,dm2Alpha2RaptorMeatTBRelExpATDiff)
+plt.xticks([i for i in range(1, 11)])
+plt.xlabel("Runde")
+plt.ylabel("Relative Differenz der ExpAT")
+plt.legend(["DM1", "DM2"], title="Verspätungsmodell")
+plt.savefig("raptorMeatTBRelExpATDiff.png", format = 'png', dpi = 1200, bbox_inches= 'tight')
+plt.show()
+plt.close()
