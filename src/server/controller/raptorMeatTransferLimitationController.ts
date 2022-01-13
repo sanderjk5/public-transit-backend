@@ -40,7 +40,7 @@ interface Label {
     calcReliability?: number,
 }
 
-export class RaptorMeatTransferOptimationAlgorithmController {
+export class RaptorMeatTransferLimitationAlgorithmController {
     // source stops
     private static sourceStop: number;
     // target stops
@@ -75,13 +75,7 @@ export class RaptorMeatTransferOptimationAlgorithmController {
     // stores the route-stop pairs of the marked stops
     private static Q: QEntry[];
 
-    // times which are used by the benchmark tests
-    private static initTime: number;
-    private static traverseRoutesTime: number;
-    private static updateExpectedArrivalTimesTime: number;
-
-    private static meatResults: number[];
-    private static algorithmDurations: number[];
+    private static maxNumberOfRounds: number;
 
     /**
      * Initializes and calls the raptor meat algorithm.
@@ -89,7 +83,7 @@ export class RaptorMeatTransferOptimationAlgorithmController {
      * @param res 
      * @returns 
      */
-    public static raptorMeatTransferOptimationAlgorithm(req: express.Request, res: express.Response) {
+    public static raptorMeatTransferLimitationAlgorithm(req: express.Request, res: express.Response) {
         try {
             // checks the parameters of the http request
             if(!req.query || !req.query.sourceStop || !req.query.targetStop || !req.query.sourceTime ||  !req.query.date ||
@@ -107,6 +101,8 @@ export class RaptorMeatTransferOptimationAlgorithmController {
             this.sourceDate = new Date(req.query.date);
             // sets the source weekday
             this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
+
+            this.maxNumberOfRounds = 6;
 
             // initializes the raptor meat algorithm
             this.init(ALPHA);
@@ -127,80 +123,6 @@ export class RaptorMeatTransferOptimationAlgorithmController {
     }
 
     /**
-     * Tests the raptor meat algorithm.
-     * @param sourceStop 
-     * @param targetStop 
-     * @param sourceTime 
-     * @param sourceDate 
-     * @returns 
-     */
-    public static testRaptorMeatTransferOptimationAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date, alpha: number){
-        try{
-            // gets the source and target stops
-            this.sourceStop = GoogleTransitData.getStopIdByName(sourceStop);
-            this.targetStop = GoogleTransitData.getStopIdByName(targetStop);
-            // converts the source time
-            this.minDepartureTime = Converter.timeToSeconds(sourceTime);
-            // sets the source date
-            this.sourceDate = sourceDate;
-            // sets the source weekday
-            this.sourceWeekday = Calculator.moduloSeven((this.sourceDate.getDay() - 1));
-            
-            const completeStartTime = performance.now();
-
-            // initializes the csa meat algorithm
-            const initStartTime = performance.now();
-            this.init(alpha);
-            const initDuration = performance.now() - initStartTime;
-
-            // calls the csa meat algorithm
-            const algorithmStartTime = performance.now();
-            this.performAlgorithm();
-            const algorithmDuration = performance.now() - algorithmStartTime;
-
-            let lastSourceStopEntry = this.k;
-            while(lastSourceStopEntry > 0){
-                if(this.expectedArrivalTimes[lastSourceStopEntry][this.sourceStop].length > 0){
-                    break;
-                } else {
-                    lastSourceStopEntry--;
-                }
-            }
-
-            const optimalRound = this.getTransferOptimalRound(lastSourceStopEntry);
-
-            // extracts decision graph
-            const decisionGraphStartTime = performance.now();
-            const meatResponse = this.extractDecisionGraphs();
-            const decisionGraphDuration = performance.now() - decisionGraphStartTime;
-
-            const completeDuration = performance.now() - completeStartTime;
-
-            let result = {
-                expectedArrivalTime: this.expectedArrivalTimes[optimalRound][this.sourceStop][0].expectedArrivalTime, 
-                completeDuration: completeDuration,
-                initDuration: initDuration, 
-                algorithmDuration: algorithmDuration, 
-                initLoopDuration: this.initTime,
-                traverseRoutesLoopDuration: this.traverseRoutesTime,
-                updateExpectedArrivalTimesLoopDuration: this.updateExpectedArrivalTimesTime,
-                decisionGraphDuration: decisionGraphDuration,
-                optimalRound: optimalRound,
-                numberOfStops: meatResponse.expandedDecisionGraph.clusters.length,
-                numberOfLegs: meatResponse.expandedDecisionGraph.links.length,
-                numberOfEdgesInCompactGraph: meatResponse.compactDecisionGraph.links.length,
-                meatResults: cloneDeep(this.meatResults),
-                algorithmDurations: cloneDeep(this.algorithmDurations),
-            };
-            this.clearArrays();
-            return result;
-        } catch(error){
-            this.clearArrays();
-            return null;
-        }
-    }
-
-    /**
      * Performs the raptor meat algorithm.
      * 
      * @param targetStops 
@@ -217,33 +139,17 @@ export class RaptorMeatTransferOptimationAlgorithmController {
             this.initNextRound();
             // fills the array of route-stop pairs
             this.fillQ();
-            this.initTime += performance.now() - startTime;
 
             // traverses each route and calculates the new expected arrival times
             startTime = performance.now();
             this.traverseRoutes();
-            this.traverseRoutesTime += performance.now() - startTime;
 
             // updates the array of expected arrival times
             startTime = performance.now();
             this.updateExpectedArrivalTimes();
-            this.updateExpectedArrivalTimesTime += performance.now() - startTime;
-
-            if(this.k < 11){
-                let expectedArrivalTimeAfterCurrentRound: number;
-                if(this.expectedArrivalTimes[this.k][this.sourceStop][0]){
-                    expectedArrivalTimeAfterCurrentRound = this.expectedArrivalTimes[this.k][this.sourceStop][0].expectedArrivalTime;
-                } else {
-                    expectedArrivalTimeAfterCurrentRound = this.meatResults[this.k-1];
-                }
-                this.meatResults[this.k] = expectedArrivalTimeAfterCurrentRound;
-                const algorithmDurationUntilThisRound = performance.now() - startTimeAlgorithmDurations;
-                this.algorithmDurations[this.k] = algorithmDurationUntilThisRound;
-            }
-            
 
             // termination condition
-            if(this.markedStops.length === 0){
+            if(this.markedStops.length === 0 || this.maxNumberOfRounds === this.k){
                 break;
             }
         }
@@ -286,14 +192,6 @@ export class RaptorMeatTransferOptimationAlgorithmController {
         this.markedStops.push(this.targetStop);
         // sets the maximum departure time of the target stops
         this.latestDepartureTimesOfLastRound[this.targetStop] = this.maxArrivalTime;
-
-        // set the times for the benchmark tests
-        this.initTime = 0;
-        this.traverseRoutesTime = 0;
-        this.updateExpectedArrivalTimesTime = 0;
-
-        this.meatResults = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-        this.algorithmDurations = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     }
 
     /**
@@ -743,21 +641,6 @@ export class RaptorMeatTransferOptimationAlgorithmController {
         return earliestTripInfos;
     }
 
-    private static getTransferOptimalRound(lastSourceStopEntry: number){
-        const raptorResult = this.expectedArrivalTimes[lastSourceStopEntry][this.sourceStop][0];
-        let optimalRound: number;
-        for(let i = 1; i < raptorResult.transferRound; i++){
-            if(this.expectedArrivalTimes[i][this.sourceStop].length > 0 && raptorResult.expectedArrivalTime > (this.expectedArrivalTimes[i][this.sourceStop][0].expectedArrivalTime - ((raptorResult.transferRound - i) * 300))){
-                optimalRound = i;
-                break;
-            }
-        }
-        if(optimalRound === undefined){
-            optimalRound = raptorResult.transferRound;
-        }
-        return optimalRound;
-    }
-
      /**
      * Extracts the decision graph.
      * @returns 
@@ -774,7 +657,7 @@ export class RaptorMeatTransferOptimationAlgorithmController {
         if(this.expectedArrivalTimes[lastSourceStopEntry][this.sourceStop][0].departureTime === Number.MAX_VALUE){
             throw new Error("Couldn't find a connection.")
         }
-        let resultRound = this.getTransferOptimalRound(lastSourceStopEntry);
+        let resultRound = lastSourceStopEntry;
 
         // the minimum expected arrival time and date
         let meatTime = this.expectedArrivalTimes[resultRound][this.sourceStop][0].expectedArrivalTime;
@@ -924,7 +807,5 @@ export class RaptorMeatTransferOptimationAlgorithmController {
         this.Q = undefined;
         this.markedStops = undefined;
         this.latestDepartureTimesOfLastRound = undefined;
-        this.meatResults = undefined;
-        this.algorithmDurations = undefined;
     }
 }

@@ -1,6 +1,7 @@
 import express from 'express';
 import { RaptorAlgorithmController } from '../controller/raptorAlgorithmController';
 import { RaptorMeatAlgorithmController } from '../controller/raptorMeatAlgorithmController';
+import { RaptorMeatTransferLimitationAlgorithmController } from '../controller/raptorMeatTransferLimitationController';
 import { RaptorMeatTransferOptimationAlgorithmController } from '../controller/raptorMeatTransferOptimationAlgorithmController';
 
 
@@ -13,5 +14,8 @@ router.get('/minimumExpectedArrivalTime', (req, res) => {
 });
 router.get('/minimumExpectedArrivalTimeTransferOptimation', (req, res) => {
     RaptorMeatTransferOptimationAlgorithmController.raptorMeatTransferOptimationAlgorithm(req, res);
+});
+router.get('/minimumExpectedArrivalTimeTransferLimitation', (req, res) => {
+    RaptorMeatTransferLimitationAlgorithmController.raptorMeatTransferLimitationAlgorithm(req, res);
 });
 export default router
