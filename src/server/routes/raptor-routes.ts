@@ -12,7 +12,7 @@ router.get('/earliestArrivalTime', (req, res) => {
 router.get('/minimumExpectedArrivalTime', (req, res) => {
     RaptorMeatAlgorithmController.raptorMeatAlgorithm(req, res);
 });
-router.get('/minimumExpectedArrivalTimeTransferOptimation', (req, res) => {
+router.get('/minimumExpectedArrivalTimeTransferOptimisation', (req, res) => {
     RaptorMeatTransferOptimationAlgorithmController.raptorMeatTransferOptimationAlgorithm(req, res);
 });
 router.get('/minimumExpectedArrivalTimeTransferLimitation', (req, res) => {

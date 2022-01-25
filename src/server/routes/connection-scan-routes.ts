@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/earliestArrivalTime', (req, res) => {
     ConnectionScanAlgorithmController.connectionScanAlgorithmRoute(req, res);
 });
-router.get('/earliestArrivalTimeWithEat', (req, res) => {
+router.get('/expectedArrivalTime', (req, res) => {
     ConnectionScanEatAlgorithmController.connectionScanEatAlgorithmRoute(req, res);
 });
 router.get('/minimumExpectedArrivalTime', (req, res) => {
