@@ -163,7 +163,7 @@ export class Generator {
     }
 
     /**
-     * Uses all stop times to generate routes which satify the following condition of the raptor algorithm: all trips of a route have the same sequence of stops.
+     * Uses all stop times to generate routes which satisfy the following condition of the raptor algorithms: all trips of a route have the same sequence of stops.
      */
     public static generateValidRoutes(): void {
         // copy of imported routes can be used to store the information of each route
@@ -173,7 +173,7 @@ export class Generator {
             return Sorter.sortStopTimesByTripIdAndSequence(a, b);
         })
 
-        // creates array with pointers to optimize the raptor algorithm
+        // creates pointer arrays to optimize the raptor algorithm
         GoogleTransitData.STOPTIMES_OF_A_TRIP = new Array(GoogleTransitData.TRIPS.length);
         GoogleTransitData.TRIPS_OF_A_ROUTE = [];
         GoogleTransitData.STOPS_OF_A_ROUTE = [];
@@ -193,12 +193,12 @@ export class Generator {
         GoogleTransitData.STOPTIMES_OF_A_TRIP[GoogleTransitData.STOPTIMES[0].tripId] = 0;
         for(let i = 0; i < GoogleTransitData.STOPTIMES.length; i++){
             let stopTime = GoogleTransitData.STOPTIMES[i];
-            // checks for each trip of a new generated route has a trip with the same stop sequence
+            // checks for each trip if a route with the same stop sequence exits already
             if(lastTripId !== stopTime.tripId){
                 // uses the string of stop ids to identify the stop sequences
                 let newRouteId = routeIdMapping.get(stopIdString)
                 // creates a new route if no equal stop sequence exists
-                if(!newRouteId){
+                if(newRouteId === undefined){
                     let newRoute = routesCopy[GoogleTransitData.TRIPS[lastTripId].routeId];
                     newRouteId = GoogleTransitData.ROUTES.length;
                     newRoute.id = newRouteId;

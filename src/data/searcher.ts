@@ -3,7 +3,7 @@ import { GoogleTransitData } from "./google-transit-data";
 export class Searcher {
     
     /**
-     * Uses binary search to find the first connection with a departure after the given value.
+     * Uses a binary search to find the first connection with a departure after the given value.
      * @param value 
      * @returns 
      */

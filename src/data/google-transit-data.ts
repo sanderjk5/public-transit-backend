@@ -1,22 +1,15 @@
 import { Stop } from "../models/Stop";
-import { CalendarDate } from "../models/CalendarDates";
 import { Route } from "../models/Routes";
 import { Calendar } from "../models/Calendar";
 import { StopTime } from "../models/StopTime";
 import { Footpath } from "../models/Footpath";
 import { Trip } from "../models/Trip";
-import { Agency } from "../models/Agency";
 import { Connection } from "../models/Connection";
 import { RouteStopMapping } from "../models/RouteStopMapping";
-import { SECONDS_OF_A_DAY } from "../constants";
-import { Converter } from "./converter";
-
 
 export class GoogleTransitData {
     // Stores data of the imported gtfs files.
-    public static AGENCIES: Agency[] = [];
     public static CALENDAR: Calendar[] = [];
-    public static CALENDAR_DATES: CalendarDate[] = [];
     public static ROUTES: Route[] = [];
     public static STOPS: Stop[] = [];
     public static STOPTIMES: StopTime[] = [];
@@ -52,7 +45,7 @@ export class GoogleTransitData {
     }
 
     /**
-     * Gets all stop ids with a given stop name.
+     * Gets the stop id of a given stop name.
      * @param name 
      * @returns 
      */
@@ -92,7 +85,7 @@ export class GoogleTransitData {
      * @param stopID 
      * @returns 
      */
-     public static getAllFootpathsOfAArrivalStop(stopID: number){
+     public static getAllFootpathsOfAnArrivalStop(stopID: number){
         let footpaths: Footpath[] = [];
         let firstFootpathOfStop = GoogleTransitData.FOOTPATHS_OF_A_ARRIVAL_STOP[stopID];
         if(firstFootpathOfStop !== undefined){
@@ -114,7 +107,7 @@ export class GoogleTransitData {
      * @returns 
      */
     public static getStopTimeByTripAndStop(tripId: number, stopId: number): StopTime {
-        if(!tripId || !stopId){
+        if(tripId === undefined || stopId === undefined){
             return null;
         }
         let firstStopTimeOfTrip = GoogleTransitData.STOPTIMES_OF_A_TRIP[tripId];
@@ -131,16 +124,15 @@ export class GoogleTransitData {
     }
 
     /**
-     * Gets the stop time of a given stop and trip. Returns null if no valid stop time exists.
+     * Gets all stop times of a given trip.
      * @param tripId 
-     * @param stopId 
      * @returns 
      */
      public static getStopTimesByTrip(tripId: number): StopTime[] {
-        if(tripId == undefined){
+        if(tripId === undefined){
             return [];
         }
-        let stopTimes = []
+        let stopTimes = [];
         let firstStopTimeOfTrip = GoogleTransitData.STOPTIMES_OF_A_TRIP[tripId];
         for(let i = firstStopTimeOfTrip; i < GoogleTransitData.STOPTIMES.length; i++) {
             let stopTime = GoogleTransitData.STOPTIMES[i];
@@ -159,10 +151,10 @@ export class GoogleTransitData {
      * @returns 
      */
     public static getStopTimesByStopAndRoute(stopId: number, r: number): StopTime[] {
-        if(!r || !stopId){
+        if(r === undefined || stopId === undefined){
             return [];
         }
-        let stopTimes = []
+        let stopTimes = [];
         let tripsOfRoute = GoogleTransitData.TRIPS_OF_A_ROUTE[r];
         for(let i = 0; i < tripsOfRoute.length; i++){
             let tripId = tripsOfRoute[i];

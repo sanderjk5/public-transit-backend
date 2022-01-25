@@ -1,7 +1,7 @@
 export class Calculator {
 
     /**
-     * Calculates correct modulo seven result (even for negative numbers).
+     * Calculates positive modulo seven results (even for negative numbers).
      * @param value 
      * @returns 
      */

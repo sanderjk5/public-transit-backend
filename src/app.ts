@@ -3,29 +3,26 @@ import routes from './server/routes';
 import cors from 'cors';
 import { Importer } from './data/importer';
 import { Generator } from './data/generator';
-import { TestController } from './server/controller/testController';
 import { Reliability } from './data/reliability';
-import { GoogleTransitData } from './data/google-transit-data';
-import { ApproximationTestController } from './server/controller/approximationTestController';
 const app = express();
 
 // imports the gtfs files
 Importer.importGoogleTransitData();
-// generates routes which can be used by the raptor algorithm
+// combines stops with the same name
 Generator.combineStops();
+// generates routes which can be used by the raptor algorithm
 Generator.generateValidRoutes();
+// sets the isAvailable array of each trip
 Generator.setIsAvailableOfTrips();
+// removes invalid trips and sorts the remaining by their departure time
 Generator.clearAndSortTrips();
 // genreates connections which can be used by the csa
 Generator.generateSortedConnections();
 // generates footpaths which can be used by raptor and csa
 Generator.generateFootpaths();
+// initializes the reliability values
 Reliability.initReliability();
-// console.time('tests')
-// TestController.performAllTests();
-// console.timeEnd('tests')
-// TestController.performAllTestsAndSafeInCSVInit();
-// TestController.getTestRequestsMEATTO();
+
 const port = 1337;
 const corsOptions = {
   origin: 'http://localhost:4200',

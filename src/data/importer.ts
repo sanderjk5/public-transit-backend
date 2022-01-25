@@ -3,12 +3,10 @@ import { GoogleTransitData } from './google-transit-data';
 import { Stop  } from '../models/Stop';
 import path from 'path'
 import { Calendar } from '../models/Calendar';
-import { CalendarDate } from '../models/CalendarDates';
 import { Route } from '../models/Routes';
 import { StopTime } from '../models/StopTime';
 import { Trip } from '../models/Trip';
 import { Converter } from './converter';
-import { Agency } from '../models/Agency';
 
 export class Importer {
     // directory of the gtfs files.
@@ -35,9 +33,7 @@ export class Importer {
      * @param directoryName 
      */
     private static importDirectory(directoryName: string, isLongDistance: boolean): void {
-        Importer.importAgency(directoryName + '/agency.txt');
         Importer.importCalendar(directoryName + '/calendar.txt');
-        Importer.importCalendarDates(directoryName + '/calendar_dates.txt');
         Importer.importRoutes(directoryName + '/routes.txt');
         Importer.importStops(directoryName + '/stops.txt');
         Importer.importTrips(directoryName + '/trips.txt', isLongDistance);
@@ -48,40 +44,11 @@ export class Importer {
      * Resets all data arrays.
      */
     private static resetArrays() {
-        GoogleTransitData.AGENCIES = [];
         GoogleTransitData.CALENDAR = [];
-        GoogleTransitData.CALENDAR_DATES = [];
         GoogleTransitData.ROUTES = [];
         GoogleTransitData.STOPS = [];
         GoogleTransitData.TRIPS = [];
         GoogleTransitData.STOPTIMES = [];
-    }
-
-    /**
-     * Imports the agency table.
-     */
-    private static importAgency(filename: string): void {
-        console.time('import agency table');
-        const importedAgency = GoogleTransitData.AGENCIES;
-        const agencyData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_DIRECTORY, filename), 'utf-8').toString().split('\n');
-        for(let i = 1; i < agencyData.length - 1; i++){
-            const currentAgencyAsArray: string[] = agencyData[i].split(',');
-            const id = Number(currentAgencyAsArray[0]);
-            const name = currentAgencyAsArray[1];
-            const url = currentAgencyAsArray[2];
-            const timezone = currentAgencyAsArray[3]
-            const lang = currentAgencyAsArray[4]
-            const agency: Agency = {
-                id: id,
-                name: name,
-                url: url,
-                timezone: timezone,
-                lang: lang
-            }
-            importedAgency.push(agency);
-        }
-        GoogleTransitData.AGENCIES = importedAgency;
-        console.timeEnd('import agency table');
     }
 
     /**
@@ -117,33 +84,6 @@ export class Importer {
         }
         GoogleTransitData.CALENDAR = importedCalendar;
         console.timeEnd('import calendar table');
-    }
-
-    /**
-     * Imports the calendar dates table.
-     */
-    private static importCalendarDates(filename: string): void {
-        console.time('import calendar dates table');
-        const importedCalendarDates = GoogleTransitData.CALENDAR_DATES;
-        const calendarDatesData: string[] = readFileSync(path.join(this.GOOGLE_TRANSIT_DIRECTORY, filename), 'utf-8').toString().split('\n');
-        for(let i = 1; i < calendarDatesData.length - 1; i++){
-            const currentCalendarDatesAsArray: string[] = calendarDatesData[i].split(',');
-            // mapping to the new id
-            const serviceId = Number(currentCalendarDatesAsArray[0]);
-            const exceptionType = currentCalendarDatesAsArray[1];
-            const date = currentCalendarDatesAsArray[2];
-            const calendarDate: CalendarDate = {
-                serviceId: this.serviceIdMap.get(serviceId),
-                date: date,
-                exception_type: exceptionType
-            }
-            if(calendarDate.serviceId !== undefined){
-                importedCalendarDates.push(calendarDate);
-            }
-            importedCalendarDates.push(calendarDate);
-        }
-        GoogleTransitData.CALENDAR_DATES = importedCalendarDates;
-        console.timeEnd('import calendar dates table');
     }
 
     /**

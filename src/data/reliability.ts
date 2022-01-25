@@ -77,7 +77,7 @@ export class Reliability {
     }
 
     /**
-     * Returns a random delay.
+     * Uses reliability values to return a random delay.
      * @param isLongDistance 
      * @returns 
      */

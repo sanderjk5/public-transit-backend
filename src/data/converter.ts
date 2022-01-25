@@ -23,7 +23,7 @@ export class Converter {
      * @returns 
      */
     public static secondsToTime(timeInSeconds: number): string {
-        // Would return a invalid time.
+        // should not return a time for too large numbers of seconds
         if(timeInSeconds > 10 * SECONDS_OF_A_DAY){
             return timeInSeconds.toString();
         }
@@ -61,6 +61,7 @@ export class Converter {
      * @returns 
      */
     public static getDayOffset(timeInSeconds: number): number {
+        // should not return a result for too large numbers of seconds
         if(timeInSeconds > 10 * SECONDS_OF_A_DAY) {
             return 0;
         }

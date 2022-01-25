@@ -5,8 +5,9 @@ import { TempEdge } from "../models/TempEdge";
 import { TempNode } from "../models/TempNode";
 
 export class Sorter {
+
     /**
-     * Sorts stop times by their departure.
+     * Sorts stop times by their departure time.
      * @param a 
      * @param b 
      * @returns 
@@ -195,6 +196,12 @@ export class Sorter {
         }
     }
 
+    /**
+     * Sorts edges by departure stop and departure time.
+     * @param a 
+     * @param b 
+     * @returns 
+     */
     public static sortEdgesByDepartureStopAndDepartureTime(a: TempEdge, b: TempEdge){
         if(a.departureStop < b.departureStop){
             return -1;
