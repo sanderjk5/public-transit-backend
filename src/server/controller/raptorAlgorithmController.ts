@@ -81,7 +81,6 @@ export class RaptorAlgorithmController {
             const journeyResponse = this.getJourneyResponse();
             res.status(200).send(journeyResponse);
         } catch (err) {
-            // console.log(err)
             res.status(500).send(err);
         }
     }
@@ -253,7 +252,7 @@ export class RaptorAlgorithmController {
             let t = tripInfo.tripId;
             let dayOffset = tripInfo.dayOffset;
             let enterTripAtStop = p;
-            if(!t){
+            if(t === undefined){
                 continue;
             }
             let reachedP = false;

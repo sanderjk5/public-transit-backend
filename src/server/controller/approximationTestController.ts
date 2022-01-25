@@ -1,5 +1,4 @@
-import { ALPHA, SECONDS_OF_A_DAY } from "../../constants";
-import { Converter } from "../../data/converter";
+import { SECONDS_OF_A_DAY } from "../../constants";
 import { GoogleTransitData } from "../../data/google-transit-data";
 import { Reliability } from "../../data/reliability";
 import { ConnectionScanMeatAlgorithmController } from "./connectionScanMeatAlgorithmController";

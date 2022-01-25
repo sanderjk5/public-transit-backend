@@ -1,6 +1,6 @@
 import express from 'express';
 import { ConnectionScanAlgorithmController } from '../controller/connectionScanAlgorithmController';
-import { ConnectionScanEatAlgorithmController } from '../controller/connectionScanEatAlgorithmController';
+import { ConnectionScanExpATAlgorithmController } from '../controller/connectionScanExpATAlgorithmController';
 import { ConnectionScanMeatAlgorithmController } from '../controller/connectionScanMeatAlgorithmController';
 
 
@@ -9,7 +9,7 @@ router.get('/earliestArrivalTime', (req, res) => {
     ConnectionScanAlgorithmController.connectionScanAlgorithmRoute(req, res);
 });
 router.get('/expectedArrivalTime', (req, res) => {
-    ConnectionScanEatAlgorithmController.connectionScanEatAlgorithmRoute(req, res);
+    ConnectionScanExpATAlgorithmController.connectionScanExpATAlgorithmRoute(req, res);
 });
 router.get('/minimumExpectedArrivalTime', (req, res) => {
     ConnectionScanMeatAlgorithmController.connectionScanMeatAlgorithmRoute(req, res);

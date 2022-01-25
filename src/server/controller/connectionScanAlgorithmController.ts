@@ -126,6 +126,17 @@ export class ConnectionScanAlgorithmController {
         }
     }
 
+    /**
+     * Returns the earliest arrival time at the target stop.
+     * @param sourceStop 
+     * @param targetStop 
+     * @param sourceDate 
+     * @param sourceTimeInSeconds 
+     * @param safeVariant 
+     * @param maxArrivalTime 
+     * @param givenDelay 
+     * @returns 
+     */
     public static getEarliestArrivalTime(sourceStop: number, targetStop: number, sourceDate: Date, sourceTimeInSeconds: number, safeVariant: boolean, maxArrivalTime: number, givenDelay: boolean = false){
         // gets the source and target stops
         this.sourceStop = sourceStop;
@@ -150,6 +161,14 @@ export class ConnectionScanAlgorithmController {
         }
     }
 
+    /**
+     * Returns the earliest arrival time at every stop. Solves the OneToAll-version of the earliest arrival time problem.
+     * @param sourceStop 
+     * @param sourceDate 
+     * @param sourceTimeInSeconds 
+     * @param maxArrivalTime 
+     * @returns 
+     */
     public static getEarliestArrivalTimes(sourceStop: number, sourceDate: Date, sourceTimeInSeconds: number, maxArrivalTime: number){
         // gets the source and target stops
         this.sourceStop = sourceStop;
@@ -260,7 +279,7 @@ export class ConnectionScanAlgorithmController {
                 
                 // checks if the trip is already used or if the trip can be reached at stop s
                 if(this.t[dayOfCurrentConnection][currentConnection.trip] !== undefined || this.s[departureStop] + currentDelay <= currentConnectionDepartureTime){
-                    // sets enter connection of a trip
+                    // sets the enter connection of the trip
                     if(this.t[dayOfCurrentConnection][currentConnection.trip] === undefined){
                         let reliability = 1;
                         if(this.j[departureStop].enterConnection !== null){
@@ -468,8 +487,6 @@ export class ConnectionScanAlgorithmController {
                 }
                 journey.legs.push(leg); 
             }
-
-            
 
             if(journeyPointersOfRoute[i].footpath !== null){
                 const footpath = GoogleTransitData.FOOTPATHS_SORTED_BY_DEPARTURE_STOP[journeyPointersOfRoute[i].footpath];

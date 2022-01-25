@@ -3,12 +3,12 @@ import { Converter } from "../../data/converter";
 import { GoogleTransitData } from "../../data/google-transit-data";
 import { ApproximationTestController } from "./approximationTestController";
 import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmController";
-import { ConnectionScanEatAlgorithmController } from "./connectionScanEatAlgorithmController";
+import { ConnectionScanExpATAlgorithmController } from "./connectionScanExpATAlgorithmController";
 import { ConnectionScanMeatAlgorithmController } from "./connectionScanMeatAlgorithmController";
 import { DelayTestController } from "./delayTestController";
 import { RaptorAlgorithmController } from "./raptorAlgorithmController";
 import { RaptorMeatAlgorithmController } from "./raptorMeatAlgorithmController";
-import { RaptorMeatTransferOptimationAlgorithmController } from "./raptorMeatTransferOptimationAlgorithmController";
+import { RaptorMeatTransferOptimisationAlgorithmController } from "./raptorMeatTransferOptimisationAlgorithmController";
 import csv from 'csv-parser';
 import fs from 'fs';
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
@@ -329,8 +329,8 @@ export class TestController {
                 let csaExpAtResponse = undefined;
                 try{
                     raptorMeatResponse = RaptorMeatAlgorithmController.testRaptorMeatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
-                    raptorMeatTOResponse = RaptorMeatTransferOptimationAlgorithmController.testRaptorMeatTransferOptimationAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha)
-                    csaExpAtResponse = ConnectionScanEatAlgorithmController.testConnectionScanEatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
+                    raptorMeatTOResponse = RaptorMeatTransferOptimisationAlgorithmController.testRaptorMeatTransferOptimisationAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha)
+                    csaExpAtResponse = ConnectionScanExpATAlgorithmController.testConnectionScanExpATAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
                     csaMeatResponse = ConnectionScanMeatAlgorithmController.testConnectionScanMeatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
                 } catch(error){
                     if(alpha === 1){
@@ -626,7 +626,7 @@ export class TestController {
             console.log('maximum absolute difference:' + knownDelaysAbsoluteDifferenceMax)
             console.log('average relative difference:' + knownDelaysRelativeDifference/numberOfSuccessfulRequests)
             console.log('maximum relative difference:' + knownDelaysRelativeDifferenceMax)
-            console.log('Raptor MEAT Transfer Optimation Results:')
+            console.log('Raptor MEAT Transfer Optimisation Results:')
             console.log('Times:')
             console.log('average raptor meat TO complete: ' + raptorMeatTOCompleteTimes/numberOfSuccessfulRequests)
             console.log('maximum raptor meat TO complete: ' + raptorMeatTOCompleteTimesMax)
@@ -824,11 +824,11 @@ export class TestController {
                         if(!raptorMeatResponse){
                             throw new Error();
                         }
-                        raptorMeatTOResponse = RaptorMeatTransferOptimationAlgorithmController.testRaptorMeatTransferOptimationAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha)
+                        raptorMeatTOResponse = RaptorMeatTransferOptimisationAlgorithmController.testRaptorMeatTransferOptimisationAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha)
                         if(!raptorMeatTOResponse){
                             throw new Error();
                         }
-                        csaExpAtResponse = ConnectionScanEatAlgorithmController.testConnectionScanEatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
+                        csaExpAtResponse = ConnectionScanExpATAlgorithmController.testConnectionScanExpATAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
                         if(!csaExpAtResponse){
                             throw new Error();
                         }
@@ -964,11 +964,11 @@ export class TestController {
                 if(!raptorMeatResponse){
                     throw new Error();
                 }
-                // raptorMeatTOResponse = RaptorMeatTransferOptimationAlgorithmController.testRaptorMeatTransferOptimationAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha)
+                // raptorMeatTOResponse = RaptorMeatTransferOptimisationAlgorithmController.testRaptorMeatTransferOptimisationAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha)
                 // if(!raptorMeatTOResponse){
                 //     throw new Error();
                 // }
-                csaExpAtResponse = ConnectionScanEatAlgorithmController.testConnectionScanEatAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, 2);
+                csaExpAtResponse = ConnectionScanExpATAlgorithmController.testConnectionScanExpATAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, 2);
                 if(!csaExpAtResponse){
                     throw new Error();
                 }
@@ -1021,7 +1021,7 @@ export class TestController {
                 if(!raptorMeatResponse){
                     throw new Error();
                 }
-                raptorMeatTOResponse = RaptorMeatTransferOptimationAlgorithmController.testRaptorMeatTransferOptimationAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, 2)
+                raptorMeatTOResponse = RaptorMeatTransferOptimisationAlgorithmController.testRaptorMeatTransferOptimisationAlgorithm(randomSourceStopName, randomTargetStopName, Converter.secondsToTime(randomSourceTime), randomSourceDate, 2)
                 if(!raptorMeatTOResponse){
                     throw new Error();
                 }
@@ -1062,7 +1062,7 @@ export class TestController {
             const randomSourceDate = dates[this.getRandomInt(numberOfDates)];
             let requestString = randomSourceStop + ', ' + randomTargetStop + ', ' + randomSourceDate + ', ' + Converter.secondsToTime(randomSourceTime);
             // console.log('request: ' + requestString)
-            const csaResponse = ConnectionScanEatAlgorithmController.testConnectionScanEatAlgorithm(randomSourceStop, randomTargetStop, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
+            const csaResponse = ConnectionScanExpATAlgorithmController.testConnectionScanExpATAlgorithm(randomSourceStop, randomTargetStop, Converter.secondsToTime(randomSourceTime), randomSourceDate, alpha);
             if(csaResponse){
                 csaEatCompleteTimes += csaResponse.completeDuration;
                 csaEatInitTimes += csaResponse.initDuration;

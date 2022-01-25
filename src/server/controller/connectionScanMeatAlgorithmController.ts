@@ -132,7 +132,7 @@ export class ConnectionScanMeatAlgorithmController {
             this.performAlgorithm();
             const algorithmDuration = performance.now() - algorithmStartTime;
 
-            // extracts decision graph
+            // extracts the decision graph
             const decisionGraphStartTime = performance.now();
             this.extractDecisionGraphs();
             const decisionGraphDuration = performance.now() - decisionGraphStartTime;
@@ -356,7 +356,6 @@ export class ConnectionScanMeatAlgorithmController {
 
         // calculates the maximum arrival time of the alpha bounded version of the algorithm
         let difference = alpha * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-        // this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
         this.maxArrivalTime = this.minDepartureTime + difference;
         this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
         
@@ -389,7 +388,7 @@ export class ConnectionScanMeatAlgorithmController {
     }
 
     /**
-     * Checks if q dominates p (domination means earlier expected arrival time or later departure time if the expected arrival times are the same).
+     * Checks if q dominates p. q dominates p if it has a smaller expected arrival time but bigger departure time.
      * @param q 
      * @param p 
      * @returns 
@@ -529,6 +528,12 @@ export class ConnectionScanMeatAlgorithmController {
         return meatResponse;
     }
 
+    /**
+     * Calculates the minimum expected arrival time of a decision graph.
+     * 
+     * @param targetStopPairs 
+     * @returns 
+     */
     private static calculateMEAT(targetStopPairs: SEntry[]){
         let meat: number = 0;
         let probabilitySum = 0;

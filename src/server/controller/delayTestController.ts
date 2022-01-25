@@ -32,7 +32,7 @@ export class DelayTestController {
     }
 
     /**
-     * Use the modified csa algorithm to calculate the earliest arrival time when the delays are knwon. 
+     * Use the modified csa algorithm to calculate the earliest arrival time when the delays are known. 
      * @param sourceStop 
      * @param targetStop 
      * @param sourceTime 

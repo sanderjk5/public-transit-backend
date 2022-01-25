@@ -6,7 +6,7 @@ import { ConnectionScanAlgorithmController } from "./connectionScanAlgorithmCont
 import FastPriorityQueue from 'fastpriorityqueue';
 import { MeatResponse } from "../../models/MeatResponse";
 import { TempEdge } from "../../models/TempEdge";
-import { ALPHA, CHANGE_TIME, MAX_D_C_LONG, MAX_D_C_NORMAL, NUMBER_OF_DAYS, SECONDS_OF_A_DAY } from "../../constants";
+import { ALPHA, MAX_D_C_LONG, MAX_D_C_NORMAL, NUMBER_OF_DAYS, SECONDS_OF_A_DAY } from "../../constants";
 import { Reliability } from "../../data/reliability";
 import { RouteStopMapping } from "../../models/RouteStopMapping";
 import { StopTime } from "../../models/StopTime";
@@ -270,7 +270,6 @@ export class RaptorMeatAlgorithmController {
         }
         // calculates the maximum arrival time
         let difference = alpha * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-        // this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
         this.maxArrivalTime = this.minDepartureTime + difference;
         this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime);
         
@@ -373,7 +372,7 @@ export class RaptorMeatAlgorithmController {
     }
 
     /**
-     * Uses the maixmum departure time of the last round to find all trips which can be reached at this stop.
+     * Uses the maximum departure time of the last round to find all trips which can be reached at this stop.
      * Calculates the new expected arrival times of these trips and adds them to the route bag.
      * @param r 
      * @param pi 
@@ -871,6 +870,12 @@ export class RaptorMeatAlgorithmController {
         return meatResponse;
     }
 
+    /**
+     * Calculates the minimum expected arrival time of a decision graph.
+     * 
+     * @param targetStopPairs 
+     * @returns 
+     */
     private static calculateMEAT(targetStopLabels: Label[]){
         let meat: number = 0;
         let probabilitySum = 0;

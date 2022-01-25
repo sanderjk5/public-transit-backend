@@ -129,7 +129,6 @@ export class RaptorMeatTransferLimitationAlgorithmController {
      */
      private static performAlgorithm(){
         this.k = 0;
-        const startTimeAlgorithmDurations = performance.now();
         while(true){
             // increases round counter
             this.k++;
@@ -167,7 +166,6 @@ export class RaptorMeatTransferLimitationAlgorithmController {
         }
         // calculates the maximum arrival time
         let difference = alpha * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-        // this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
         this.maxArrivalTime = this.minDepartureTime + difference;
         
         this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime);
@@ -515,7 +513,6 @@ export class RaptorMeatTransferLimitationAlgorithmController {
             // checks if new labels for this stop were created in the current round
             if(this.expectedArrivalTimesOfCurrentRound[i].length === 0){
                 this.expectedArrivalTimes[this.k][i] = [];
-                // this.expectedArrivalTimes[this.k][i] = cloneDeep(this.expectedArrivalTimes[this.k-1][i])
                 continue;
             }
             let newExpectedArrivalTimes: Label[] = [];
@@ -782,6 +779,12 @@ export class RaptorMeatTransferLimitationAlgorithmController {
         return meatResponse;
     }
 
+    /**
+     * Calculates the minimum expected arrival time of a decision graph.
+     * 
+     * @param targetStopPairs 
+     * @returns 
+     */
     private static calculateMEAT(targetStopLabels: Label[]){
         let meat: number = 0;
         let probabilitySum = 0;
@@ -800,6 +803,9 @@ export class RaptorMeatTransferLimitationAlgorithmController {
         return meat;
     }
 
+    /**
+     * Clears all arrays to remove unused storage usage.
+     */
     private static clearArrays(){
         this.expectedArrivalTimes = undefined;
         this.expectedArrivalTimesOfCurrentRound = undefined;

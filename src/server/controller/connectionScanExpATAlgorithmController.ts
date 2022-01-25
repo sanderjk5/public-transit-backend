@@ -41,7 +41,7 @@ interface TEntry {
     finalFootpath?: number,
 }
 
-export class ConnectionScanEatAlgorithmController {
+export class ConnectionScanExpATAlgorithmController {
     // the profile function of each stop
     private static s: SEntry[][];
     // the earliest expected arrival time of each trip
@@ -71,7 +71,7 @@ export class ConnectionScanEatAlgorithmController {
      * @param res 
      * @returns 
      */
-    public static connectionScanEatAlgorithmRoute(req: express.Request, res: express.Response){
+    public static connectionScanExpATAlgorithmRoute(req: express.Request, res: express.Response){
         try {
             // checks the parameters of the http request
             if(!req.query || !req.query.sourceStop || !req.query.targetStop || !req.query.sourceTime || !req.query.date ||
@@ -113,7 +113,7 @@ export class ConnectionScanEatAlgorithmController {
      * @param sourceDate 
      * @returns 
      */
-    public static testConnectionScanEatAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date, alpha: number){
+    public static testConnectionScanExpATAlgorithm(sourceStop: string, targetStop: string, sourceTime: string, sourceDate: Date, alpha: number){
         try {
             // gets the source and target stops
             this.sourceStop = GoogleTransitData.getStopIdByName(sourceStop);
@@ -135,7 +135,6 @@ export class ConnectionScanEatAlgorithmController {
             const algorithmStartTime = performance.now();
             this.performAlgorithm();
             const algorithmDuration = performance.now() - algorithmStartTime;
-
 
             // extracts decision graph
             const decisionGraphStartTime = performance.now();
@@ -169,7 +168,7 @@ export class ConnectionScanEatAlgorithmController {
     }
 
     /**
-     * Performs the modified version of the profile algorithm to solve the minimum expected arrival time problem.
+     * Performs the modified version of the profile algorithm to solve the expected arrival time problem.
      */
     private static performAlgorithm() {
         // sets the indices of the current and previous day (starts with maximum arrival time)
@@ -362,7 +361,6 @@ export class ConnectionScanEatAlgorithmController {
 
         // calculates the maximum arrival time of the alpha bounded version of the algorithm
         let difference = alpha * (this.earliestSafeArrivalTimeCSA - this.minDepartureTime);
-        // this.maxArrivalTime = Math.min(this.minDepartureTime + difference, this.earliestSafeArrivalTimeCSA + SECONDS_OF_A_DAY - 1);
         this.maxArrivalTime = this.minDepartureTime + difference;
 
         // sets the relevant dates
@@ -371,7 +369,7 @@ export class ConnectionScanEatAlgorithmController {
 
         this.currentDate.setDate(this.currentDate.getDate() + Converter.getDayDifference(this.maxArrivalTime));
         
-        this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime)
+        this.earliestArrivalTimes = ConnectionScanAlgorithmController.getEarliestArrivalTimes(this.sourceStop, this.sourceDate, this.minDepartureTime, this.maxArrivalTime);
 
         // sets the profile function array
         this.s = new Array(GoogleTransitData.STOPS.length);
