@@ -1,6 +1,6 @@
 # Public Transit Backend
 
-The backend part of the public transit project.
+The backend part of the public transit bachelor thesis.
 
 ---
 ## Requirements
